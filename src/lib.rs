@@ -1,3 +1,5 @@
+mod scripting;
+
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -84,7 +86,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 /// This function should be called before any other loitsu functions.
 pub fn init_core() {
     println!("loitsu core starting up...");
+
     let event_loop = EventLoop::new();
+    let lua = scripting::init_scripting().unwrap();
     let window = winit::window::WindowBuilder::new()
         .with_title("loitsu")
         .build(&event_loop)
@@ -95,6 +99,7 @@ pub fn init_core() {
         env_logger::init();
         pollster::block_on(run(event_loop, window));
     }
+
     #[cfg(target_arch = "wasm32")]
     {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -112,7 +117,6 @@ pub fn init_core() {
         wasm_bindgen_futures::spawn_local(run(event_loop, window));
     }
 }
-
 
 #[cfg(test)]
 mod tests {
