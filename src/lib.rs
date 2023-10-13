@@ -62,7 +62,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
                 
-                let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+                let encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
                 // TODO: Here well loop through our drawables :DDD
 
@@ -88,7 +88,8 @@ pub fn init_core() {
     println!("loitsu core starting up...");
 
     let event_loop = EventLoop::new();
-    let lua = scripting::init_scripting().unwrap();
+    let mut lua = scripting::init_scripting().unwrap();
+    lua.load_script("print(\"hello from lua\")").unwrap();
     let window = winit::window::WindowBuilder::new()
         .with_title("loitsu")
         .build(&event_loop)
