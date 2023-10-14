@@ -1,6 +1,5 @@
-use loitsu::init_core;
+use loitsu::init_engine;
 
 fn main() {
-    println!("Hello, world!");
-    init_core();
+    init_engine();
 }

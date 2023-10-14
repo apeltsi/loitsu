@@ -1,5 +1,6 @@
 mod scripting;
 
+use mlua::prelude::*;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -84,12 +85,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
 /// Initializes the core systems of loitsu.
 /// This function should be called before any other loitsu functions.
-pub fn init_core() {
+pub fn init_engine() {
     println!("loitsu core starting up...");
 
     let event_loop = EventLoop::new();
-    let mut lua = scripting::init_scripting().unwrap();
-    lua.load_script("print(\"hello from lua\")").unwrap();
+    let mut lua = scripting::ScriptingInstance::new().unwrap();
+    {
+        lua.load_script("e", "print(\"hello from lua\")").unwrap();
+    }
     let window = winit::window::WindowBuilder::new()
         .with_title("loitsu")
         .build(&event_loop)
