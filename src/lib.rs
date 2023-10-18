@@ -39,7 +39,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         alpha_mode: swapchain_capabilities.alpha_modes[0],
         view_formats: vec![],
     };
-
+    println!("Running event loop...");
     event_loop.run(move |event, _, control_flow| {
         let _ = (&instance, &adapter);
 
@@ -64,8 +64,23 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
                 
-                let encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+                let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
+                // Lets clear the main texture
+                {
+                    let _ = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("Clear Texture"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: &view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                store: false
+                            }
+                        })],
+                        depth_stencil_attachment: None,
+                    });
+                }
                 // TODO: Here well loop through our drawables :DDD
 
                 queue.submit(Some(encoder.finish()));
@@ -87,20 +102,19 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 /// Initializes the core systems of loitsu.
 /// This function should be called before any other loitsu functions.
 pub fn init_engine() {
-    println!("loitsu core starting up...");
-
+    println!("Loitsu core starting up...");
     let event_loop = EventLoop::new();
     let mut lua = scripting::lua::LuaInstance::new().unwrap();
     {
-        lua.load_script("e", "print(\"hello from lua\");a = 3").unwrap();
-        lua.execute_in_environment("e", "print(\"ello?\");").unwrap();
-        lua.execute_in_environment("e", "print(a);").unwrap();
+        lua.load_script("LOITSU_LUA", "print(\"Loitsu Lua Runtime is online\");").unwrap();
     }
+    println!("Opening window...");
     let window = winit::window::WindowBuilder::new()
         .with_title("loitsu")
         .build(&event_loop)
         .unwrap();
 
+    println!("Preparing window...");
     #[cfg(not(target_arch = "wasm32"))]
     {
         env_logger::init();
