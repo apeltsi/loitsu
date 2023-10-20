@@ -1,0 +1,16 @@
+[package]
+name = "loitsu-cli"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "loitsu"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.4.6", features = ["derive"] }
+cargo_toml = "0.16.3"
+warp = "0.3"
+tokio = { version = "1.33.0", features = ["full"] }

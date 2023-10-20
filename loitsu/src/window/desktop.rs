@@ -1,12 +1,21 @@
-mod scripting;
-
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
 
-use scripting::ScriptingInstance;
+pub fn init_window() {
+    let event_loop = EventLoop::new();
+    println!("Opening window...");
+    let window = winit::window::WindowBuilder::new()
+        .with_title("loitsu")
+        .build(&event_loop)
+        .unwrap();
+
+    println!("Preparing window...");
+    env_logger::init();
+    pollster::block_on(run(event_loop, window));
+}
 
 async fn run(event_loop: EventLoop<()>, window: Window) {
     let size = window.inner_size();
@@ -97,49 +106,4 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             _ => {}
         }
     });
-}
-
-/// Initializes the core systems of loitsu.
-/// This function should be called before any other loitsu functions.
-pub fn init_engine() {
-    println!("Loitsu core starting up...");
-    let event_loop = EventLoop::new();
-    let mut lua = scripting::lua::LuaInstance::new().unwrap();
-    {
-        lua.load_script("LOITSU_LUA", "print(\"Loitsu Lua Runtime is online\");").unwrap();
-    }
-    println!("Opening window...");
-    let window = winit::window::WindowBuilder::new()
-        .with_title("loitsu")
-        .build(&event_loop)
-        .unwrap();
-
-    println!("Preparing window...");
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        env_logger::init();
-        pollster::block_on(run(event_loop, window));
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    {
-        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-        console_log::init().expect("could not initialize logger");
-        use winit::platform::web::WindowExtWebSys;
-        // On wasm, append the canvas to the document body
-        web_sys::window()
-            .and_then(|win| win.document())
-            .and_then(|doc| doc.body())
-            .and_then(|body| {
-                body.append_child(&web_sys::Element::from(window.canvas()))
-                    .ok()
-            })
-            .expect("couldn't append canvas to document body");
-        wasm_bindgen_futures::spawn_local(run(event_loop, window));
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
 }
