@@ -1,39 +1,92 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<title>{APP_NAME}</title>
-    <style>
-      body {
-        margin: 0;
-        padding: 0;
-        overflow: hidden;
-        color: white;
-        background-color: black;
-        font-family: "Roboto", sans-serif;
-      }
-      .loadingContainer {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
-        width: 100vw;
-      }
-      .logo {
-        width: 30vw;
-        height: auto;
-      }
-    </style>
-	<script src="./{APP_NAME}.js"></script>
-  </head>
-  <body>
-    <div class="loadingContainer">
-      <img src="./loitsu.png" class="logo" alt="Loitsu Logo" />
-      <h1>Waiting for game...</h1>
-    </div>
-    <canvas></canvas>
-  </body>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>{APP_NAME}</title>
+		<style>
+			body {
+				margin: 0;
+				padding: 0;
+				overflow: hidden;
+				color: white;
+				background-color: black;
+				font-family: "Roboto", sans-serif;
+			}
+			.loadingContainer {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				height: 100vh;
+				width: 100vw;
+				transition-property: filter;
+				transition-duration: 0.4s;
+			}
+			.logo {
+				height: 40vh;
+				width: auto;
+				animation-name: logoSplash;
+				animation-duration: 0.4s;
+				animation-timing-function: ease-out;
+			}
+			p {
+				color: #624a6b;
+			}
+			@keyframes logoSplash {
+				from {
+					transform: scale(0.8);
+					opacity: 0;
+				}
+				to {
+					transform: scale(1);
+					opacity: 1;
+				}
+			}
+			.doneLoading {
+				filter: opacity(0);
+				pointer-events: none;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="loadingContainer" id="loading">
+			<img src="./loitsu.png" class="logo" alt="Loitsu Logo" />
+			<h1 id="loadingText">Loading Loitsu runtime...</h1>
+			<p>Loitsu web 0.1.0</p>
+			<p>Loitsu runtime {LOITSU_VERSION}</p>
+		</div>
+		<canvas id="canvas" width="640" height="400"></canvas>
+		<script>
+			const loadingText = document.getElementById("loadingText");
+			var Module = {
+				canvas: document.getElementById("canvas"),
+				preRun: [],
+				onRuntimeInitialized: function() {
+					console.log("Loitsu runtime loaded.");
+					let interval = setInterval(() => {
+						if (window._check_status != undefined) {
+							let status = window._check_status();
+							
+							if(status == 1) {
+								loadingText.innerHTML = "Starting renderer...";
+							}
+
+							if(status == 2) {
+								loadingText.innerHTML = "Finalizing...";
+							}
+
+							if(status == 3) {
+								loadingText.innerHTML = "Enjoy!";
+								document.getElementById("loading").classList.add("doneLoading");
+								clearInterval(interval);
+							}
+						}
+					}, 50);
+				}
+			};
+		</script>
+		<script src="./{APP_NAME}.js"></script>
+	</body>
 </html>
 

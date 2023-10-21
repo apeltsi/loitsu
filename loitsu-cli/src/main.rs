@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use warp::Filter;
-use cargo_toml::Manifest;
+use cargo_toml::{Manifest, Dependency};
 
 #[derive(Debug, Parser)] 
 #[command(name = "loitsu")]
@@ -52,9 +52,21 @@ async fn build(target: &str, release: bool, run: bool) {
         path.push("Cargo.toml");
         let manifest = Manifest::from_path(path).unwrap();
         let package_name = manifest.package.unwrap().name;
+
+        let loitsu_version = match &manifest.dependencies["loitsu"] {
+            Dependency::Simple(ver) => ver.to_owned(),
+            Dependency::Inherited(_inherited) => "Unknown".to_string(),
+            Dependency::Detailed(detail) => {
+                let ver = &detail.version;
+                match ver {
+                    Some(version) => version.to_owned(),
+                    None => "Unknown".to_string()
+                }
+            }
+        };
         println!("Creating player...");
         // Lets copy the web player files
-        generate_player_files(&package_name, release);
+        generate_player_files(&package_name, &loitsu_version, release);
         println!("Build Done!");
         if run {
             let mut path = std::env::current_dir().unwrap();
@@ -79,10 +91,10 @@ async fn build(target: &str, release: bool, run: bool) {
     }
 }
 
-fn generate_player_files(app_name: &str, release: bool) {
+fn generate_player_files(app_name: &str, loitsu_version: &str, release: bool) {
     // First lets load the player html file located in /player
     let raw_player_html = include_str!("../player/index.html");
-    let player_html = raw_player_html.replace("{APP_NAME}", &app_name);
+    let player_html = raw_player_html.replace("{APP_NAME}", &app_name).replace("{LOITSU_VERSION}", &loitsu_version);
 
     // Now lets write the html file to the output directory
     
@@ -127,8 +139,18 @@ fn build_with_args(args: Vec<String>, release: bool, run: bool) {
 }
 
 async fn start_webserver(directory: &str) {
-    // Lets start a webserver in the given directory
-    let route = warp::get().and(warp::fs::dir(str_static(directory.to_string())));
+    // Let's start a webserver in the given directory
+
+    // Add middleware to set Cache-Control header
+    let add_no_cache_header = warp::any().map(|| {
+        warp::reply::with_header(warp::reply(), "Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
+    });
+
+    let route = warp::get()
+        .and(warp::fs::dir(str_static(directory.to_string())))
+        .and(add_no_cache_header)
+        .map(|reply, _| reply);
+
     println!("Project live at http://localhost:5959");
     warp::serve(route).run(([127, 0, 0, 1], 5959)).await;
 }
