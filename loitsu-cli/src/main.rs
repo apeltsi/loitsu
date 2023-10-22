@@ -46,7 +46,7 @@ async fn build(target: &str, release: bool, run: bool) {
     if target == "web" {
         println!("Building for web");
         // Now we can build the target
-        build_with_args(vec!["--target=wasm32-unknown-emscripten".to_string()], release, false);
+        build_with_args(vec!["--target=wasm32-unknown-unknown".to_string()], release, false);
         // Lets read the name of the app we just built, this can be determined from the Cargo.toml file
         let mut path = std::env::current_dir().unwrap();
         path.push("Cargo.toml");
@@ -72,7 +72,7 @@ async fn build(target: &str, release: bool, run: bool) {
             let mut path = std::env::current_dir().unwrap();
             
             path.push("target");
-            path.push("wasm32-unknown-emscripten");
+            path.push("wasm32-unknown-unknown");
             if release {
                 path.push("release");
             } else {
