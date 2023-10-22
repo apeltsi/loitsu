@@ -1,4 +1,4 @@
-pub mod lua;
+pub mod rune;
 use std::fmt;
 
 pub type Result<T> = std::result::Result<T, ScriptingError>;
@@ -25,7 +25,6 @@ impl fmt::Display for ScriptingError {
 
 pub trait ScriptingInstance {
     fn new() -> Result<Self> where Self: Sized;
-    fn load_script(&mut self, env_name: &str, script: &str) -> Result<()>;
-    fn execute_in_environment(&mut self, env_name: &str, script: &str) -> Result<()>;
+    fn add_script(&mut self, name: &str, path: &str, script: &str) -> Result<()>;
 }
 

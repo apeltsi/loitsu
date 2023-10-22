@@ -9,10 +9,8 @@ use scripting::ScriptingInstance;
 /// This function should be called before any other loitsu functions.
 pub fn init_engine() {
     println!("Loitsu core starting up...");
-    let mut lua = scripting::lua::LuaInstance::new().unwrap();
-    {
-        lua.load_script("LOITSU_LUA", "print(\"Loitsu Lua Runtime is online\");").unwrap();
-    }
+    let mut rune = scripting::rune::RuneInstance::new().unwrap();
+    rune.add_script("test", "test", "fn main() { println(\"Hello, world!\"); }").unwrap();
     #[cfg(not(target_arch = "wasm32"))]
     {
         use window::desktop;

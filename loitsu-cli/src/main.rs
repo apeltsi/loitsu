@@ -101,7 +101,7 @@ fn generate_player_files(app_name: &str, loitsu_version: &str, release: bool) {
     let mut path = std::env::current_dir().unwrap();
 
     path.push("target");
-    path.push("wasm32-unknown-emscripten");
+    path.push("wasm32-unknown-unknown");
     if release {
         path.push("release");
     } else {
@@ -132,7 +132,7 @@ fn build_with_args(args: Vec<String>, release: bool, run: bool) {
         command.arg("--release");
     }
     command.args(args);
-    command.env("EMCC_CFLAGS", "-g -s ERROR_ON_UNDEFINED_SYMBOLS=0 --no-entry -s FULL_ES3=1");
+    command.env("RUSTFLAGS", "--cfg=web_sys_unstable_apis");
     let mut child = command.spawn().expect("failed to build");
     // lets wait for the build to complete
     child.wait().unwrap();
