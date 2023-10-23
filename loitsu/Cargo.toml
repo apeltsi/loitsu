@@ -7,14 +7,17 @@ authors = ["Amos Peltonen"]
 [dependencies]
 env_logger = "0.10.0"
 pollster = "0.3.0"
-wgpu = "0.17.1"
 rune = "0.13.1"
 winit = "0.28.7"
+raw-window-handle = "0.6.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
 console_log = "1.0.0"
+wasm-bindgen = "0.2.87"
 wasm-bindgen-futures = "0.4.37"
 web-sys = "0.3.64"
+wgpu = {version = "0.17.1", features = ["webgl"]}
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+wgpu = "0.17.1"

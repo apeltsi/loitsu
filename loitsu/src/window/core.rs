@@ -3,14 +3,19 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
+use crate::log;
+
+#[cfg(target_arch = "wasm32")]
+use crate::web::update_loading_status;
 
 pub async fn run(event_loop: EventLoop<()>, window: Window) {
+    unsafe { HAS_RENDERED = false; }
+    #[cfg(target_arch = "wasm32")]
+    update_loading_status(2);
     let size = window.inner_size();
 
     let instance = wgpu::Instance::default();
-
-    let surface = unsafe { instance.create_surface(&window)}.unwrap();
-
+    let surface = unsafe {instance.create_surface(&window).unwrap()};
     let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::HighPerformance,
         force_fallback_adapter: false,
@@ -35,7 +40,8 @@ pub async fn run(event_loop: EventLoop<()>, window: Window) {
         alpha_mode: swapchain_capabilities.alpha_modes[0],
         view_formats: vec![],
     };
-    println!("Running event loop...");
+    surface.configure(&device, &config);
+    log!("Running event loop...");
     event_loop.run(move |event, _, control_flow| {
         let _ = (&instance, &adapter);
 
@@ -67,7 +73,16 @@ pub async fn run(event_loop: EventLoop<()>, window: Window) {
     });
 }
 
+static mut HAS_RENDERED: bool = false;
+
 pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu::Queue) {
+    #[cfg(target_arch = "wasm32")]
+    {
+        if(!unsafe { HAS_RENDERED }) {
+            update_loading_status(3);
+            unsafe { HAS_RENDERED = true; }
+        }
+    }
     let frame = surface
         .get_current_texture()
         .expect("Failed to acquire next swap chain texture");
@@ -85,7 +100,7 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu
                 view: &view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    load: wgpu::LoadOp::Clear(wgpu::Color::RED),
                     store: false
                 }
             })],
