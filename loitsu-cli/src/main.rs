@@ -128,7 +128,6 @@ fn build_with_args(args: Vec<String>, release: bool, run: bool) {
         command.arg("--release");
     }
     command.args(args);
-    command.env("RUSTFLAGS", "--cfg=web_sys_unstable_apis");
     let mut child = command.spawn().expect("failed to build");
     // lets wait for the build to complete
     child.wait().unwrap();
