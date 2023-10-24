@@ -8,6 +8,12 @@ pub struct ScriptingError {
     message: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct ScriptingSource {
+    pub name: String,
+    pub source: String,
+}
+
 impl ScriptingError {
     pub fn new(message: &str) -> Self {
         Self {
@@ -24,7 +30,6 @@ impl fmt::Display for ScriptingError {
 
 
 pub trait ScriptingInstance {
-    fn new() -> Result<Self> where Self: Sized;
-    fn add_script(&mut self, name: &str, path: &str, script: &str) -> Result<()>;
+    fn new_with_sources(sources: Vec<ScriptingSource>) -> Result<Self> where Self: Sized;
 }
 

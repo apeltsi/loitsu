@@ -15,3 +15,14 @@ pub fn log(s: &str) {
         println!("{}", s);
     }
 }
+
+pub fn error(s: &str) {
+    #[cfg(target_arch = "wasm32")]
+    {
+        web_sys::console::error_1(&s.into());
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        eprintln!("{}", s);
+    }
+}

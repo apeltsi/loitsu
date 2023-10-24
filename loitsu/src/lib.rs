@@ -2,7 +2,7 @@ mod scripting;
 mod rendering;
 mod logging;
 
-use scripting::ScriptingInstance;
+use scripting::{ScriptingInstance, ScriptingSource};
 
 #[cfg(target_arch = "wasm32")]
 mod web;
@@ -16,8 +16,18 @@ pub fn init_engine() {
         console_log::init().expect("could not initialize logger");
     }
     log!("Loitsu core starting up...");
-    let mut rune = scripting::rune::RuneInstance::new().unwrap();
-    rune.add_script("test", "test", "fn main() { println(\"Hello, world!\"); }").unwrap();
+    let mut rune = scripting::rune::
+        RuneInstance::new_with_sources(
+            vec![ScriptingSource{
+                name: "main".to_string(),
+                source: r#"
+                    fn main() {
+                        print("Hello, world!");
+                    }
+                "#.to_string()
+            }
+        
+            ]).unwrap();
     #[cfg(not(target_arch = "wasm32"))]
     {
         use rendering::desktop;
