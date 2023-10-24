@@ -6,6 +6,7 @@ use std::path::Path;
 use warp::Filter;
 use cargo_toml::{Manifest, Dependency};
 use std::path::PathBuf;
+mod asset_builder;
 
 #[derive(Debug, Parser)] 
 #[command(name = "loitsu")]
@@ -43,7 +44,6 @@ async fn main() {
 }
 
 async fn build(target: &str, release: bool, run: bool) {
-
     if target == "web" {
         println!("Building for web");
         // Now we can build the target
@@ -78,6 +78,8 @@ async fn build(target: &str, release: bool, run: bool) {
         println!("Creating player...");
         // Lets copy the web player files
         generate_player_files(&out_path, &package_name, &loitsu_version);
+        println!("Building assets...");
+        asset_builder::build_assets(&out_path);
         println!("Build Done!");
         if run {
             start_webserver(&out_path).await;
@@ -85,6 +87,16 @@ async fn build(target: &str, release: bool, run: bool) {
     } else if target == "" {
         // Now we can build the target
         println!("Building for native");
+        println!("Building assets...");
+        let mut out_path = std::env::current_dir().unwrap();
+        out_path.push("target");
+        if release {
+            out_path.push("release");
+        } else {
+            out_path.push("debug");
+        }
+        asset_builder::build_assets(&out_path);
+        println!("Building native target...");
         build_with_args(vec![], release, run);
     } else {
         panic!("Unsupported target: {}", target);

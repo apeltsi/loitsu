@@ -1,0 +1,15 @@
+{
+	"entities": [
+		{
+			"id": "cc144df8-2a20-4fb3-a966-a517f25fea41",
+			"name": "Hello World",
+			"children": [],
+			"components": [
+				{
+					"name": "Hello_World",
+					"properties": {}
+				}
+			]
+		}
+	]
+}

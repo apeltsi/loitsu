@@ -72,21 +72,21 @@ fn core_module() -> Result<Module> {
     m.function("print", | log: &str | crate::logging::log(log)).build()?;
     m.function("error", | log: &str | crate::logging::error(log)).build()?;
     // Math Constants
-    m.constant("PI", std::f64::consts::PI)?;
-    m.constant("E", std::f64::consts::E)?;
+    m.constant("PI", std::f64::consts::PI).build()?;
+    m.constant("E", std::f64::consts::E).build()?;
 
     // Platform Constants
     #[cfg(target_arch = "wasm32")]
     {
-        m.constant("PLATFORM", "WEB")?;
-        m.constant("IS_WEB", true)?;
+        m.constant("PLATFORM", "WEB").build()?;
+        m.constant("IS_WEB", true).build()?;
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
-        m.constant("PLATFORM", "DESKTOP")?;
-        m.constant("IS_WEB", false)?;
+        m.constant("PLATFORM", "DESKTOP").build()?;
+        m.constant("IS_WEB", false).build()?;
     }
-    m.constant("LOITSU_VERSION", env!("CARGO_PKG_VERSION"))?;
+    m.constant("LOITSU_VERSION", env!("CARGO_PKG_VERSION")).build()?;
 
     Ok(m)
 }

@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Amos Peltonen"]
 
+[features]
+scene_generation = []
+
 [dependencies]
 env_logger = "0.10.0"
 pollster = "0.3.0"

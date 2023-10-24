@@ -1,11 +1,18 @@
-mod scripting;
-mod rendering;
-mod logging;
+pub mod scripting;
+pub mod rendering;
+pub mod logging;
+pub mod scene_management;
 
 use scripting::{ScriptingInstance, ScriptingSource};
 
 #[cfg(target_arch = "wasm32")]
 mod web;
+
+#[cfg(feature = "scene_generation")]
+pub fn build_scenes(scenes: Vec<String>, scripts: Vec<ScriptingSource>) {
+    let mut rune = scripting::rune::
+        RuneInstance::new_with_sources(scripts).unwrap();
+}
 
 /// Initializes the core systems of loitsu.
 /// This function should be called before any other loitsu functions.

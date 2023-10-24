@@ -1,0 +1,7 @@
+struct Hello_World {}
+
+impl Hello_World {
+	fn start() {
+		print("Hello World!");
+	}
+}
