@@ -59,7 +59,7 @@ pub async fn run(event_loop: EventLoop<()>, window: Window) {
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
-                crate::window::core::render_frame(&surface, &device, &queue);
+                crate::rendering::core::render_frame(&surface, &device, &queue);
             }
             Event::WindowEvent {
                 ref event,

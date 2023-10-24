@@ -1,5 +1,5 @@
 mod scripting;
-mod window;
+mod rendering;
 mod logging;
 
 use scripting::ScriptingInstance;
@@ -20,13 +20,13 @@ pub fn init_engine() {
     rune.add_script("test", "test", "fn main() { println(\"Hello, world!\"); }").unwrap();
     #[cfg(not(target_arch = "wasm32"))]
     {
-        use window::desktop;
+        use rendering::desktop;
         desktop::init_window();
     }
 
     #[cfg(target_arch = "wasm32")]
     {
-        use window::web;
+        use rendering::web;
         web::init_view();
     }
 }

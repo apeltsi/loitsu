@@ -10,6 +10,6 @@ pub fn init_window() {
 
     log!("Preparing window...");
     env_logger::init();
-    pollster::block_on(crate::window::core::run(event_loop, window));
+    pollster::block_on(crate::rendering::core::run(event_loop, window));
 }
 

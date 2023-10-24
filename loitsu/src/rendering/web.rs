@@ -32,5 +32,5 @@ pub fn init_view() {
                 .ok()
         })
     .expect("couldn't append canvas to document body");
-    wasm_bindgen_futures::spawn_local(crate::window::core::run(event_loop, window));
+    wasm_bindgen_futures::spawn_local(crate::rendering::core::run(event_loop, window));
 }
