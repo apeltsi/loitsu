@@ -2,6 +2,7 @@ pub mod scripting;
 pub mod rendering;
 pub mod logging;
 pub mod scene_management;
+pub mod ecs;
 
 use scripting::{ScriptingInstance, ScriptingSource};
 
@@ -9,9 +10,15 @@ use scripting::{ScriptingInstance, ScriptingSource};
 mod web;
 
 #[cfg(feature = "scene_generation")]
-pub fn build_scenes(scenes: Vec<String>, scripts: Vec<ScriptingSource>) {
-    let mut rune = scripting::rune::
+pub fn build_scenes(scenes: Vec<(String, String)>, scripts: Vec<ScriptingSource>) {
+    let mut rune = scripting::rune_runtime::
         RuneInstance::new_with_sources(scripts).unwrap();
+    let mut e = ecs::ECS::new();
+    for scene in scenes {
+        let scene = scene_management::Scene::from_json(scene.0, scene.1);
+        e.load_scene(scene, &mut rune);
+        e.run_build_step(&mut rune);
+    }
 }
 
 /// Initializes the core systems of loitsu.
@@ -23,7 +30,7 @@ pub fn init_engine() {
         console_log::init().expect("could not initialize logger");
     }
     log!("Loitsu core starting up...");
-    let mut rune = scripting::rune::
+    let _rune = scripting::rune_runtime::
         RuneInstance::new_with_sources(
             vec![ScriptingSource{
                 name: "main".to_string(),

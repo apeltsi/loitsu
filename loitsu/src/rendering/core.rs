@@ -94,17 +94,19 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu
 
     // Lets clear the main texture
     {
-        let c_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let _r_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Clear Texture"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &view,
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color::RED),
-                    store: true
+                    store: wgpu::StoreOp::Store 
                 }
             })],
             depth_stencil_attachment: None,
+            occlusion_query_set: None,
+            timestamp_writes: None
         });
     }
     // TODO: Here well loop through our drawables :DDD

@@ -1,7 +1,17 @@
-struct Hello_World {}
+pub struct Hello_World {
+	name
+}
 
 impl Hello_World {
-	fn start() {
+	pub fn new() {
+		Hello_World {
+			name: "World"
+		}
+	}
+	pub fn build(self) {
+		print(`HELLO BUILD! I'm ${self.name}!`);
+	}
+	pub fn start(self) {
 		print("Hello World!");
 	}
 }

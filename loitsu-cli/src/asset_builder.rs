@@ -11,7 +11,8 @@ pub fn build_assets(out_dir: &PathBuf) {
         let files = files.clone();
         for file in files {
             if file.name.ends_with(".scene.json") {
-                scenes.push(String::from_utf8(file.data).unwrap());
+                let name = file.name.split(".").collect::<Vec<&str>>()[0];
+                scenes.push((name.to_owned(), String::from_utf8(file.data).unwrap()));
             }
         }
     }

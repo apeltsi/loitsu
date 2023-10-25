@@ -1,16 +1,39 @@
-use rune::{Context, Diagnostics, Source, Sources, ContextError, Module, Unit, BuildError};
-use rune::diagnostics::{Diagnostic, EmitError};
-use rune::runtime::RuntimeContext;
+use rune::{Context, Diagnostics, Source, Sources, ContextError, Module, BuildError, Vm};
+use rune::runtime::{Value, Struct, VmError, Shared, Args};
+use rune::diagnostics::EmitError;
 use crate::ScriptingInstance;
-use crate::scripting::{ScriptingError, ScriptingSource};
-use crate::log;
+use crate::scripting::{ScriptingError, ScriptingSource, ScriptingData};
 use rune::termcolor::{StandardStream, ColorChoice};
+use crate::scene_management::Component;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
 pub struct RuneInstance {
-    runtime: RuntimeContext,
-    unit: Unit
+    virtual_machine: Vm,
+}
+
+pub struct RuneComponent {
+    pub data: Option<Shared<Struct>>
+}
+
+impl ScriptingData for RuneComponent {
+    fn from_component_proto(proto: Component, instance: &mut RuneInstance) -> Result<Self> {
+        // lets start by initializing a new struct in the runtime
+        let data = instance.virtual_machine.call([proto.name.as_str(), "new"], ())?;
+        let component_data = match data {
+            Value::Struct(data) => {
+                Some(data)
+            },
+            _ => {
+                None
+            }
+        };
+
+        Ok(RuneComponent {
+            data: component_data
+        })
+    }
 }
 
 impl From<rune::alloc::Error> for ScriptingError {
@@ -37,6 +60,12 @@ impl From<EmitError> for ScriptingError {
     }
 }
 
+impl From<VmError> for ScriptingError {
+    fn from(error: VmError) -> Self {
+        Self::new(&format!("Rune vm error: {}", error))
+    }
+}
+
 impl ScriptingInstance for RuneInstance {
     fn new_with_sources(sources: Vec<ScriptingSource>) -> Result<Self> {
         let mut context = Context::new();
@@ -47,7 +76,7 @@ impl ScriptingInstance for RuneInstance {
         for source in sources {
             rune_sources.insert(Source::new(source.name, source.source)?);
         }
-        let mut diagnostics = Diagnostics::new();
+        let mut diagnostics = Diagnostics::without_warnings();
         let result = rune::prepare(&mut rune_sources)
             .with_context(&context)
             .with_diagnostics(&mut diagnostics)
@@ -59,11 +88,18 @@ impl ScriptingInstance for RuneInstance {
         }
 
         let unit = result?;
+        let unit = Arc::new(unit);
+        let runtime_context = Arc::new(runtime);
+        let vm = Vm::new(runtime_context, unit);
 
         Ok(Self {
-            runtime,
-            unit
+            virtual_machine: vm,
         })
+    }
+
+    fn call<T>(&mut self, path: [&str; 2], args: T) -> Result<Value> where T: Args {
+        let result = self.virtual_machine.execute(path, args)?.complete().into_result()?;
+        Ok(result)
     }
 }
 

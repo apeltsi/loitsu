@@ -1,15 +1,18 @@
 {
-	"entities": [
-		{
-			"id": "cc144df8-2a20-4fb3-a966-a517f25fea41",
-			"name": "Hello World",
-			"children": [],
-			"components": [
-				{
-					"name": "Hello_World",
-					"properties": {}
-				}
-			]
-		}
-	]
+  "entities": [
+    {
+      "id": "cc144df8-2a20-4fb3-a966-a517f25fea41",
+      "name": "Hello World",
+      "children": [],
+      "components": [
+        {
+          "name": "Hello_World",
+          "id": "91c85465-57b1-4a5e-ae88-b95b5f5becea",
+          "properties": {
+            "name": "scene"
+          }
+        }
+      ]
+    }
+  ]
 }
