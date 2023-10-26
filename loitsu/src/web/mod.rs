@@ -6,7 +6,5 @@ extern "C" {
 }
 
 pub fn update_loading_status(status: u32) {
-    unsafe {
-        set_status(status);
-    }
+    set_status(status);
 }

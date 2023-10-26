@@ -3,7 +3,7 @@ use walkdir::WalkDir;
 use loitsu::scripting::ScriptingSource;
 use std::str;
 
-pub fn build_assets(out_dir: &PathBuf) {
+pub fn build_assets(_out_dir: &PathBuf) {
     let files = read_files("assets");
     
     let mut scenes = Vec::new();
@@ -30,10 +30,11 @@ pub fn build_assets(out_dir: &PathBuf) {
     println!("Building {} scenes and {} scripts...", scenes.len(), scripts.len());
     let scenes = loitsu::build_scenes(scenes, scripts);
     for scene in scenes {
-        let mut path = out_dir.clone();
         println!("{}", scene.to_json());
     }
 }
+
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct AssetFile {
     path: PathBuf,

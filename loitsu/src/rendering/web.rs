@@ -1,10 +1,5 @@
-use winit::{
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    window::Window,
-};
+use winit::event_loop::EventLoop;
 use winit::platform::web::WindowExtWebSys;
-use wasm_bindgen::closure::Closure;
 use crate::log;
 use crate::web::update_loading_status;
 

@@ -10,6 +10,7 @@ use crate::scene_management::Property;
 
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
+#[cfg(feature = "scene_generation")]
 static mut REQUIRED_ASSETS: Vec<String> = Vec::new();
 
 pub struct RuneInstance {
@@ -28,7 +29,7 @@ impl ScriptingData for RuneComponent {
             Value::Struct(data) => {
                 {
                     let mut component_data = data.clone().into_mut().unwrap();
-                    let mut component_data_obj = component_data.data_mut();
+                    let component_data_obj = component_data.data_mut();
                     // lets assign all of our properties
                     for (key, value) in proto.properties {
                         component_data_obj.insert_value(rune::alloc::String::try_from(key)?, value).unwrap();
@@ -46,7 +47,7 @@ impl ScriptingData for RuneComponent {
         })
     }
 
-    fn to_component_proto(&self, proto: &Component, instance: &mut RuneInstance) -> Result<Component> {
+    fn to_component_proto(&self, proto: &Component) -> Result<Component> {
         let mut proto = proto.clone();
         if let Some(data) = &self.data {
             let component_data = data.clone().into_mut().unwrap();
@@ -96,7 +97,7 @@ impl ToValue for Property {
             Property::Array(value) => {
                 let mut vec = rune::runtime::Vec::new();
                 for item in value {
-                    vec.push_value(item.to_value()).into_result();
+                    let _ = vec.push_value(item.to_value()).into_result();
                 }
                 VmResult::Ok(Value::Vec(Shared::new(vec).unwrap()))
             },
@@ -148,7 +149,7 @@ impl ScriptingInstance for RuneInstance {
         let runtime = context.runtime()?;
         let mut rune_sources = Sources::new();
         for source in sources {
-            rune_sources.insert(Source::new(source.name, source.source)?);
+            let _ = rune_sources.insert(Source::new(source.name, source.source)?);
         }
         let mut diagnostics = Diagnostics::without_warnings();
         let result = rune::prepare(&mut rune_sources)

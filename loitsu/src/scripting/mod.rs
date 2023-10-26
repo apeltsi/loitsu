@@ -39,5 +39,5 @@ pub trait ScriptingData {
     // This function taking in a rune instance is less than ideal but ill try to deal with it in
     // the future :)
     fn from_component_proto(proto: Component, instance: &mut rune_runtime::RuneInstance) -> Result<Self> where Self: Sized;
-    fn to_component_proto(&self, proto: &Component, instance: &mut rune_runtime::RuneInstance) -> Result<Component>;
+    fn to_component_proto(&self, proto: &Component) -> Result<Component>;
 }

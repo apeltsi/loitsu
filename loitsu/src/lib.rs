@@ -19,7 +19,7 @@ pub fn build_scenes(scenes: Vec<(String, String)>, scripts: Vec<ScriptingSource>
         let scene = scene_management::Scene::from_json(scene.0, scene.1);
         e.load_scene(scene, &mut rune);
         e.run_build_step(&mut rune);
-        let mut scene = e.as_scene(&mut rune);
+        let mut scene = e.as_scene();
         e.clear();
         scene.required_assets = unsafe { scripting::rune_runtime::get_required_assets() };
         unsafe { scripting::rune_runtime::clear_required_assets() };

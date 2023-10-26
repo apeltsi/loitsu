@@ -8,6 +8,7 @@ pub struct ECS {
     runtime_entities: Vec<RuntimeEntity>,
 }
 
+#[allow(dead_code)]
 struct RuntimeEntity {
     name: String,
     id: String,
@@ -16,6 +17,7 @@ struct RuntimeEntity {
     children: Vec<RuntimeEntity>,
 }
 
+#[allow(dead_code)]
 struct RuntimeComponent {
     name: String,
     data: RuneComponent,
@@ -59,10 +61,10 @@ impl ECS {
     }
 
     #[cfg(feature = "scene_generation")]
-    pub fn as_scene(&self, scripting: &mut RuneInstance) -> Scene {
+    pub fn as_scene(&self) -> Scene {
         Scene {
             name: self.active_scene.name.clone(),
-            entities: self.runtime_entities.iter().map(|runtime_entity| runtime_entity.as_entity(scripting)).collect(),
+            entities: self.runtime_entities.iter().map(|runtime_entity| runtime_entity.as_entity()).collect(),
             required_assets: Vec::new()
         }
     }
@@ -70,20 +72,20 @@ impl ECS {
 
 impl RuntimeEntity {
     #[cfg(feature = "scene_generation")]
-    pub fn as_entity(&self, scripting: &mut RuneInstance) -> Entity {
+    pub fn as_entity(&self) -> Entity {
         Entity {
             name: self.name.clone(),
             id: self.id.clone(),
-            components: self.components.iter().map(|runtime_component| runtime_component.as_component(scripting)).collect(),
-            children: self.children.iter().map(|runtime_entity| runtime_entity.as_entity(scripting)).collect(),
+            components: self.components.iter().map(|runtime_component| runtime_component.as_component()).collect(),
+            children: self.children.iter().map(|runtime_entity| runtime_entity.as_entity()).collect(),
         }
     }
 }
 
 impl RuntimeComponent {
     #[cfg(feature = "scene_generation")]
-    pub fn as_component(&self, scripting: &mut RuneInstance) -> Component {
-        self.data.to_component_proto(&self.component_proto, scripting).unwrap()
+    pub fn as_component(&self) -> Component {
+        self.data.to_component_proto(&self.component_proto).unwrap()
     }
 }
 

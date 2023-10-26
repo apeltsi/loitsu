@@ -78,7 +78,7 @@ static mut HAS_RENDERED: bool = false;
 pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu::Queue) {
     #[cfg(target_arch = "wasm32")]
     {
-        if(!unsafe { HAS_RENDERED }) {
+        if !unsafe { HAS_RENDERED } { 
             update_loading_status(3);
             unsafe { HAS_RENDERED = true; }
         }
