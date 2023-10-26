@@ -52,34 +52,37 @@ impl ECS {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.active_scene = Scene::new("INITIAL_SCENE".to_string());
+        self.static_scene = None;
+        self.runtime_entities = Vec::new();
+    }
+
     #[cfg(feature = "scene_generation")]
-    pub fn as_scene(&self) -> Scene {
+    pub fn as_scene(&self, scripting: &mut RuneInstance) -> Scene {
         Scene {
             name: self.active_scene.name.clone(),
-            entities: self.runtime_entities.iter().map(|runtime_entity| runtime_entity.as_entity()).collect(),
+            entities: self.runtime_entities.iter().map(|runtime_entity| runtime_entity.as_entity(scripting)).collect(),
         }
     }
 }
 
 impl RuntimeEntity {
     #[cfg(feature = "scene_generation")]
-    pub fn as_entity(&self) -> Entity {
+    pub fn as_entity(&self, scripting: &mut RuneInstance) -> Entity {
         Entity {
             name: self.name.clone(),
             id: self.id.clone(),
-            components: self.components.iter().map(|runtime_component| runtime_component.as_component()).collect(),
-            children: self.children.iter().map(|runtime_entity| runtime_entity.as_entity()).collect(),
+            components: self.components.iter().map(|runtime_component| runtime_component.as_component(scripting)).collect(),
+            children: self.children.iter().map(|runtime_entity| runtime_entity.as_entity(scripting)).collect(),
         }
     }
 }
 
 impl RuntimeComponent {
     #[cfg(feature = "scene_generation")]
-    pub fn as_component(&self) -> Component {
-        Component {
-            name: self.name.clone(),
-            properties: self.component_proto.properties.clone(),
-        }
+    pub fn as_component(&self, scripting: &mut RuneInstance) -> Component {
+        self.data.to_component_proto(&self.component_proto, scripting).unwrap()
     }
 }
 

@@ -1,6 +1,8 @@
 #[cfg(feature = "scene_generation")]
-use serde_json::Value;
+use serde_json::{Value, Map};
+
 use std::collections::HashMap;
+
 
 #[derive(Debug, Clone)]
 pub enum Property {
@@ -50,6 +52,18 @@ impl Scene {
     pub fn add_entity(&mut self, entity: Entity) {
         self.entities.push(entity);
     }
+
+    #[cfg(feature = "scene_generation")]
+    pub fn to_json(&self) -> String {
+        let mut entities = Vec::new();
+        for entity in self.entities.clone() {
+            entities.push(entity.to_json());
+        }
+        let mut scene: HashMap<&str, Value> = HashMap::new();
+        scene.insert("name", serde_json::Value::String(self.name.clone()));
+        scene.insert("entities", serde_json::Value::Array(entities));
+        serde_json::to_string(&scene).unwrap()
+    }
 }
 #[cfg(feature = "scene_generation")]
 fn collect_entities(entities: Vec<Value>) -> Vec<Entity> {
@@ -91,6 +105,24 @@ impl Entity {
     pub fn add_component(&mut self, component: Component) {
         self.components.push(component);
     }
+
+    #[cfg(feature = "scene_generation")]
+    pub fn to_json(&self) -> Value {
+        let mut components = Vec::new();
+        for component in self.components.clone() {
+            components.push(component.to_json());
+        }
+        let mut entity = Map::new();
+        entity.insert("name".to_string(), serde_json::Value::String(self.name.clone()));
+        entity.insert("id".to_string(), serde_json::Value::String(self.id.clone()));
+        entity.insert("components".to_string(), serde_json::Value::Array(components));
+        let mut children = Vec::new();
+        for child in self.children.clone() {
+            children.push(child.to_json());
+        }
+        entity.insert("children".to_string(), serde_json::Value::Array(children));
+        Value::Object(entity)
+    }
 }
 
 impl Component {
@@ -103,6 +135,17 @@ impl Component {
 
     pub fn add_property(&mut self, name: String, property: Property) {
         self.properties.insert(name, property);
+    }
+    #[cfg(feature = "scene_generation")]
+    pub fn to_json(&self) -> Value {
+        let mut properties = Map::new();
+        for property in self.properties.clone() {
+            properties.insert(property.0, property.1.to_json());
+        }
+        let mut component = Map::new();
+        component.insert("name".to_string(), serde_json::Value::String(self.name.clone()));
+        component.insert("properties".to_string(), serde_json::Value::Object(properties));
+        Value::Object(component)
     }
 }
 
@@ -120,5 +163,24 @@ fn json_value_as_property(value: Value) -> Property {
             Property::Array(out)
         }
         _ => panic!("Unsupported property type!"),
+    }
+}
+
+#[cfg(feature = "scene_generation")]
+impl Property {
+    pub fn to_json(&self) -> Value {
+        match self {
+            Property::String(s) => Value::String(s.clone()),
+            Property::Number(n) => Value::Number(serde_json::Number::from_f64(*n as f64).unwrap()),
+            Property::Boolean(b) => Value::Bool(*b),
+            Property::Array(a) => {
+                let mut out = Vec::new();
+                for v in a {
+                    out.push(v.to_json());
+                }
+                Value::Array(out)
+            }
+            _ => panic!("Unsupported property type!"),
+        }
     }
 }

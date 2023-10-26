@@ -43,6 +43,40 @@ impl ScriptingData for RuneComponent {
             data: component_data
         })
     }
+
+    fn to_component_proto(&self, proto: &Component, instance: &mut RuneInstance) -> Result<Component> {
+        let mut proto = proto.clone();
+        if let Some(data) = &self.data {
+            let component_data = data.clone().into_mut().unwrap();
+            let component_data_obj = component_data.data();
+            for (key, value) in component_data_obj.iter() {
+                proto.properties.insert(key.to_string(), value.clone().into());
+            }
+        }
+        Ok(proto.clone())
+    }
+}
+
+impl From<Value> for Property {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::String(value) => {
+                Property::String(value.into_ref().unwrap().to_string())
+            },
+            Value::Float(value) => {
+                Property::Number(value as f32)
+            },
+            Value::Integer(value) => {
+                Property::Number(value as f32)
+            },
+            Value::Bool(value) => {
+                Property::Boolean(value)
+            },
+            _ => {
+                Property::String("".to_string())
+            }
+        }
+    }
 }
 
 impl ToValue for Property {

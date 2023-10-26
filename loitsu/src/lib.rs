@@ -10,15 +10,20 @@ use scripting::{ScriptingInstance, ScriptingSource};
 mod web;
 
 #[cfg(feature = "scene_generation")]
-pub fn build_scenes(scenes: Vec<(String, String)>, scripts: Vec<ScriptingSource>) {
+pub fn build_scenes(scenes: Vec<(String, String)>, scripts: Vec<ScriptingSource>) -> Vec<scene_management::Scene> {
     let mut rune = scripting::rune_runtime::
         RuneInstance::new_with_sources(scripts).unwrap();
     let mut e = ecs::ECS::new();
+    let mut generated_scenes = Vec::new();
     for scene in scenes {
         let scene = scene_management::Scene::from_json(scene.0, scene.1);
         e.load_scene(scene, &mut rune);
         e.run_build_step(&mut rune);
+        let scene = e.as_scene(&mut rune);
+        e.clear();
+        generated_scenes.push(scene);
     }
+    generated_scenes
 }
 
 /// Initializes the core systems of loitsu.
