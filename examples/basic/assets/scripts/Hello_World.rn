@@ -11,6 +11,7 @@ impl Hello_World {
 	pub fn build(self) {
 		print(`HELLO BUILD! I'm ${self.name}!`);
 		self.name = "im different!";
+		require_asset("test!");
 	}
 	pub fn start(self) {
 		print("Hello World!");

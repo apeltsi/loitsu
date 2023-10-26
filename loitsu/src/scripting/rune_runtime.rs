@@ -10,6 +10,8 @@ use crate::scene_management::Property;
 
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
+static mut REQUIRED_ASSETS: Vec<String> = Vec::new();
+
 pub struct RuneInstance {
     virtual_machine: Vm,
 }
@@ -175,6 +177,16 @@ impl ScriptingInstance for RuneInstance {
     }
 }
 
+#[cfg(feature = "scene_generation")]
+pub unsafe fn get_required_assets() -> Vec<String> {
+    REQUIRED_ASSETS.clone()
+}
+
+#[cfg(feature = "scene_generation")]
+pub unsafe fn clear_required_assets() {
+    REQUIRED_ASSETS.clear();
+}
+
 fn core_module() -> Result<Module> {
     let mut m = Module::new();
     m.function("print", | log: &str | crate::logging::log(log)).build()?;
@@ -196,5 +208,12 @@ fn core_module() -> Result<Module> {
     }
     m.constant("LOITSU_VERSION", env!("CARGO_PKG_VERSION")).build()?;
 
+    #[cfg(feature = "scene_generation")]
+    {
+        m.function("require_asset", | asset: &str | {
+            unsafe { REQUIRED_ASSETS.push(asset.to_string()); }
+            Ok::<(), ()>(())
+        }).build()?;
+    }
     Ok(m)
 }

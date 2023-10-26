@@ -18,6 +18,7 @@ pub enum Property {
 pub struct Scene {
     pub name: String,
     pub entities: Vec<Entity>,
+    pub required_assets: Vec<String>
 }
 
 #[derive(Debug, Clone)]
@@ -38,6 +39,7 @@ impl Scene {
         Scene {
             name,
             entities: Vec::new(),
+            required_assets: Vec::new(),
         }
     }
     #[cfg(feature = "scene_generation")]
@@ -62,6 +64,7 @@ impl Scene {
         let mut scene: HashMap<&str, Value> = HashMap::new();
         scene.insert("name", serde_json::Value::String(self.name.clone()));
         scene.insert("entities", serde_json::Value::Array(entities));
+        scene.insert("required_assets", serde_json::Value::Array(self.required_assets.clone().into_iter().map(|asset| serde_json::Value::String(asset)).collect()));
         serde_json::to_string(&scene).unwrap()
     }
 }

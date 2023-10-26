@@ -28,7 +28,11 @@ pub fn build_assets(out_dir: &PathBuf) {
     }
 
     println!("Building {} scenes and {} scripts...", scenes.len(), scripts.len());
-    loitsu::build_scenes(scenes, scripts);
+    let scenes = loitsu::build_scenes(scenes, scripts);
+    for scene in scenes {
+        let mut path = out_dir.clone();
+        println!("{}", scene.to_json());
+    }
 }
 #[derive(Debug, Clone)]
 struct AssetFile {

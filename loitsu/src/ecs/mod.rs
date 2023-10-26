@@ -63,6 +63,7 @@ impl ECS {
         Scene {
             name: self.active_scene.name.clone(),
             entities: self.runtime_entities.iter().map(|runtime_entity| runtime_entity.as_entity(scripting)).collect(),
+            required_assets: Vec::new()
         }
     }
 }
