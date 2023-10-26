@@ -51,6 +51,36 @@ impl ECS {
             }
         }
     }
+
+    #[cfg(feature = "scene_generation")]
+    pub fn as_scene(&self) -> Scene {
+        Scene {
+            name: self.active_scene.name.clone(),
+            entities: self.runtime_entities.iter().map(|runtime_entity| runtime_entity.as_entity()).collect(),
+        }
+    }
+}
+
+impl RuntimeEntity {
+    #[cfg(feature = "scene_generation")]
+    pub fn as_entity(&self) -> Entity {
+        Entity {
+            name: self.name.clone(),
+            id: self.id.clone(),
+            components: self.components.iter().map(|runtime_component| runtime_component.as_component()).collect(),
+            children: self.children.iter().map(|runtime_entity| runtime_entity.as_entity()).collect(),
+        }
+    }
+}
+
+impl RuntimeComponent {
+    #[cfg(feature = "scene_generation")]
+    pub fn as_component(&self) -> Component {
+        Component {
+            name: self.name.clone(),
+            properties: self.component_proto.properties.clone(),
+        }
+    }
 }
 
 fn init_entities(proto_entities: Vec<Entity>, scripting: &mut RuneInstance) -> Vec<RuntimeEntity> {

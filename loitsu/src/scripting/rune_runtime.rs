@@ -1,11 +1,12 @@
-use rune::{Context, Diagnostics, Source, Sources, ContextError, Module, BuildError, Vm};
-use rune::runtime::{Value, Struct, VmError, Shared, Args};
+use rune::{Context, Diagnostics, Source, Sources, ContextError, Module, BuildError, Vm, ToValue};
+use rune::runtime::{Value, Struct, VmError, Shared, Args, VmResult};
 use rune::diagnostics::EmitError;
 use crate::ScriptingInstance;
 use crate::scripting::{ScriptingError, ScriptingSource, ScriptingData};
 use rune::termcolor::{StandardStream, ColorChoice};
 use crate::scene_management::Component;
 use std::sync::Arc;
+use crate::scene_management::Property;
 
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
@@ -23,6 +24,14 @@ impl ScriptingData for RuneComponent {
         let data = instance.virtual_machine.call([proto.name.as_str(), "new"], ())?;
         let component_data = match data {
             Value::Struct(data) => {
+                {
+                    let mut component_data = data.clone().into_mut().unwrap();
+                    let mut component_data_obj = component_data.data_mut();
+                    // lets assign all of our properties
+                    for (key, value) in proto.properties {
+                        component_data_obj.insert_value(rune::alloc::String::try_from(key)?, value).unwrap();
+                    }
+                }
                 Some(data)
             },
             _ => {
@@ -33,6 +42,35 @@ impl ScriptingData for RuneComponent {
         Ok(RuneComponent {
             data: component_data
         })
+    }
+}
+
+impl ToValue for Property {
+    fn to_value(self) -> VmResult<Value> {
+        match self {
+            Property::String(value) => {
+                rune::alloc::String::try_from(value.clone()).unwrap().to_value()
+            },
+            Property::Number(value) => {
+                VmResult::Ok(Value::Float(value.clone() as f64))
+            },
+            Property::Boolean(value) => {
+                VmResult::Ok(Value::Bool(value.clone()))
+            },
+            Property::Array(value) => {
+                let mut vec = rune::runtime::Vec::new();
+                for item in value {
+                    vec.push_value(item.to_value()).into_result();
+                }
+                VmResult::Ok(Value::Vec(Shared::new(vec).unwrap()))
+            },
+            Property::EntityReference(value) => {
+                rune::alloc::String::try_from(value.clone()).unwrap().to_value()
+            },
+            Property::ComponentReference(value) => {
+                rune::alloc::String::try_from(value.clone()).unwrap().to_value()
+            },
+        }
     }
 }
 
