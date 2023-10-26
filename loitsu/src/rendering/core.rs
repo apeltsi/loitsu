@@ -3,27 +3,19 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
+use crate::log;
 
-pub fn init_window() {
-    let event_loop = EventLoop::new();
-    println!("Opening window...");
-    let window = winit::window::WindowBuilder::new()
-        .with_title("loitsu")
-        .build(&event_loop)
-        .unwrap();
+#[cfg(target_arch = "wasm32")]
+use crate::web::update_loading_status;
 
-    println!("Preparing window...");
-    env_logger::init();
-    pollster::block_on(run(event_loop, window));
-}
-
-async fn run(event_loop: EventLoop<()>, window: Window) {
+pub async fn run(event_loop: EventLoop<()>, window: Window) {
+    unsafe { HAS_RENDERED = false; }
+    #[cfg(target_arch = "wasm32")]
+    update_loading_status(2);
     let size = window.inner_size();
 
     let instance = wgpu::Instance::default();
-
-    let surface = unsafe { instance.create_surface(&window)}.unwrap();
-
+    let surface = unsafe {instance.create_surface(&window).unwrap()};
     let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::HighPerformance,
         force_fallback_adapter: false,
@@ -48,7 +40,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         alpha_mode: swapchain_capabilities.alpha_modes[0],
         view_formats: vec![],
     };
-    println!("Running event loop...");
+    surface.configure(&device, &config);
+    log!("Running event loop...");
     event_loop.run(move |event, _, control_flow| {
         let _ = (&instance, &adapter);
 
@@ -66,7 +59,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
-                crate::window::core::render_frame(&surface, &device, &queue);
+                crate::rendering::core::render_frame(&surface, &device, &queue);
             }
             Event::WindowEvent {
                 ref event,
@@ -78,4 +71,46 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             _ => {}
         }
     });
+}
+
+static mut HAS_RENDERED: bool = false;
+
+pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu::Queue) {
+    #[cfg(target_arch = "wasm32")]
+    {
+        if !unsafe { HAS_RENDERED } { 
+            update_loading_status(3);
+            unsafe { HAS_RENDERED = true; }
+        }
+    }
+    let frame = surface
+        .get_current_texture()
+        .expect("Failed to acquire next swap chain texture");
+    let view = frame
+        .texture
+        .create_view(&wgpu::TextureViewDescriptor::default());
+
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
+    // Lets clear the main texture
+    {
+        let _r_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Clear Texture"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::RED),
+                    store: wgpu::StoreOp::Store 
+                }
+            })],
+            depth_stencil_attachment: None,
+            occlusion_query_set: None,
+            timestamp_writes: None
+        });
+    }
+    // TODO: Here well loop through our drawables :DDD
+
+    queue.submit(Some(encoder.finish()));
+    frame.present();
 }

@@ -22,6 +22,11 @@
 				width: 100vw;
 				transition-property: filter;
 				transition-duration: 0.4s;
+				position: absolute;
+				top: 0;
+				left: 0;
+				z-index: 100;
+				background-color: black;
 			}
 			.logo {
 				height: 40vh;
@@ -29,6 +34,13 @@
 				animation-name: logoSplash;
 				animation-duration: 0.4s;
 				animation-timing-function: ease-out;
+			}
+			canvas {
+				position: absolute;
+				top: 0;
+				left: 0;
+				width: 100vw;
+				height: 100vh;
 			}
 			p {
 				color: #624a6b;
@@ -53,40 +65,11 @@
 		<div class="loadingContainer" id="loading">
 			<img src="./loitsu.png" class="logo" alt="Loitsu Logo" />
 			<h1 id="loadingText">Loading Loitsu runtime...</h1>
-			<p>Loitsu web 0.1.0</p>
+			<p>Loitsu web 0.1.1</p>
 			<p>Loitsu runtime {LOITSU_VERSION}</p>
+			<p>Built on {BUILD_DATE}</p>
 		</div>
-		<canvas id="canvas" width="640" height="400"></canvas>
-		<script>
-			const loadingText = document.getElementById("loadingText");
-			var Module = {
-				canvas: document.getElementById("canvas"),
-				preRun: [],
-				onRuntimeInitialized: function() {
-					console.log("Loitsu runtime loaded.");
-					let interval = setInterval(() => {
-						if (window._check_status != undefined) {
-							let status = window._check_status();
-							
-							if(status == 1) {
-								loadingText.innerHTML = "Starting renderer...";
-							}
-
-							if(status == 2) {
-								loadingText.innerHTML = "Finalizing...";
-							}
-
-							if(status == 3) {
-								loadingText.innerHTML = "Enjoy!";
-								document.getElementById("loading").classList.add("doneLoading");
-								clearInterval(interval);
-							}
-						}
-					}, 50);
-				}
-			};
-		</script>
-		<script src="./{APP_NAME}.js"></script>
+		<script type="module" src="./loitsu-web.js"></script>
 	</body>
 </html>
 

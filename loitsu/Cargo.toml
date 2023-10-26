@@ -4,19 +4,24 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Amos Peltonen"]
 
+[features]
+scene_generation = ["dep:serde_json"]
+
 [dependencies]
 env_logger = "0.10.0"
 pollster = "0.3.0"
-wgpu = "0.17.1"
-mlua = { version = "0.9.1", features = ["luau"] }
+rune = "0.13.1"
+winit = "0.28.7"
+raw-window-handle = "0.6.0"
+serde_json = {version = "1.0", optional = true}
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
 console_log = "1.0.0"
+wasm-bindgen = "0.2.87"
 wasm-bindgen-futures = "0.4.37"
 web-sys = "0.3.64"
-khronos-egl = { version = "6.0.0", features = ["static", "no-pkg-config"] }
-wgpu-hal = "0.17.2"
+wgpu = {version = "0.18.0", features = ["webgl"]}
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-winit = "0.28.7"
+wgpu = "0.18.0"
