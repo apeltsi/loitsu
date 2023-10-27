@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use walkdir::WalkDir;
 use loitsu::scripting::ScriptingSource;
 use std::str;
+use crate::shard_gen;
 
 pub fn build_assets(_out_dir: &PathBuf) {
     let files = read_files("assets");
@@ -29,8 +30,10 @@ pub fn build_assets(_out_dir: &PathBuf) {
 
     println!("Building {} scenes and {} scripts...", scenes.len(), scripts.len());
     let scenes = loitsu::build_scenes(scenes, scripts);
-    for scene in scenes {
-        println!("{}", scene.to_json());
+    println!("Generating shards...");
+    let shards = shard_gen::generate_shards(scenes);
+    for shard in shards {
+        println!("Shard: {:?}", shard.name);
     }
 }
 

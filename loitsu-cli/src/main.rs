@@ -7,6 +7,7 @@ use warp::Filter;
 use cargo_toml::{Manifest, Dependency};
 use std::path::PathBuf;
 mod asset_builder;
+mod shard_gen;
 
 #[derive(Debug, Parser)] 
 #[command(name = "loitsu")]
