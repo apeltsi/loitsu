@@ -1,10 +1,13 @@
-#[derive(Copy, Clone, bitcode::Encode, bitcode::Decode)]
+use std::collections::HashMap;
+use std::io::Write;
+
+#[derive(Clone, bitcode::Encode, bitcode::Decode)]
 pub struct Shard {
     name: String,
     assets: HashMap<String, ShardFile>
 }
 
-#[derive(Copy, Clone, bitcode::Encode, bitcode::Decode)]
+#[derive(Clone, bitcode::Encode, bitcode::Decode)]
 pub struct ShardFile {
     name: String,
     data: Vec<u8>,
@@ -19,7 +22,7 @@ impl Shard {
     }
 
     pub fn add_file(&mut self, name: String, data: Vec<u8>) {
-        self.assets.insert(name, ShardFile {
+        self.assets.insert(name.clone(), ShardFile {
             name,
             data
         });
@@ -34,9 +37,7 @@ impl Shard {
     }
 
     pub fn encode(&self) -> Vec<u8> {
-        let mut b_encoder = bitcode::Encoder::new();
-        b_encoder.encode(self);
-        let uncompressed_bytes = b_encoder.into_bytes();
+        let uncompressed_bytes = bitcode::encode(&self).unwrap();
 
         // now lets compress it
         let mut encoder = zstd::stream::Encoder::new(Vec::new(), 0).unwrap();

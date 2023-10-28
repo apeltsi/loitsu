@@ -3,6 +3,7 @@ pub mod rendering;
 pub mod logging;
 pub mod scene_management;
 pub mod ecs;
+pub mod asset_management;
 
 use scripting::{ScriptingInstance, ScriptingSource};
 

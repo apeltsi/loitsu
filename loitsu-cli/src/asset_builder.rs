@@ -1,10 +1,12 @@
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use walkdir::WalkDir;
 use loitsu::scripting::ScriptingSource;
 use std::str;
 use crate::shard_gen;
+use std::fs::File;
+use std::io::Write;
 
-pub fn build_assets(_out_dir: &PathBuf) {
+pub fn build_assets(out_dir: &PathBuf) {
     let files = read_files("assets");
     
     let mut scenes = Vec::new();
@@ -32,8 +34,38 @@ pub fn build_assets(_out_dir: &PathBuf) {
     let scenes = loitsu::build_scenes(scenes, scripts);
     println!("Generating shards...");
     let shards = shard_gen::generate_shards(scenes);
+    let shard_dir = out_dir.join("shards");
+
+    // lets make sure the shard dir exists
+    let s_path = Path::new(&shard_dir);
+
+    if !s_path.exists() {
+        std::fs::create_dir_all(s_path);
+    }
+    let mut total_size: usize = 0;
+    let shard_count = shards.len();
     for shard in shards {
-        println!("Shard: {:?}", shard.name);
+        let data = shard.encode();
+        total_size += data.len();
+        let mut path = shard_dir.clone(); 
+        path.push(shard.name);
+        path.set_extension("shard");
+        // now lets write the data
+        let mut file = File::create(path).unwrap();
+        file.write_all(&data);
+    }
+    println!("Generated {} shard(s) with a total size of {}", shard_count, format_size(total_size));
+}
+
+fn format_size(size: usize) -> String {
+    if size > 1024 * 1024 * 1024 {
+        format!("{:.2} GB", size as f64 / 1024.0 / 1024.0 / 1024.0)
+    } else if size > 1024 * 1024 {
+        format!("{:.2} MB", size as f64 / 1024.0 / 1024.0)
+    } else if size > 1024 {
+        format!("{:.2} KB", size as f64 / 1024.0)
+    } else {
+        format!("{} B", size)
     }
 }
 

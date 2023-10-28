@@ -1,6 +1,8 @@
 use loitsu::scene_management::Scene;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hasher, Hash};
+use std::fs::File;
+use std::io::Read;
 
 #[derive(Debug, Clone)]
 pub struct Shard {
@@ -75,6 +77,22 @@ impl Shard {
             return None;
         }
         Some(others)
+    }
+
+    pub fn encode(&self) -> Vec<u8> {
+        let mut path = std::env::current_dir().unwrap();
+        path.push("assets");
+        let mut actual_shard = loitsu::asset_management::shard::Shard::new(self.name.clone());
+        for asset in &self.assets {
+            // lets read the raw file
+            let mut file_path = path.clone();
+            file_path.push(asset.clone());
+            let mut file = File::open(file_path).expect(format!("Unable to open {}", asset).as_str());
+            let mut data = Vec::new();
+            file.read_to_end(&mut data).unwrap();
+            actual_shard.add_file(asset.to_string(), data);
+        }
+        actual_shard.encode()
     }
 
     pub fn find_intersection(&self, other: &Shard) -> Vec<String> {
