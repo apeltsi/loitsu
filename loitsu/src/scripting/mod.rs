@@ -1,6 +1,7 @@
 pub mod rune_runtime;
 use std::fmt;
 use crate::scene_management::Component;
+use bitcode;
 
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
@@ -9,7 +10,7 @@ pub struct ScriptingError {
     message: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, bitcode::Encode, bitcode::Decode)]
 pub struct ScriptingSource {
     pub name: String,
     pub source: String,

@@ -1,4 +1,7 @@
+use loitsu::asset_management::static_shard::StaticShard;
+use loitsu::scripting::ScriptingSource;
 use loitsu::scene_management::Scene;
+use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hasher, Hash};
 use std::fs::File;
@@ -115,9 +118,9 @@ impl Shard {
     }
 }
 
-pub fn generate_shards(scenes: Vec<Scene>) -> Vec<Shard> {
+pub fn generate_shards(scenes: Vec<Scene>, scripts: Vec<ScriptingSource>) -> (Vec<Shard>, StaticShard) {
     let mut initial_shards = Vec::new();
-    for scene in scenes {
+    for scene in scenes.clone() {
         initial_shards.push(Shard::new(scene.required_assets, true, vec![scene.name]));
     }
     let mut did_change = true;
@@ -146,5 +149,23 @@ pub fn generate_shards(scenes: Vec<Scene>) -> Vec<Shard> {
         shards[i].generate_name();
     }
 
-    shards
+    // Now for the static shard
+    let mut map = HashMap::new();
+    let scenes_clone = scenes.clone();
+    for shard in &shards {
+        for dependent in &shard.dependents {
+            if let Some(scene) = scenes_clone.iter().find(|x| x.name == *dependent) {
+                let mut shard_list = map.get(&scene.name).unwrap_or(&Vec::new()).clone();
+                shard_list.push(shard.name.clone());
+                map.insert(scene.name.clone(), shard_list);
+            }
+        }
+    }
+    let static_shard = StaticShard::new(map, scripts, scenes);
+
+    (shards, static_shard)
+}
+
+fn generate_static_shard() {
+
 }

@@ -21,9 +21,14 @@ pub fn build_assets(out_dir: &PathBuf) {
     }
 
     let mut scripts = Vec::new();
+    let mut script_sources = Vec::new();
     for file in files {
         if file.name.ends_with(".rn") {
             scripts.push(ScriptingSource {
+                name: file.name.clone(),
+                source: String::from_utf8(file.data.clone()).unwrap(),
+            });
+            script_sources.push(ScriptingSource {
                 name: file.name,
                 source: String::from_utf8(file.data).unwrap(),
             });
@@ -33,7 +38,7 @@ pub fn build_assets(out_dir: &PathBuf) {
     println!("Building {} scenes and {} scripts...", scenes.len(), scripts.len());
     let scenes = loitsu::build_scenes(scenes, scripts);
     println!("Generating shards...");
-    let shards = shard_gen::generate_shards(scenes);
+    let (shards, static_shard) = shard_gen::generate_shards(scenes, script_sources);
     let shard_dir = out_dir.join("shards");
 
     // lets make sure the shard dir exists
@@ -54,7 +59,17 @@ pub fn build_assets(out_dir: &PathBuf) {
         let mut file = File::create(path).unwrap();
         file.write_all(&data);
     }
-    println!("Generated {} shard(s) with a total size of {}", shard_count, format_size(total_size));
+
+    // lets write the static shards
+    let data = static_shard.encode();
+    total_size += data.len();
+    let mut path = shard_dir.clone();
+    path.push("static");
+    path.set_extension("shard");
+    let mut file = File::create(path).unwrap();
+    file.write_all(&data);
+
+    println!("Generated {} shard(s) with a total size of {}", shard_count + 1, format_size(total_size));
 }
 
 fn format_size(size: usize) -> String {
