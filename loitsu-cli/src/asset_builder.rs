@@ -5,6 +5,10 @@ use std::str;
 use crate::shard_gen;
 use std::fs::File;
 use std::io::Write;
+use serde_json;
+use serde_json::Value;
+use std::collections::HashMap;
+use std::fs;
 
 pub fn build_assets(out_dir: &PathBuf) {
     let files = read_files("assets");
@@ -40,7 +44,8 @@ pub fn build_assets(out_dir: &PathBuf) {
     println!("Generating shards...");
     let (shards, static_shard) = shard_gen::generate_shards(scenes, script_sources);
     let shard_dir = out_dir.join("shards");
-
+    let asset_path = std::env::current_dir().unwrap().join("assets");
+    let overrides = get_asset_overrides(&asset_path);
     // lets make sure the shard dir exists
     let s_path = Path::new(&shard_dir);
 
@@ -50,7 +55,7 @@ pub fn build_assets(out_dir: &PathBuf) {
     let mut total_size: usize = 0;
     let shard_count = shards.len();
     for shard in shards {
-        let data = shard.encode();
+        let data = shard.encode(&overrides);
         total_size += data.len();
         let mut path = shard_dir.clone(); 
         path.push(shard.name);
@@ -116,4 +121,39 @@ fn read_files(directory: &str) -> Vec<AssetFile> {
         }
     }
     files
+}
+
+pub struct AssetOverride {
+    pub resolution_multiplier: Option<f32>,
+}
+
+fn get_asset_overrides(path: &PathBuf) -> HashMap<String, AssetOverride> {
+    let mut override_map = HashMap::new();
+    let mut path = path.clone();
+    path.push("assetprefs.json");
+    // lets check if the file exists
+    if !path.exists() {
+        return override_map;
+    }
+
+    let data = fs::read_to_string(path).unwrap();
+    let v: Value = serde_json::from_str(data.as_str()).unwrap();
+    if let Value::Object(map) = v {
+        for (key, value) in map {
+            if let Value::Object(map) = value {
+                let mut asset_override = AssetOverride {
+                    resolution_multiplier: None,
+                };
+                for (key, value) in map {
+                    if key == "resolution_multiplier" {
+                        if let Value::Number(num) = value {
+                            asset_override.resolution_multiplier = Some(num.as_f64().unwrap() as f32);
+                        }
+                    }
+                }
+                override_map.insert(key, asset_override);
+            }
+        }
+    }
+    override_map
 }
