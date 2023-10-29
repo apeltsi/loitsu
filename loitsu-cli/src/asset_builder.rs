@@ -52,6 +52,13 @@ pub fn build_assets(out_dir: &PathBuf) {
     if !s_path.exists() {
         std::fs::create_dir_all(s_path);
     }
+
+    // lets quickly clear the shard directory
+    for entry in std::fs::read_dir(s_path).unwrap() {
+        let entry = entry.unwrap();
+        std::fs::remove_file(entry.path()).unwrap();
+    }
+
     let mut total_size: usize = 0;
     let shard_count = shards.len();
     for shard in shards {
