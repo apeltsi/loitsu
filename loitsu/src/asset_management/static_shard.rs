@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::io::Write;
+use std::io::Read;
 
 use crate::scene_management::Scene;
 use crate::scripting::ScriptingSource;
@@ -36,5 +37,13 @@ impl StaticShard {
         encoder.write_all(&uncompressed_bytes).unwrap();
         let compressed_bytes = encoder.finish().unwrap();
         compressed_bytes
+    }
+
+    pub fn decode(data: &[u8]) -> StaticShard {
+        let mut decoder = zstd::stream::Decoder::new(data).unwrap();
+        let mut uncompressed_bytes = Vec::new();
+        decoder.read_to_end(&mut uncompressed_bytes).unwrap();
+        let shard: StaticShard = bitcode::decode(&uncompressed_bytes).unwrap();
+        shard
     }
 }

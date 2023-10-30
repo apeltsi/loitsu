@@ -3,7 +3,7 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
-use crate::log;
+use crate::{log, asset_management::AssetManager};
 
 #[cfg(target_arch = "wasm32")]
 use crate::web::update_loading_status;
@@ -41,12 +41,16 @@ pub async fn run(event_loop: EventLoop<()>, window: Window) {
         view_formats: vec![],
     };
     surface.configure(&device, &config);
+    let asset_manager = AssetManager::new();
     log!("Running event loop...");
     event_loop.run(move |event, _, control_flow| {
         let _ = (&instance, &adapter);
 
-        *control_flow = ControlFlow::Wait;
+        *control_flow = ControlFlow::Poll;
         match event {
+            Event::MainEventsCleared => {
+                window.request_redraw();
+            },
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
                 ..
@@ -59,7 +63,7 @@ pub async fn run(event_loop: EventLoop<()>, window: Window) {
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
-                crate::rendering::core::render_frame(&surface, &device, &queue);
+                crate::rendering::core::render_frame(&surface, &device, &queue, &asset_manager);
             }
             Event::WindowEvent {
                 ref event,
@@ -75,7 +79,7 @@ pub async fn run(event_loop: EventLoop<()>, window: Window) {
 
 static mut HAS_RENDERED: bool = false;
 
-pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu::Queue) {
+pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu::Queue, asset_manager: &AssetManager) {
     #[cfg(target_arch = "wasm32")]
     {
         if !unsafe { HAS_RENDERED } { 
@@ -91,7 +95,10 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu
         .create_view(&wgpu::TextureViewDescriptor::default());
 
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
+    let mut clear_color = wgpu::Color::RED;
+    if *asset_manager.status.clone().lock().unwrap() == crate::asset_management::AssetManagerStatus::Done {
+        clear_color = wgpu::Color::BLUE;
+    }
     // Lets clear the main texture
     {
         let _r_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -100,7 +107,7 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu
                 view: &view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color::RED),
+                    load: wgpu::LoadOp::Clear(clear_color),
                     store: wgpu::StoreOp::Store 
                 }
             })],

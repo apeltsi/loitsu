@@ -80,7 +80,8 @@ async fn build(target: &str, release: bool, run: bool) {
         // Lets copy the web player files
         generate_player_files(&out_path, &package_name, &loitsu_version);
         println!("Building assets...");
-        asset_builder::build_assets(&out_path);
+        
+        asset_builder::build_assets(&out_path.join("out"));
         println!("Build Done!");
         if run {
             start_webserver(&out_path).await;

@@ -5,8 +5,8 @@ use crate::ScriptingInstance;
 use crate::scripting::{ScriptingError, ScriptingSource, ScriptingData};
 use rune::termcolor::{StandardStream, ColorChoice};
 use crate::scene_management::Component;
-use std::sync::Arc;
 use crate::scene_management::Property;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
