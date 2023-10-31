@@ -1,5 +1,3 @@
-use bitcode::decode;
-
 use self::static_shard::StaticShard;
 use crate::log;
 
@@ -52,7 +50,7 @@ impl AssetManager {
                     *status_clone.lock().unwrap() = AssetManagerStatus::Done;
                 },
                 Err(e) => {
-                    log!("Failed to load static shard: {:?}", e);
+                    log!("Failed to load static shard: {:?}", e.message);
                     // TODO: On web platforms this could show some error to the user
                 }
             }

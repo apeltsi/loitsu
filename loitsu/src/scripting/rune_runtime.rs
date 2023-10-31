@@ -21,7 +21,7 @@ pub struct RuneComponent {
     pub data: Option<Shared<Struct>>
 }
 
-impl ScriptingData for RuneComponent {
+impl ScriptingData<RuneInstance> for RuneComponent {
     fn from_component_proto(proto: Component, instance: &mut RuneInstance) -> Result<Self> {
         // lets start by initializing a new struct in the runtime
         let data = instance.virtual_machine.call([proto.name.as_str(), "new"], ())?;
@@ -142,6 +142,7 @@ impl From<VmError> for ScriptingError {
 }
 
 impl ScriptingInstance for RuneInstance {
+    type Data = RuneComponent;
     fn new_with_sources(sources: Vec<ScriptingSource>) -> Result<Self> {
         let mut context = Context::new();
         let core_module = core_module()?;
@@ -176,8 +177,31 @@ impl ScriptingInstance for RuneInstance {
         let result = self.virtual_machine.execute(path, args)?.complete().into_result()?;
         Ok(result)
     }
-}
 
+    fn run_component_methods<RuneComponent>(&mut self, entities: &[crate::ecs::RuntimeEntity<Self>], method: &str) {
+        for entity in entities {
+            self.run_component_methods_on_entity(&entity, method);
+            for child in &entity.children {
+                self.run_component_methods_on_entity(child, method);
+            }
+        }
+    }
+
+}
+impl RuneInstance {
+    fn run_component_methods_on_entity(&mut self, entity: &crate::ecs::RuntimeEntity<Self>, method: &str) {
+        for component in &entity.components {
+            match &component.data.data {
+                Some(data) => {
+                    let _ = self.virtual_machine.call([component.component_proto.name.as_str(), method], (data.clone(), )).unwrap();
+                },
+                None => {
+                    let _ = self.virtual_machine.call([component.component_proto.name.as_str(), method], (rune::runtime::Value::EmptyTuple, )).unwrap();
+                }
+            }
+        }
+    }
+}
 #[cfg(feature = "scene_generation")]
 pub unsafe fn get_required_assets() -> Vec<String> {
     REQUIRED_ASSETS.clone()

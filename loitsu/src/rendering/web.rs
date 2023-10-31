@@ -2,8 +2,10 @@ use winit::event_loop::EventLoop;
 use winit::platform::web::WindowExtWebSys;
 use crate::log;
 use crate::web::update_loading_status;
+use crate::scripting::ScriptingInstance;
+use crate::ecs::ECS;
 
-pub fn init_view() {
+pub fn init_view<T>(scripting: T, ecs: ECS<T>) where T: ScriptingInstance + 'static {
     log!("Initializing web...");
     update_loading_status(1);
 
@@ -27,5 +29,5 @@ pub fn init_view() {
                 .ok()
         })
     .expect("couldn't append canvas to document body");
-    wasm_bindgen_futures::spawn_local(crate::rendering::core::run(event_loop, window));
+    wasm_bindgen_futures::spawn_local(crate::rendering::core::run(event_loop, window, scripting, ecs));
 }

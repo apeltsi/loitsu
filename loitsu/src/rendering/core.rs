@@ -3,12 +3,13 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
-use crate::{log, asset_management::AssetManager};
+use crate::{log, asset_management::AssetManager, scripting::ScriptingInstance};
+use crate::ecs::ECS;
 
 #[cfg(target_arch = "wasm32")]
 use crate::web::update_loading_status;
 
-pub async fn run(event_loop: EventLoop<()>, window: Window) {
+pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T, mut ecs: ECS<T>) where T: ScriptingInstance + 'static {
     unsafe { HAS_RENDERED = false; }
     #[cfg(target_arch = "wasm32")]
     update_loading_status(2);
@@ -63,6 +64,7 @@ pub async fn run(event_loop: EventLoop<()>, window: Window) {
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
+                ecs.run_frame(&mut scripting);
                 crate::rendering::core::render_frame(&surface, &device, &queue, &asset_manager);
             }
             Event::WindowEvent {

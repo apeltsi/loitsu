@@ -19,3 +19,4 @@ walkdir = "2"
 loitsu = { path = "../loitsu", features = ["scene_generation"] }
 serde_json = "1.0"
 image = "0.24.7"
+checksumdir = "0.3.0"

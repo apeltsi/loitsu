@@ -38,7 +38,7 @@ pub fn init_engine() {
         console_log::init().expect("could not initialize logger");
     }
     log!("Loitsu core starting up...");
-    let _rune = scripting::rune_runtime::
+    let rune = scripting::rune_runtime::
         RuneInstance::new_with_sources(
             vec![ScriptingSource{
                 name: "main".to_string(),
@@ -50,16 +50,18 @@ pub fn init_engine() {
             }
         
             ]).unwrap();
+    let ecs = ecs::ECS::<scripting::rune_runtime::RuneInstance>::new();
+
     #[cfg(not(target_arch = "wasm32"))]
     {
         use rendering::desktop;
-        desktop::init_window();
+        desktop::init_window(rune, ecs);
     }
 
     #[cfg(target_arch = "wasm32")]
     {
         use rendering::web;
-        web::init_view();
+        web::init_view(rune, ecs);
     }
 }
 

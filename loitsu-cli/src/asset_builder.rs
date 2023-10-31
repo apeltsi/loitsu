@@ -9,8 +9,26 @@ use serde_json;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
+use std::io::Read;
 
 pub fn build_assets(out_dir: &PathBuf) {
+    let asset_path = std::env::current_dir().unwrap().join("assets");
+    let shard_dir = out_dir.join("shards");
+
+    let checksum = get_assets_checksum(&asset_path);
+    // lets compare the checksum to the previous one
+    let mut old_checksum = String::new();
+    let mut old_checksum_path = shard_dir.clone();
+    old_checksum_path.push("checksum");
+    if old_checksum_path.exists() {
+        let mut file = File::open(old_checksum_path).unwrap();
+        file.read_to_string(&mut old_checksum).unwrap();
+    }
+    if checksum == old_checksum {
+        println!("Assets haven't changed. No shards were generated.");
+        return;
+    }
+
     let files = read_files("assets");
     
     let mut scenes = Vec::new();
@@ -43,14 +61,13 @@ pub fn build_assets(out_dir: &PathBuf) {
     let scenes = loitsu::build_scenes(scenes, scripts);
     println!("Generating shards...");
     let (shards, static_shard) = shard_gen::generate_shards(scenes, script_sources);
-    let shard_dir = out_dir.join("shards");
-    let asset_path = std::env::current_dir().unwrap().join("assets");
+
     let overrides = get_asset_overrides(&asset_path);
     // lets make sure the shard dir exists
     let s_path = Path::new(&shard_dir);
 
     if !s_path.exists() {
-        std::fs::create_dir_all(s_path);
+        std::fs::create_dir_all(s_path).unwrap();
     }
 
     // lets quickly clear the shard directory
@@ -69,7 +86,7 @@ pub fn build_assets(out_dir: &PathBuf) {
         path.set_extension("shard");
         // now lets write the data
         let mut file = File::create(path).unwrap();
-        file.write_all(&data);
+        file.write_all(&data).unwrap();
     }
 
     // lets write the static shards
@@ -79,9 +96,19 @@ pub fn build_assets(out_dir: &PathBuf) {
     path.push("static");
     path.set_extension("shard");
     let mut file = File::create(path).unwrap();
-    file.write_all(&data);
+    file.write_all(&data).unwrap();
 
+    // Now we'll write the checksum
+    let mut path = shard_dir.clone();
+    path.push("checksum");
+    let mut file = File::create(path).unwrap();
+    file.write_all(checksum.as_bytes()).unwrap();
+    
     println!("Generated {} shard(s) with a total size of {}", shard_count + 1, format_size(total_size));
+}
+
+fn get_assets_checksum(path: &PathBuf) -> String {
+    checksumdir::checksumdir(path.to_str().unwrap()).unwrap()
 }
 
 fn format_size(size: usize) -> String {

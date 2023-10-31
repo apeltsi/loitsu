@@ -7,8 +7,6 @@ use web_sys::{Request, RequestInit, RequestMode, Response};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_futures::JsFuture;
 
-#[cfg(not(target_arch = "wasm32"))]
-use std::path::PathBuf;
 use crate::asset_management::AssetError;
 
 #[cfg(target_arch = "wasm32")]
