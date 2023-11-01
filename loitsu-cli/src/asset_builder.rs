@@ -10,6 +10,8 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
+use crate::info;
+
 
 pub fn build_assets(out_dir: &PathBuf) {
     let asset_path = std::env::current_dir().unwrap().join("assets");
@@ -25,9 +27,11 @@ pub fn build_assets(out_dir: &PathBuf) {
         file.read_to_string(&mut old_checksum).unwrap();
     }
     if checksum == old_checksum {
-        println!("Assets haven't changed. No shards were generated.");
+        info!("Assets haven't changed. No shards were generated.");
         return;
     }
+    
+    info!("Building assets...");
 
     let files = read_files("assets");
     
@@ -57,9 +61,9 @@ pub fn build_assets(out_dir: &PathBuf) {
         }
     }
 
-    println!("Building {} scenes and {} scripts...", scenes.len(), scripts.len());
+    info!("Building {} scenes and {} scripts...", scenes.len(), scripts.len());
     let scenes = loitsu::build_scenes(scenes, scripts);
-    println!("Generating shards...");
+    info!("Generating shards...");
     let (shards, static_shard) = shard_gen::generate_shards(scenes, script_sources);
 
     let overrides = get_asset_overrides(&asset_path);
@@ -104,7 +108,7 @@ pub fn build_assets(out_dir: &PathBuf) {
     let mut file = File::create(path).unwrap();
     file.write_all(checksum.as_bytes()).unwrap();
     
-    println!("Generated {} shard(s) with a total size of {}", shard_count + 1, format_size(total_size));
+    info!("Generated {} shard(s) with a total size of {}", shard_count + 1, format_size(total_size));
 }
 
 fn get_assets_checksum(path: &PathBuf) -> String {
