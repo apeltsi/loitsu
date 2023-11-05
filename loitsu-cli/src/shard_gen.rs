@@ -10,6 +10,7 @@ use crate::asset_builder::AssetOverride;
 use image::io::Reader as ImageReader;
 use std::path::PathBuf;
 use std::io::Cursor;
+use loitsu::Preferences;
 
 #[derive(Debug, Clone)]
 pub struct Shard {
@@ -126,7 +127,7 @@ impl Shard {
     }
 }
 
-pub fn generate_shards(scenes: Vec<Scene>, scripts: Vec<ScriptingSource>) -> (Vec<Shard>, StaticShard) {
+pub fn generate_shards(scenes: Vec<Scene>, scripts: Vec<ScriptingSource>, preferences: &Preferences) -> (Vec<Shard>, StaticShard) {
     let mut initial_shards = Vec::new();
     for scene in scenes.clone() {
         initial_shards.push(Shard::new(scene.required_assets, true, vec![scene.name]));

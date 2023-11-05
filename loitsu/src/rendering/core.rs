@@ -3,7 +3,7 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
-use crate::{log, asset_management::AssetManager, scripting::ScriptingInstance};
+use crate::{log, scripting::ScriptingInstance};
 use crate::ecs::ECS;
 
 #[cfg(target_arch = "wasm32")]
@@ -42,7 +42,6 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
         view_formats: vec![],
     };
     surface.configure(&device, &config);
-    let asset_manager = AssetManager::new();
     log!("Running event loop...");
     event_loop.run(move |event, _, control_flow| {
         let _ = (&instance, &adapter);
@@ -65,7 +64,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
             }
             Event::RedrawRequested(_) => {
                 ecs.run_frame(&mut scripting);
-                crate::rendering::core::render_frame(&surface, &device, &queue, &asset_manager);
+                crate::rendering::core::render_frame(&surface, &device, &queue);
             }
             Event::WindowEvent {
                 ref event,
@@ -81,7 +80,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
 
 static mut HAS_RENDERED: bool = false;
 
-pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu::Queue, asset_manager: &AssetManager) {
+pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu::Queue) {
     #[cfg(target_arch = "wasm32")]
     {
         if !unsafe { HAS_RENDERED } { 
@@ -98,6 +97,7 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu
 
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
     let mut clear_color = wgpu::Color::RED;
+    let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
     if *asset_manager.status.clone().lock().unwrap() == crate::asset_management::AssetManagerStatus::Done {
         clear_color = wgpu::Color::BLUE;
     }

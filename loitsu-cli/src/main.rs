@@ -24,13 +24,17 @@ enum Commands {
         #[arg(short, long, default_value = "")]
         target: String,
         #[arg(short, long, default_value = "false")]
-        release: bool
+        release: bool,
+        #[arg(short, long, default_value = "false")]
+        force: bool
     },
     Run {
         #[arg(short, long, default_value = "")]
         target: String,
         #[arg(short, long, default_value = "false")]
-        release: bool
+        release: bool,
+        #[arg(short, long, default_value = "false")]
+        force: bool
     }
 }
 #[tokio::main]
@@ -38,12 +42,12 @@ async fn main() {
     let args = Cli::parse();
 
     match args.command {
-        Commands::Build { target, release } => build(&target, release, false).await,
-        Commands::Run { target, release } => build(&target, release, true).await,
+        Commands::Build { target, release, force } => build(&target, release, false, force).await,
+        Commands::Run { target, release, force } => build(&target, release, true, force).await,
     }
 }
 
-async fn build(target: &str, release: bool, run: bool) {
+async fn build(target: &str, release: bool, run: bool, force: bool) {
     if target == "web" {
         info!("Building for web");
         // Now we can build the target
@@ -79,7 +83,7 @@ async fn build(target: &str, release: bool, run: bool) {
         // Lets copy the web player files
         generate_player_files(&out_path, &package_name, &loitsu_version);
         
-        asset_builder::build_assets(&out_path.join("out"));
+        asset_builder::build_assets(&out_path.join("out"), force);
         if run {
             start_webserver(&out_path).await;
         } else {
@@ -95,7 +99,7 @@ async fn build(target: &str, release: bool, run: bool) {
         } else {
             out_path.push("debug");
         }
-        asset_builder::build_assets(&out_path);
+        asset_builder::build_assets(&out_path, force);
         info!("Building native target...");
         build_with_args(vec![], release, run);
     } else {

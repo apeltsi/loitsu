@@ -24,7 +24,7 @@ pub struct RuneComponent {
 impl ScriptingData<RuneInstance> for RuneComponent {
     fn from_component_proto(proto: Component, instance: &mut RuneInstance) -> Result<Self> {
         // lets start by initializing a new struct in the runtime
-        let data = instance.virtual_machine.call([proto.name.as_str(), "new"], ()).expect("Error when initializing component. Did you forget to include a new method?");
+        let data = instance.virtual_machine.call([proto.name.as_str(), "new"], ()).expect("Error when initializing component. Did you forget to include a 'new' method?");
         let component_data = match data {
             Value::Struct(data) => {
                 {

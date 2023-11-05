@@ -11,9 +11,10 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use crate::info;
+use std::path::*;
+use loitsu::Preferences;
 
-
-pub fn build_assets(out_dir: &PathBuf) {
+pub fn build_assets(out_dir: &PathBuf, force: bool) {
     let asset_path = std::env::current_dir().unwrap().join("assets");
     let shard_dir = out_dir.join("shards");
 
@@ -26,7 +27,7 @@ pub fn build_assets(out_dir: &PathBuf) {
         let mut file = File::open(old_checksum_path).unwrap();
         file.read_to_string(&mut old_checksum).unwrap();
     }
-    if checksum == old_checksum {
+    if checksum == old_checksum && !force {
         info!("Assets haven't changed. No shards were generated.");
         return;
     }
@@ -40,8 +41,10 @@ pub fn build_assets(out_dir: &PathBuf) {
         let files = files.clone();
         for file in files {
             if file.name.ends_with(".scene.json") {
-                let name = file.name.split(".").collect::<Vec<&str>>()[0];
+                let path = file.path.strip_prefix(asset_path.clone()).unwrap();
+                let name = path.to_str().unwrap().replace(".scene.json", "");
                 scenes.push((name.to_owned(), String::from_utf8(file.data).unwrap()));
+                info!("Found scene: {}", name);
             }
         }
     }
@@ -61,10 +64,24 @@ pub fn build_assets(out_dir: &PathBuf) {
         }
     }
 
+    // lets load our Preferences
+    let preferences = {
+        let mut path = asset_path.clone();
+        path.push("preferences.json");
+        if path.exists() {
+            let mut file = File::open(path).unwrap();
+            let mut data = String::new();
+            file.read_to_string(&mut data).unwrap();
+            serde_json::from_str::<Preferences>(&data).unwrap()
+        } else {
+            panic!("Couldn't find preferences.json! Please create one in the assets directory with the required fields.")
+        }
+    };
+
     info!("Building {} scenes and {} scripts...", scenes.len(), scripts.len());
     let scenes = loitsu::build_scenes(scenes, scripts);
     info!("Generating shards...");
-    let (shards, static_shard) = shard_gen::generate_shards(scenes, script_sources);
+    let (shards, static_shard) = shard_gen::generate_shards(scenes, script_sources, &preferences);
 
     let overrides = get_asset_overrides(&asset_path);
     // lets make sure the shard dir exists
@@ -168,7 +185,7 @@ pub struct AssetOverride {
 fn get_asset_overrides(path: &PathBuf) -> HashMap<String, AssetOverride> {
     let mut override_map = HashMap::new();
     let mut path = path.clone();
-    path.push("assetprefs.json");
+    path.push("overrides.json");
     // lets check if the file exists
     if !path.exists() {
         return override_map;

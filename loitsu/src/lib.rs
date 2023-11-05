@@ -7,6 +7,11 @@ pub mod asset_management;
 
 use scripting::{ScriptingInstance, ScriptingSource};
 
+#[cfg_attr(feature = "json_preference_parse", derive(serde::Deserialize))]
+pub struct Preferences {
+    default_scenes: String
+}
+
 #[cfg(target_arch = "wasm32")]
 mod web;
 
@@ -37,6 +42,7 @@ pub fn init_engine() {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
         console_log::init().expect("could not initialize logger");
     }
+
     log!("Loitsu core starting up...");
     let rune = scripting::rune_runtime::
         RuneInstance::new_with_sources(

@@ -1,6 +1,6 @@
 use self::static_shard::StaticShard;
 use crate::log;
-
+use lazy_static::lazy_static;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_futures::spawn_local;
 
@@ -12,6 +12,10 @@ use std::sync::{Arc, Mutex};
 pub mod shard;
 pub mod static_shard;
 pub mod get_file;
+
+lazy_static!{
+    pub static ref ASSET_MANAGER: Arc<Mutex<AssetManager>> = Arc::new(Mutex::new(AssetManager::new()));
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AssetManagerStatus {
