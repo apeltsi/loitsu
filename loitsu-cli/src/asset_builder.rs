@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use crate::info;
-use std::path::*;
 use loitsu::Preferences;
 
 pub fn build_assets(out_dir: &PathBuf, force: bool) {

@@ -8,8 +8,9 @@ pub mod asset_management;
 use scripting::{ScriptingInstance, ScriptingSource};
 
 #[cfg_attr(feature = "json_preference_parse", derive(serde::Deserialize))]
+#[derive(Clone, bitcode::Decode, bitcode::Encode)]
 pub struct Preferences {
-    default_scenes: String
+    default_scene: String
 }
 
 #[cfg(target_arch = "wasm32")]

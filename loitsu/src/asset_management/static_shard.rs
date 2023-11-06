@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::io::Read;
 
+use crate::Preferences;
 use crate::scene_management::Scene;
 use crate::scripting::ScriptingSource;
 
@@ -9,7 +10,8 @@ use crate::scripting::ScriptingSource;
 pub struct StaticShard {
     shard_map: HashMap<String, Vec<String>>, // A mapping of scene -> required shards
     scripts: Vec<ScriptingSource>,
-    scenes: Vec<Scene>
+    scenes: Vec<Scene>,
+    preferences: Preferences
 }
 
 
@@ -21,11 +23,12 @@ pub struct StaticShardFile {
 }
 
 impl StaticShard {
-    pub fn new(shard_map: HashMap<String, Vec<String>>, scripts: Vec<ScriptingSource>, scenes: Vec<Scene>) -> StaticShard {
+    pub fn new(shard_map: HashMap<String, Vec<String>>, scripts: Vec<ScriptingSource>, scenes: Vec<Scene>, preferences: Preferences) -> StaticShard {
         StaticShard {
             shard_map,
             scripts,
-            scenes
+            scenes,
+            preferences
         }
     }
     
