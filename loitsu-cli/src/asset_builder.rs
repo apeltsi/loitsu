@@ -41,7 +41,7 @@ pub fn build_assets(out_dir: &PathBuf, force: bool) {
         for file in files {
             if file.name.ends_with(".scene.json") {
                 let path = file.path.strip_prefix(asset_path.clone()).unwrap();
-                let name = path.to_str().unwrap().replace(".scene.json", "");
+                let name = path.to_str().unwrap().replace(".scene.json", "").replace("\\", "/");
                 scenes.push((name.to_owned(), String::from_utf8(file.data).unwrap()));
                 info!("Found scene: {}", name);
             }

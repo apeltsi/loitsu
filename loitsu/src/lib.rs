@@ -5,7 +5,7 @@ pub mod scene_management;
 pub mod ecs;
 pub mod asset_management;
 
-use scripting::{ScriptingInstance, ScriptingSource};
+use scripting::ScriptingInstance;
 
 #[cfg_attr(feature = "json_preference_parse", derive(serde::Deserialize))]
 #[derive(Clone, bitcode::Decode, bitcode::Encode)]
@@ -17,7 +17,7 @@ pub struct Preferences {
 mod web;
 
 #[cfg(feature = "scene_generation")]
-pub fn build_scenes(scenes: Vec<(String, String)>, scripts: Vec<ScriptingSource>) -> Vec<scene_management::Scene> {
+pub fn build_scenes(scenes: Vec<(String, String)>, scripts: Vec<scripting::ScriptingSource>) -> Vec<scene_management::Scene> {
     let mut rune = scripting::rune_runtime::
         RuneInstance::new_with_sources(scripts).unwrap();
     let mut e = ecs::ECS::new();
@@ -45,18 +45,7 @@ pub fn init_engine() {
     }
 
     log!("Loitsu core starting up...");
-    let rune = scripting::rune_runtime::
-        RuneInstance::new_with_sources(
-            vec![ScriptingSource{
-                name: "main".to_string(),
-                source: r#"
-                    fn main() {
-                        print("Hello, world!");
-                    }
-                "#.to_string()
-            }
-        
-            ]).unwrap();
+    let rune = scripting::rune_runtime::RuneInstance::new_uninitialized().unwrap();
     let ecs = ecs::ECS::<scripting::rune_runtime::RuneInstance>::new();
 
     #[cfg(not(target_arch = "wasm32"))]

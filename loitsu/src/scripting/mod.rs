@@ -34,6 +34,8 @@ impl fmt::Display for ScriptingError {
 pub trait ScriptingInstance: Sized {
     type Data: ScriptingData<Self>;
     fn new_with_sources(sources: Vec<ScriptingSource>) -> Result<Self> where Self: Sized;
+    fn new_uninitialized() -> Result<Self> where Self: Sized;
+    fn initialize(&mut self, sources: Vec<ScriptingSource>) -> Result<()>;
     fn call<T>(&mut self, path: [&str; 2], args: T) -> Result<rune::runtime::Value> where T: rune::runtime::Args;
     fn run_component_methods<T>(&mut self, entities: &[crate::ecs::RuntimeEntity<Self>], method: &str);
 }

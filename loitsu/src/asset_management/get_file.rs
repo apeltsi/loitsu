@@ -23,7 +23,7 @@ impl From<std::io::Error> for AssetError {
 }
 
 #[cfg(target_arch = "wasm32")]
-pub async fn get_file(path: &str) -> Result<Vec<u8>, AssetError> {
+pub async fn get_file(path: String) -> Result<Vec<u8>, AssetError> {
     let mut opts = RequestInit::new();
     opts.method("GET");
     opts.mode(RequestMode::Cors);
@@ -49,7 +49,7 @@ pub async fn get_file(path: &str) -> Result<Vec<u8>, AssetError> {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub async fn get_file(path: &str) -> Result<Vec<u8>, AssetError> {
+pub async fn get_file(path: String) -> Result<Vec<u8>, AssetError> {
     let mut path_buf = std::env::current_exe().unwrap();
     path_buf.pop();
     path_buf.push("shards");

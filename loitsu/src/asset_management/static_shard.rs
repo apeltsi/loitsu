@@ -49,4 +49,20 @@ impl StaticShard {
         let shard: StaticShard = bitcode::decode(&uncompressed_bytes).unwrap();
         shard
     }
+
+    pub fn get_preferences(&self) -> &Preferences {
+        &self.preferences
+    }
+
+    pub fn get_available_scene_names(&self) -> Vec<String> {
+        self.scenes.iter().map(|scene| scene.name.clone()).collect()
+    }
+
+    pub fn get_scene(&self, name: &str) -> Option<&Scene> {
+        self.scenes.iter().find(|scene| scene.name == name)
+    }
+
+    pub fn get_scripts(&self) -> &Vec<ScriptingSource> {
+        &self.scripts
+    }
 }

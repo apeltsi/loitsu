@@ -3,7 +3,7 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
-use crate::{log, scripting::ScriptingInstance};
+use crate::{log, scripting::ScriptingInstance, scene_management::Scene};
 use crate::ecs::ECS;
 
 #[cfg(target_arch = "wasm32")]
@@ -43,6 +43,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     };
     surface.configure(&device, &config);
     log!("Running event loop...");
+    let mut ecs_initialized = false;
     event_loop.run(move |event, _, control_flow| {
         let _ = (&instance, &adapter);
 
@@ -63,7 +64,33 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
-                ecs.run_frame(&mut scripting);
+                if !ecs_initialized {
+                    let scene: Option<Scene> = {
+                        let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
+                        let x = if let Some(static_shard) = &asset_manager.assets.lock().unwrap().static_shard {
+                            // init scripts
+                            scripting.initialize(static_shard.get_scripts().clone()).unwrap();
+                            log!("Scripting initialized");
+                            let default_scene_name = static_shard.get_preferences().default_scene.as_str();
+                            let scene = static_shard.get_scene(default_scene_name);
+                            Some(scene.expect(
+                            format!("Default scene wasn't included in the static shard! Expected to find scene '{}'. Available scenes are '{}'", 
+                                    default_scene_name,
+                                    static_shard.get_available_scene_names().join("', '")
+                            ).as_str()).clone())
+                        } else {
+                            None
+                        }; x
+                    };
+                    if let Some(scene) = scene {
+                        ecs.load_scene(
+                            scene, &mut scripting);
+                        ecs_initialized = true;
+                        log!("ECS initialized");
+                    }
+                } else {
+                    ecs.run_frame(&mut scripting);
+                }
                 crate::rendering::core::render_frame(&surface, &device, &queue);
             }
             Event::WindowEvent {
@@ -98,7 +125,7 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
     let mut clear_color = wgpu::Color::RED;
     let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
-    if *asset_manager.status.clone().lock().unwrap() == crate::asset_management::AssetManagerStatus::Done {
+    if asset_manager.pending_tasks.fetch_or(0, std::sync::atomic::Ordering::SeqCst) == 0 {
         clear_color = wgpu::Color::BLUE;
     }
     // Lets clear the main texture

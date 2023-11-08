@@ -1,3 +1,5 @@
+#[cfg(not(feature = "scene_generation"))]
+use crate::asset_management::ASSET_MANAGER;
 use crate::scene_management::{Scene, Entity, Component};
 use crate::scripting::{ScriptingData, ScriptingInstance};
 
@@ -38,6 +40,8 @@ impl<T: ScriptingInstance> ECS<T> {
         // next up we'll have to figure out how to load our assets
         // lets start by requesting the appropriate shards
         
+        #[cfg(not(feature = "scene_generation"))]
+        ASSET_MANAGER.lock().unwrap().request_shards(scene.shards.clone());
     }
 
     pub fn run_build_step(&mut self, scripting: &mut T) {
