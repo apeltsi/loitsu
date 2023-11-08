@@ -170,6 +170,11 @@ pub fn generate_shards(scenes: Vec<Scene>, scripts: Vec<ScriptingSource>, prefer
             }
         }
     }
+    let mut scenes = scenes;
+    for scene in &mut scenes {
+        scene.required_assets = Vec::new();
+        scene.shards = map.get(&scene.name).unwrap_or(&Vec::new()).clone();
+    }
     let static_shard = StaticShard::new(map, scripts, scenes, preferences.clone());
 
     (shards, static_shard)

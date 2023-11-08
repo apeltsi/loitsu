@@ -19,7 +19,8 @@ pub enum Property {
 pub struct Scene {
     pub name: String,
     pub entities: Vec<Entity>,
-    pub required_assets: Vec<String>
+    pub required_assets: Vec<String>,
+    pub shards: Vec<String>
 }
 
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
@@ -46,6 +47,7 @@ impl Scene {
             name,
             entities: Vec::new(),
             required_assets: Vec::new(),
+            shards: Vec::new()
         }
     }
     #[cfg(feature = "scene_generation")]

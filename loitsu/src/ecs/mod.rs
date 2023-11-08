@@ -34,6 +34,10 @@ impl<T: ScriptingInstance> ECS<T> {
     pub fn load_scene(&mut self, scene: Scene, scripting: &mut T) {
         self.active_scene = scene.clone();
         self.runtime_entities = init_entities(scene.entities, scripting);
+
+        // next up we'll have to figure out how to load our assets
+        // lets start by requesting the appropriate shards
+        
     }
 
     pub fn run_build_step(&mut self, scripting: &mut T) {
@@ -60,7 +64,8 @@ impl<T: ScriptingInstance> ECS<T> {
         Scene {
             name: self.active_scene.name.clone(),
             entities: self.runtime_entities.iter().map(|runtime_entity| runtime_entity.as_entity()).collect(),
-            required_assets: Vec::new()
+            required_assets: Vec::new(),
+            shards: Vec::new(),
         }
     }
 }
