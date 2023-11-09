@@ -6,11 +6,16 @@ use winit::{
 use crate::{log, scripting::ScriptingInstance, scene_management::Scene};
 use crate::ecs::ECS;
 
+pub static mut TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
+
 #[cfg(target_arch = "wasm32")]
 use crate::web::update_loading_status;
 
+use super::{drawable::Drawable, shader::ShaderManager};
+
 pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T, mut ecs: ECS<T>) where T: ScriptingInstance + 'static {
     unsafe { HAS_RENDERED = false; }
+    unsafe { HAS_LOADED = false; }
     #[cfg(target_arch = "wasm32")]
     update_loading_status(2);
     let size = window.inner_size();
@@ -32,6 +37,8 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     let swapchain_capabilities = surface.get_capabilities(&adapter);
     let swapchain_format = swapchain_capabilities.formats[0];
 
+    unsafe { TARGET_FORMAT = swapchain_format; }
+
     let mut config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
         format: swapchain_format,
@@ -42,8 +49,18 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
         view_formats: vec![],
     };
     surface.configure(&device, &config);
+    
+    // lets load our default shaders
+    let mut shader_manager = crate::rendering::shader::ShaderManager::new();
+    shader_manager.load_default_shaders(&device);
+
+
     log!("Running event loop...");
     let mut ecs_initialized = false;
+    let mut drawables = Vec::<Box<dyn Drawable>>::new();
+    let debug = Box::new(crate::rendering::drawable::DebugDrawable {});
+    debug.init(&device, &shader_manager);
+    drawables.push(debug);
     event_loop.run(move |event, _, control_flow| {
         let _ = (&instance, &adapter);
 
@@ -91,7 +108,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 } else {
                     ecs.run_frame(&mut scripting);
                 }
-                crate::rendering::core::render_frame(&surface, &device, &queue);
+                crate::rendering::core::render_frame(&surface, &device, &queue, &drawables, &shader_manager, ecs_initialized);
             }
             Event::WindowEvent {
                 ref event,
@@ -106,8 +123,9 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
 }
 
 static mut HAS_RENDERED: bool = false;
+static mut HAS_LOADED: bool = false;
 
-pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu::Queue) {
+pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu::Queue, drawables: &Vec<Box<dyn Drawable>>, shader_manager: &ShaderManager, ecs_initialized: bool) {
     #[cfg(target_arch = "wasm32")]
     {
         if !unsafe { HAS_RENDERED } { 
@@ -124,14 +142,23 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu
 
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
     let mut clear_color = wgpu::Color::RED;
-    let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
-    if asset_manager.pending_tasks.fetch_or(0, std::sync::atomic::Ordering::SeqCst) == 0 {
-        clear_color = wgpu::Color::BLUE;
+    {
+        let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
+        if asset_manager.pending_tasks.fetch_or(0, std::sync::atomic::Ordering::SeqCst) == 0 && ecs_initialized {
+            clear_color = wgpu::Color::BLUE;
+            #[cfg(target_arch = "wasm32")]
+            {
+                if !unsafe { HAS_LOADED } { 
+                    update_loading_status(4);
+                    unsafe { HAS_LOADED = true; }
+                }
+            }
+        }
     }
     // Lets clear the main texture
     {
-        let _r_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Clear Texture"),
+        let mut r_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Primary Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &view,
                 resolve_target: None,
@@ -144,8 +171,11 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu
             occlusion_query_set: None,
             timestamp_writes: None
         });
+
+        for drawable in drawables {
+            drawable.draw(&mut r_pass, &shader_manager);
+        }
     }
-    // TODO: Here well loop through our drawables :DDD
 
     queue.submit(Some(encoder.finish()));
     frame.present();
