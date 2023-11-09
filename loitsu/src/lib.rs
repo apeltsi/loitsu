@@ -3,14 +3,21 @@ pub mod rendering;
 pub mod logging;
 pub mod scene_management;
 pub mod ecs;
+pub mod asset_management;
 
-use scripting::{ScriptingInstance, ScriptingSource};
+use scripting::ScriptingInstance;
+
+#[cfg_attr(feature = "json_preference_parse", derive(serde::Deserialize))]
+#[derive(Clone, bitcode::Decode, bitcode::Encode)]
+pub struct Preferences {
+    default_scene: String
+}
 
 #[cfg(target_arch = "wasm32")]
 mod web;
 
 #[cfg(feature = "scene_generation")]
-pub fn build_scenes(scenes: Vec<(String, String)>, scripts: Vec<ScriptingSource>) -> Vec<scene_management::Scene> {
+pub fn build_scenes(scenes: Vec<(String, String)>, scripts: Vec<scripting::ScriptingSource>) -> Vec<scene_management::Scene> {
     let mut rune = scripting::rune_runtime::
         RuneInstance::new_with_sources(scripts).unwrap();
     let mut e = ecs::ECS::new();
@@ -36,29 +43,21 @@ pub fn init_engine() {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
         console_log::init().expect("could not initialize logger");
     }
+
     log!("Loitsu core starting up...");
-    let _rune = scripting::rune_runtime::
-        RuneInstance::new_with_sources(
-            vec![ScriptingSource{
-                name: "main".to_string(),
-                source: r#"
-                    fn main() {
-                        print("Hello, world!");
-                    }
-                "#.to_string()
-            }
-        
-            ]).unwrap();
+    let rune = scripting::rune_runtime::RuneInstance::new_uninitialized().unwrap();
+    let ecs = ecs::ECS::<scripting::rune_runtime::RuneInstance>::new();
+
     #[cfg(not(target_arch = "wasm32"))]
     {
         use rendering::desktop;
-        desktop::init_window();
+        desktop::init_window(rune, ecs);
     }
 
     #[cfg(target_arch = "wasm32")]
     {
         use rendering::web;
-        web::init_view();
+        web::init_view(rune, ecs);
     }
 }
 

@@ -5,8 +5,8 @@ use crate::ScriptingInstance;
 use crate::scripting::{ScriptingError, ScriptingSource, ScriptingData};
 use rune::termcolor::{StandardStream, ColorChoice};
 use crate::scene_management::Component;
-use std::sync::Arc;
 use crate::scene_management::Property;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
@@ -14,17 +14,17 @@ pub type Result<T> = std::result::Result<T, ScriptingError>;
 static mut REQUIRED_ASSETS: Vec<String> = Vec::new();
 
 pub struct RuneInstance {
-    virtual_machine: Vm,
+    virtual_machine: Option<Vm>,
 }
 
 pub struct RuneComponent {
     pub data: Option<Shared<Struct>>
 }
 
-impl ScriptingData for RuneComponent {
+impl ScriptingData<RuneInstance> for RuneComponent {
     fn from_component_proto(proto: Component, instance: &mut RuneInstance) -> Result<Self> {
         // lets start by initializing a new struct in the runtime
-        let data = instance.virtual_machine.call([proto.name.as_str(), "new"], ())?;
+        let data = instance.virtual_machine.as_mut().unwrap().call([proto.name.as_str(), "new"], ()).expect("Error when initializing component. Did you forget to include a 'new' method?");
         let component_data = match data {
             Value::Struct(data) => {
                 {
@@ -142,6 +142,8 @@ impl From<VmError> for ScriptingError {
 }
 
 impl ScriptingInstance for RuneInstance {
+    type Data = RuneComponent;
+
     fn new_with_sources(sources: Vec<ScriptingSource>) -> Result<Self> {
         let mut context = Context::new();
         let core_module = core_module()?;
@@ -168,16 +170,75 @@ impl ScriptingInstance for RuneInstance {
         let vm = Vm::new(runtime_context, unit);
 
         Ok(Self {
-            virtual_machine: vm,
+            virtual_machine: Some(vm),
         })
     }
 
+    fn new_uninitialized() -> Result<Self> {
+        Ok(Self {
+            virtual_machine: None,
+        })
+    }
+    
+    fn initialize(&mut self, sources: Vec<ScriptingSource>) -> Result<()> {
+        let mut context = Context::new();
+        let core_module = core_module()?;
+        context.install(&core_module)?;
+        let runtime = context.runtime()?;
+        let mut rune_sources = Sources::new();
+        for source in sources {
+            let _ = rune_sources.insert(Source::new(source.name, source.source)?);
+        }
+        let mut diagnostics = Diagnostics::without_warnings();
+        let result = rune::prepare(&mut rune_sources)
+            .with_context(&context)
+            .with_diagnostics(&mut diagnostics)
+            .build();
+
+        if !diagnostics.is_empty() {
+            let mut writer = StandardStream::stderr(ColorChoice::Always);
+            diagnostics.emit(&mut writer, &rune_sources)?;
+        }
+
+        let unit = result?;
+        let unit = Arc::new(unit);
+        let runtime_context = Arc::new(runtime);
+        let vm = Vm::new(runtime_context, unit);
+
+        self.virtual_machine = Some(vm);
+
+        Ok(())
+    }
+
     fn call<T>(&mut self, path: [&str; 2], args: T) -> Result<Value> where T: Args {
-        let result = self.virtual_machine.execute(path, args)?.complete().into_result()?;
+        let result = self.virtual_machine.as_mut().unwrap().execute(path, args)?.complete().into_result()?;
         Ok(result)
     }
-}
 
+    fn run_component_methods<RuneComponent>(&mut self, entities: &[crate::ecs::RuntimeEntity<Self>], method: &str) {
+        for entity in entities {
+            self.run_component_methods_on_entity(&entity, method);
+            for child in &entity.children {
+                self.run_component_methods_on_entity(child, method);
+            }
+        }
+    }
+
+}
+impl RuneInstance {
+    fn run_component_methods_on_entity(&mut self, entity: &crate::ecs::RuntimeEntity<Self>, method: &str) {
+        for component in &entity.components {
+            match &component.data.data {
+                Some(data) => {
+                    let _ = self.virtual_machine.as_mut().unwrap().call([component.component_proto.name.as_str(), method], (data.clone(), ));
+                },
+                None => {
+                    let _ = self.virtual_machine.as_mut().unwrap().call([component.component_proto.name.as_str(), method], (rune::runtime::Value::EmptyTuple, ));
+                }
+            }
+        }
+    }
+}
 #[cfg(feature = "scene_generation")]
 pub unsafe fn get_required_assets() -> Vec<String> {
     REQUIRED_ASSETS.clone()
@@ -213,6 +274,12 @@ fn core_module() -> Result<Module> {
     {
         m.function("require_asset", | asset: &str | {
             unsafe { REQUIRED_ASSETS.push(asset.to_string()); }
+            Ok::<(), ()>(())
+        }).build()?;
+    }
+    #[cfg(not(feature = "scene_generation"))]
+    {
+        m.function("require_asset", | _asset: &str | {
             Ok::<(), ()>(())
         }).build()?;
     }

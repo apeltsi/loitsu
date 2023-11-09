@@ -2,9 +2,10 @@
 use serde_json::{Value, Map};
 
 use std::collections::HashMap;
+use bitcode;
 
-
-#[derive(Debug, Clone)]
+#[derive(Clone, bitcode::Encode, bitcode::Decode)]
+#[bitcode(recursive)]
 pub enum Property {
     String(String),
     Number(f32),
@@ -14,23 +15,29 @@ pub enum Property {
     ComponentReference(String), // Reference to another component in the scene (Represents the ID)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, bitcode::Encode, bitcode::Decode)]
 pub struct Scene {
     pub name: String,
     pub entities: Vec<Entity>,
-    pub required_assets: Vec<String>
+    pub required_assets: Vec<String>,
+    pub shards: Vec<String>
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, bitcode::Encode, bitcode::Decode)]
+#[bitcode(recursive)]
 pub struct Entity {
     pub name: String,
+    #[bitcode_hint(ascii_lowercase)]
     pub id: String,
     pub components: Vec<Component>,
     pub children: Vec<Entity>,
 }
-#[derive(Debug, Clone)]
+
+#[derive(Clone, bitcode::Encode, bitcode::Decode)]
 pub struct Component {
     pub name: String,
+    #[bitcode_hint(ascii_lowercase)]
+    pub id: String,
     pub properties: HashMap<String, Property>,
 }
 
@@ -40,6 +47,7 @@ impl Scene {
             name,
             entities: Vec::new(),
             required_assets: Vec::new(),
+            shards: Vec::new()
         }
     }
     #[cfg(feature = "scene_generation")]
@@ -80,7 +88,8 @@ fn collect_entities(entities: Vec<Value>) -> Vec<Entity> {
         let components = entity["components"].as_array().unwrap();
         for component in components {
             let name = component["name"].as_str().unwrap().to_string();
-            let mut out_component = Component::new(name);
+            let id = component["id"].as_str().unwrap().to_string();
+            let mut out_component = Component::new(name, id);
             let properties = component["properties"].as_object().unwrap();
             for property in properties {
                 let property_name = property.0.clone();
@@ -129,9 +138,10 @@ impl Entity {
 }
 
 impl Component {
-    pub fn new(name: String) -> Component {
+    pub fn new(name: String, id: String) -> Component {
         Component {
             name,
+            id,
             properties: HashMap::new(),
         }
     }

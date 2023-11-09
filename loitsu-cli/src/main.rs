@@ -6,7 +6,9 @@ use std::path::Path;
 use warp::Filter;
 use cargo_toml::{Manifest, Dependency};
 use std::path::PathBuf;
+use colored::*;
 mod asset_builder;
+mod shard_gen;
 
 #[derive(Debug, Parser)] 
 #[command(name = "loitsu")]
@@ -22,30 +24,32 @@ enum Commands {
         #[arg(short, long, default_value = "")]
         target: String,
         #[arg(short, long, default_value = "false")]
-        release: bool
+        release: bool,
+        #[arg(short, long, default_value = "false")]
+        force: bool
     },
     Run {
         #[arg(short, long, default_value = "")]
         target: String,
         #[arg(short, long, default_value = "false")]
-        release: bool
+        release: bool,
+        #[arg(short, long, default_value = "false")]
+        force: bool
     }
 }
 #[tokio::main]
 async fn main() {
-    println!("Loitsu Dev Tools");
-
     let args = Cli::parse();
 
     match args.command {
-        Commands::Build { target, release } => build(&target, release, false).await,
-        Commands::Run { target, release } => build(&target, release, true).await,
+        Commands::Build { target, release, force } => build(&target, release, false, force).await,
+        Commands::Run { target, release, force } => build(&target, release, true, force).await,
     }
 }
 
-async fn build(target: &str, release: bool, run: bool) {
+async fn build(target: &str, release: bool, run: bool, force: bool) {
     if target == "web" {
-        println!("Building for web");
+        info!("Building for web");
         // Now we can build the target
         build_with_args(vec!["--target=wasm32-unknown-unknown".to_string()], release, false);
         let mut out_path = std::env::current_dir().unwrap();
@@ -73,21 +77,21 @@ async fn build(target: &str, release: bool, run: bool) {
                 }
             }
         };
-        println!("Running wasm-bindgen...");
+        info!("Running wasm-bindgen...");
         wasm_bindgen(&out_path, package_name.as_str());
-        println!("Creating player...");
+        info!("Creating player...");
         // Lets copy the web player files
         generate_player_files(&out_path, &package_name, &loitsu_version);
-        println!("Building assets...");
-        asset_builder::build_assets(&out_path);
-        println!("Build Done!");
+        
+        asset_builder::build_assets(&out_path.join("out"), force);
         if run {
             start_webserver(&out_path).await;
+        } else {
+            done("Build Done!");
         }
     } else if target == "" {
         // Now we can build the target
-        println!("Building for native");
-        println!("Building assets...");
+        info!("Building for native");
         let mut out_path = std::env::current_dir().unwrap();
         out_path.push("target");
         if release {
@@ -95,8 +99,8 @@ async fn build(target: &str, release: bool, run: bool) {
         } else {
             out_path.push("debug");
         }
-        asset_builder::build_assets(&out_path);
-        println!("Building native target...");
+        asset_builder::build_assets(&out_path, force);
+        info!("Building native target...");
         build_with_args(vec![], release, run);
     } else {
         panic!("Unsupported target: {}", target);
@@ -115,7 +119,6 @@ fn generate_player_files(path: &PathBuf, app_name: &str, loitsu_version: &str) {
     let out_dir = Path::new(&out_str);
     let dest_path = &out_dir.join("index.html");
     let mut f = File::create(&dest_path).unwrap();
-    println!("Writing player.html to {}", dest_path.to_str().unwrap());
     f.write_all(player_html.as_bytes()).unwrap();
 
     // Finally lets copy the loitsu logo & js to the output directory
@@ -159,7 +162,7 @@ async fn start_webserver(path: &PathBuf) {
         .and(add_no_cache_header)
         .map(|reply, _| reply);
 
-    println!("Project live at http://localhost:5959");
+    done("Build done! Project live at http://localhost:5959");
     warp::serve(route).run(([127, 0, 0, 1], 5959)).await;
 }
 
@@ -177,4 +180,17 @@ fn wasm_bindgen(path: &PathBuf, bin_name: &str) {
 
 fn str_static(s: String) -> &'static str {
     s.leak()
+}
+
+#[macro_export]
+macro_rules! info {
+    ($($t:tt)*) => ($crate::info(&format_args!($($t)*).to_string()))
+}
+
+pub fn info(msg: &str) {
+    println!("{} {}", "[INFO]".bright_blue(),msg);
+}
+
+pub fn done(msg: &str) {
+    println!("{} {}", "[DONE]".bright_green(),msg);
 }

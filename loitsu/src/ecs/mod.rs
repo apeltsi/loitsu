@@ -1,31 +1,31 @@
+#[cfg(not(feature = "scene_generation"))]
+use crate::asset_management::ASSET_MANAGER;
 use crate::scene_management::{Scene, Entity, Component};
 use crate::scripting::{ScriptingData, ScriptingInstance};
-use crate::scripting::rune_runtime::{RuneInstance, RuneComponent};
 
-pub struct ECS {
+pub struct ECS<T> where T: ScriptingInstance {
     pub active_scene: Scene,
     pub static_scene: Option<Scene>,
-    runtime_entities: Vec<RuntimeEntity>,
+    runtime_entities: Vec<RuntimeEntity<T>>,
 }
 
 #[allow(dead_code)]
-struct RuntimeEntity {
+pub struct RuntimeEntity<T> where T: ScriptingInstance {
     name: String,
     id: String,
-    components: Vec<RuntimeComponent>,
+    pub components: Vec<RuntimeComponent<T>>,
     entity_proto: Entity,
-    children: Vec<RuntimeEntity>,
+    pub children: Vec<RuntimeEntity<T>>,
 }
 
 #[allow(dead_code)]
-struct RuntimeComponent {
-    name: String,
-    data: RuneComponent,
-    component_proto: Component,
+pub struct RuntimeComponent<T> where T: ScriptingInstance {
+    pub data: T::Data,
+    pub component_proto: Component,
 }
 
-impl ECS {
-    pub fn new() -> ECS {
+impl<T: ScriptingInstance> ECS<T> {
+    pub fn new() -> ECS<T> {
         ECS {
             active_scene: Scene::new("INITIAL_SCENE".to_string()),
             static_scene: None,
@@ -33,25 +33,28 @@ impl ECS {
         }
     }
 
-    pub fn load_scene(&mut self, scene: Scene, scripting: &mut RuneInstance) {
+    pub fn load_scene(&mut self, scene: Scene, scripting: &mut T) {
         self.active_scene = scene.clone();
         self.runtime_entities = init_entities(scene.entities, scripting);
+
+        // next up we'll have to figure out how to load our assets
+        // lets start by requesting the appropriate shards
+        
+        #[cfg(not(feature = "scene_generation"))]
+        ASSET_MANAGER.lock().unwrap().request_shards(scene.shards.clone());
     }
 
-    pub fn run_build_step(&mut self, scripting: &mut RuneInstance) {
+    pub fn run_build_step(&mut self, scripting: &mut T) {
+        self.run_component_methods(scripting, "build");
+    }
+
+    pub fn run_frame(&mut self, scripting: &mut T) {
+        self.run_component_methods(scripting, "frame");
+    }
+
+    fn run_component_methods(&mut self, scripting: &mut T, method: &str) {
         // Lets iterate over the entities and run the build step on each component
-        for runtime_entity in &self.runtime_entities {
-            for runtime_component in &runtime_entity.components {
-                match &runtime_component.data.data {
-                    Some(data) => {
-                        scripting.call([runtime_component.name.as_str(), "build"], (data.clone(), )).unwrap();
-                    },
-                    None => {
-                        scripting.call([runtime_component.name.as_str(), "build"], (rune::runtime::Value::EmptyTuple, )).unwrap();
-                    }
-                }
-            }
-        }
+        scripting.run_component_methods::<T>(self.runtime_entities.as_slice(), method);
     }
 
     pub fn clear(&mut self) {
@@ -65,12 +68,13 @@ impl ECS {
         Scene {
             name: self.active_scene.name.clone(),
             entities: self.runtime_entities.iter().map(|runtime_entity| runtime_entity.as_entity()).collect(),
-            required_assets: Vec::new()
+            required_assets: Vec::new(),
+            shards: Vec::new(),
         }
     }
 }
 
-impl RuntimeEntity {
+impl<T: ScriptingInstance> RuntimeEntity<T> {
     #[cfg(feature = "scene_generation")]
     pub fn as_entity(&self) -> Entity {
         Entity {
@@ -82,14 +86,14 @@ impl RuntimeEntity {
     }
 }
 
-impl RuntimeComponent {
+impl<T: ScriptingInstance> RuntimeComponent<T> {
     #[cfg(feature = "scene_generation")]
     pub fn as_component(&self) -> Component {
         self.data.to_component_proto(&self.component_proto).unwrap()
     }
 }
 
-fn init_entities(proto_entities: Vec<Entity>, scripting: &mut RuneInstance) -> Vec<RuntimeEntity> {
+fn init_entities<T>(proto_entities: Vec<Entity>, scripting: &mut T) -> Vec<RuntimeEntity<T>> where T: ScriptingInstance {
     // Lets recursively iterate over the entities and create a runtime entity for each one
     let mut runtime_entities = Vec::new();
     for proto_entity in proto_entities {
@@ -102,8 +106,7 @@ fn init_entities(proto_entities: Vec<Entity>, scripting: &mut RuneInstance) -> V
         };
         for proto_component in runtime_entity.entity_proto.components.clone() {
             let runtime_component = RuntimeComponent {
-                name: proto_component.name.clone(),
-                data: RuneComponent::from_component_proto(proto_component.clone(), scripting).unwrap(),
+                data: ScriptingData::from_component_proto(proto_component.clone(), scripting).unwrap(),
                 component_proto: proto_component,
             };
             runtime_entity.components.push(runtime_component);

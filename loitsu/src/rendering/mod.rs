@@ -7,3 +7,6 @@ pub mod web;
 pub mod desktop;
 
 pub mod core;
+
+pub mod drawable;
+pub mod shader;

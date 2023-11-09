@@ -1,0 +1,18 @@
+{
+  "entities": [
+    {
+      "id": "7264233e-4dfa-4a4d-9ab2-7d08964985db",
+      "name": "This is a test",
+      "children": [],
+      "components": [
+        {
+          "name": "Other",
+          "id": "28a714ad-9dcb-4d26-b15e-fc7604225816",
+          "properties": {
+            "name": "hoho"
+          }
+        }
+      ]
+    }
+  ]
+}
