@@ -72,12 +72,25 @@ impl Shard {
         }
         Ok(ConsumedShard {
             name: self.name.clone(),
-            assets
+            assets,
+            is_initialized: false
         })
     }
 }
 
 pub struct ConsumedShard {
     pub name: String,
-    pub assets: HashMap<String, Box<dyn Asset>>
+    pub assets: HashMap<String, Box<dyn Asset>>,
+    pub is_initialized: bool
+}
+
+impl ConsumedShard {
+    pub fn initialize(&mut self, graphics_device: &wgpu::Device, queue: &wgpu::Queue) {
+        // assets such as sprites have to be initialized 
+        // (with access to the graphics device)
+        for (_, asset) in self.assets.iter_mut() {
+            asset.initialize(graphics_device, queue).unwrap();
+        }
+        self.is_initialized = true;
+    }
 }

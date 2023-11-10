@@ -61,6 +61,7 @@ impl AssetManager {
             assets,
         }
     }
+
     pub fn request_shards(&mut self, shards: Vec<String>) {
         let assets = self.assets.clone();
         let pending_tasks = self.pending_tasks.clone();
@@ -98,6 +99,18 @@ impl AssetManager {
         });
     }
 
+    pub fn initialize_shards(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+        if self.pending_tasks.load(Ordering::SeqCst) > 0 {
+            return;
+        }
+        let mut assets = self.assets.lock().unwrap();
+        for shard in &mut assets.shards {
+            if shard.is_initialized {
+                continue;
+            }
+            shard.initialize(device, queue);
+        }
+    }
 }
 
 #[derive(Debug)]

@@ -106,9 +106,11 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         log!("ECS initialized");
                     }
                 } else {
+                    let mut asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
+                    asset_manager.initialize_shards(&device, &queue);
                     ecs.run_frame(&mut scripting);
                 }
-                crate::rendering::core::render_frame(&surface, &device, &queue, &drawables, &shader_manager, ecs_initialized);
+                render_frame(&surface, &device, &queue, &drawables, &shader_manager, ecs_initialized);
             }
             Event::WindowEvent {
                 ref event,
@@ -144,7 +146,7 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu
     let mut clear_color = wgpu::Color::RED;
     {
         let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
-        if asset_manager.pending_tasks.fetch_or(0, std::sync::atomic::Ordering::SeqCst) == 0 && ecs_initialized {
+        if asset_manager.pending_tasks.load(std::sync::atomic::Ordering::SeqCst) == 0 && ecs_initialized {
             clear_color = wgpu::Color::BLUE;
             #[cfg(target_arch = "wasm32")]
             {
