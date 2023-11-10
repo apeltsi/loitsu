@@ -2,6 +2,7 @@ pub mod rune_runtime;
 use std::fmt;
 use crate::scene_management::Component;
 use bitcode;
+use crate::ecs::ComponentFlags;
 
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
@@ -37,7 +38,8 @@ pub trait ScriptingInstance: Sized {
     fn new_uninitialized() -> Result<Self> where Self: Sized;
     fn initialize(&mut self, sources: Vec<ScriptingSource>) -> Result<()>;
     fn call<T>(&mut self, path: [&str; 2], args: T) -> Result<rune::runtime::Value> where T: rune::runtime::Args;
-    fn run_component_methods<T>(&mut self, entities: &[crate::ecs::RuntimeEntity<Self>], method: &str);
+    fn run_component_methods<T>(&mut self, entities: &[crate::ecs::RuntimeEntity<Self>], method: ComponentFlags);
+    fn get_component_flags(&self, component_name: &str) -> ComponentFlags;
 }
 
 pub trait ScriptingData<T> where T: ScriptingInstance {

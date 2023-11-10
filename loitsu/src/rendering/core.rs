@@ -155,7 +155,6 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu
             }
         }
     }
-    // Lets clear the main texture
     {
         let mut r_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Primary Pass"),
@@ -163,6 +162,7 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu
                 view: &view,
                 resolve_target: None,
                 ops: wgpu::Operations {
+                    // Lets clear the main texture
                     load: wgpu::LoadOp::Clear(clear_color),
                     store: wgpu::StoreOp::Store 
                 }

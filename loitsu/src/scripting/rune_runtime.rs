@@ -7,6 +7,7 @@ use rune::termcolor::{StandardStream, ColorChoice};
 use crate::scene_management::Component;
 use crate::scene_management::Property;
 use std::sync::Arc;
+use crate::ecs::ComponentFlags;
 
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
@@ -215,19 +216,53 @@ impl ScriptingInstance for RuneInstance {
         Ok(result)
     }
 
-    fn run_component_methods<RuneComponent>(&mut self, entities: &[crate::ecs::RuntimeEntity<Self>], method: &str) {
+    fn run_component_methods<RuneComponent>(&mut self, entities: &[crate::ecs::RuntimeEntity<Self>], method: ComponentFlags) {
         for entity in entities {
-            self.run_component_methods_on_entity(&entity, method);
+            if entity.component_flags & method == method {
+                self.run_component_methods_on_entity(&entity, method);
+            }
             for child in &entity.children {
-                self.run_component_methods_on_entity(child, method);
+                if child.component_flags & method == method {
+                    self.run_component_methods_on_entity(child, method);
+                }
             }
         }
     }
 
+    fn get_component_flags(&self, component_name: &str) -> ComponentFlags {
+        let mut flags = ComponentFlags::EMPTY;
+        if let Some(vm) = &self.virtual_machine {
+            let result = vm.lookup_function([component_name, "build"]);
+            if let Ok(_) = result {
+                flags |= ComponentFlags::BUILD;
+            }
+            let result = vm.lookup_function([component_name, "frame"]);
+            if let Ok(_) = result {
+                flags |= ComponentFlags::FRAME;
+            }
+            let result = vm.lookup_function([component_name, "late_frame"]);
+            if let Ok(_) = result {
+                flags |= ComponentFlags::LATE_FRAME;
+            }
+            let result = vm.lookup_function([component_name, "tick"]);
+            if let Ok(_) = result {
+                flags |= ComponentFlags::TICK;
+            }
+            let result = vm.lookup_function([component_name, "destroy"]);
+            if let Ok(_) = result {
+                flags |= ComponentFlags::DESTROY;
+            }
+        }
+        flags
+    }
 }
 impl RuneInstance {
-    fn run_component_methods_on_entity(&mut self, entity: &crate::ecs::RuntimeEntity<Self>, method: &str) {
+    fn run_component_methods_on_entity(&mut self, entity: &crate::ecs::RuntimeEntity<Self>, c_flags: ComponentFlags) {
+        let method = flags_to_method(c_flags);
         for component in &entity.components {
+            if component.flags & c_flags != c_flags {
+                continue;
+            }
             match &component.data.data {
                 Some(data) => {
                     let r = self.virtual_machine.as_mut().unwrap().call([component.component_proto.name.as_str(), method], (data.clone(), ));
@@ -245,6 +280,18 @@ impl RuneInstance {
         }
     }
 }
+
+fn flags_to_method(flags: ComponentFlags) -> &'static str {
+    match flags {
+        ComponentFlags::BUILD => "build",
+        ComponentFlags::FRAME => "frame",
+        ComponentFlags::LATE_FRAME => "late_frame",
+        ComponentFlags::TICK => "tick",
+        ComponentFlags::DESTROY => "destroy",
+        _ => panic!("Invalid component flags"),
+    }
+}
+
 #[cfg(feature = "scene_generation")]
 pub unsafe fn get_required_assets() -> Vec<String> {
     REQUIRED_ASSETS.clone()
