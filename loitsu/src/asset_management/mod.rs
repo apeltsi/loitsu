@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex, atomic::{AtomicUsize, Ordering}};
 pub mod shard;
 pub mod static_shard;
 pub mod get_file;
+pub mod asset;
 
 lazy_static!{
     pub static ref ASSET_MANAGER: Arc<Mutex<AssetManager>> = Arc::new(Mutex::new(AssetManager::new()));
@@ -24,7 +25,7 @@ pub struct AssetManager {
 }
 
 pub struct Assets {
-    pub shards: Vec<shard::Shard>,
+    pub shards: Vec<shard::ConsumedShard>,
     pub static_shard: Option<static_shard::StaticShard>,
 }
 
@@ -83,8 +84,9 @@ impl AssetManager {
                 match result {
                     Ok(file) => {
                         log!("Successfully loaded shard");
-                        let shard = shard::Shard::decode(&file);
-                        assets.shards.push(shard);
+                        let mut shard = shard::Shard::decode(&file);
+                        let consumed_shard = shard.consume().unwrap();
+                        assets.shards.push(consumed_shard);
                         pending_tasks.fetch_sub(1, Ordering::SeqCst);
                     },
                     Err(e) => {

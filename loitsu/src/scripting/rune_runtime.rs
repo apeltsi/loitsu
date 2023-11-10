@@ -56,7 +56,7 @@ impl ScriptingData<RuneInstance> for RuneComponent {
                 proto.properties.insert(key.to_string(), value.clone().into());
             }
         }
-        Ok(proto.clone())
+        Ok(proto)
     }
 }
 
@@ -230,10 +230,16 @@ impl RuneInstance {
         for component in &entity.components {
             match &component.data.data {
                 Some(data) => {
-                    let _ = self.virtual_machine.as_mut().unwrap().call([component.component_proto.name.as_str(), method], (data.clone(), ));
+                    let r = self.virtual_machine.as_mut().unwrap().call([component.component_proto.name.as_str(), method], (data.clone(), ));
+                    if let Err(error) = r {
+                        crate::logging::error(&format!("Error running method {} on component {}: {}", method, component.component_proto.name, error));
+                    }
                 },
                 None => {
-                    let _ = self.virtual_machine.as_mut().unwrap().call([component.component_proto.name.as_str(), method], (rune::runtime::Value::EmptyTuple, ));
+                    let r = self.virtual_machine.as_mut().unwrap().call([component.component_proto.name.as_str(), method], (rune::runtime::Value::EmptyTuple, ));
+                    if let Err(error) = r {
+                        crate::logging::error(&format!("Error running method {} on component {}: {}", method, component.component_proto.name, error));
+                    }
                 }
             }
         }

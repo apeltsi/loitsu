@@ -1,5 +1,6 @@
 #[cfg(not(feature = "scene_generation"))]
 use crate::asset_management::ASSET_MANAGER;
+use crate::log;
 use crate::scene_management::{Scene, Entity, Component};
 use crate::scripting::{ScriptingData, ScriptingInstance};
 
@@ -105,6 +106,7 @@ fn init_entities<T>(proto_entities: Vec<Entity>, scripting: &mut T) -> Vec<Runti
             children: init_entities(proto_entity.children.clone(), scripting),
         };
         for proto_component in runtime_entity.entity_proto.components.clone() {
+            log!("Component {} attached with {} properties", proto_component.name, proto_component.properties.len());
             let runtime_component = RuntimeComponent {
                 data: ScriptingData::from_component_proto(proto_component.clone(), scripting).unwrap(),
                 component_proto: proto_component,

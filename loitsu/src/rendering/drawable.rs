@@ -10,7 +10,6 @@ pub trait Drawable {
 pub struct DebugDrawable {}
 
 impl Drawable for DebugDrawable {
-
     fn init(&self, _device: &wgpu::Device, _shader_manager: &ShaderManager) {
     }
 
