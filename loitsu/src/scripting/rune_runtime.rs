@@ -216,12 +216,24 @@ impl ScriptingInstance for RuneInstance {
         Ok(result)
     }
 
-    fn run_component_methods<RuneComponent>(&mut self, entities: &[crate::ecs::RuntimeEntity<Self>], method: ComponentFlags) {
+    fn run_component_methods<RuneComponent>(&mut self, entities: &mut [crate::ecs::RuntimeEntity<Self>], method: ComponentFlags) {
         for entity in entities {
+            if entity.is_new {
+                if entity.component_flags & ComponentFlags::START == ComponentFlags::START {
+                    self.run_component_methods_on_entity(&entity, ComponentFlags::START);
+                }
+                entity.is_new = false;
+            }
             if entity.component_flags & method == method {
                 self.run_component_methods_on_entity(&entity, method);
             }
-            for child in &entity.children {
+            for child in &mut entity.children {
+                if child.is_new {
+                    if child.component_flags & ComponentFlags::START == ComponentFlags::START {
+                        self.run_component_methods_on_entity(child, ComponentFlags::START);
+                    }
+                    child.is_new = false;
+                }
                 if child.component_flags & method == method {
                     self.run_component_methods_on_entity(child, method);
                 }
@@ -232,25 +244,19 @@ impl ScriptingInstance for RuneInstance {
     fn get_component_flags(&self, component_name: &str) -> ComponentFlags {
         let mut flags = ComponentFlags::EMPTY;
         if let Some(vm) = &self.virtual_machine {
-            let result = vm.lookup_function([component_name, "build"]);
-            if let Ok(_) = result {
-                flags |= ComponentFlags::BUILD;
-            }
-            let result = vm.lookup_function([component_name, "frame"]);
-            if let Ok(_) = result {
-                flags |= ComponentFlags::FRAME;
-            }
-            let result = vm.lookup_function([component_name, "late_frame"]);
-            if let Ok(_) = result {
-                flags |= ComponentFlags::LATE_FRAME;
-            }
-            let result = vm.lookup_function([component_name, "tick"]);
-            if let Ok(_) = result {
-                flags |= ComponentFlags::TICK;
-            }
-            let result = vm.lookup_function([component_name, "destroy"]);
-            if let Ok(_) = result {
-                flags |= ComponentFlags::DESTROY;
+            let methods = vec![
+                ComponentFlags::BUILD,
+                ComponentFlags::FRAME,
+                ComponentFlags::LATE_FRAME,
+                ComponentFlags::TICK,
+                ComponentFlags::START,
+                ComponentFlags::DESTROY,
+            ];
+            for method in methods {
+                let result = vm.lookup_function([component_name, flags_to_method(method)]);
+                if let Ok(_) = result {
+                    flags |= method;
+                }
             }
         }
         flags
@@ -287,6 +293,7 @@ fn flags_to_method(flags: ComponentFlags) -> &'static str {
         ComponentFlags::FRAME => "frame",
         ComponentFlags::LATE_FRAME => "late_frame",
         ComponentFlags::TICK => "tick",
+        ComponentFlags::START => "start",
         ComponentFlags::DESTROY => "destroy",
         _ => panic!("Invalid component flags"),
     }

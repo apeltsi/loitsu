@@ -13,12 +13,13 @@ pub struct ECS<T> where T: ScriptingInstance {
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct ComponentFlags: u32 {
-        const EMPTY = 0b00000000;
-        const BUILD = 0b00000001;
-        const FRAME = 0b00000010;
-        const LATE_FRAME = 0b00000100;
-        const TICK = 0b00001000;
-        const DESTROY = 0b00010000;
+        const EMPTY =       0b00000000;
+        const BUILD =       0b00000001;
+        const FRAME =       0b00000010;
+        const LATE_FRAME =  0b00000100;
+        const TICK =        0b00001000;
+        const START =       0b00010000;
+        const DESTROY =     0b00100000;
     }
 }
 
@@ -30,6 +31,7 @@ pub struct RuntimeEntity<T> where T: ScriptingInstance {
     entity_proto: Entity,
     pub children: Vec<RuntimeEntity<T>>,
     pub component_flags: ComponentFlags, // this is the union of all the component flags, so we can quickly check if we need to run a method
+    pub is_new: bool
 }
 
 #[allow(dead_code)]
@@ -69,7 +71,7 @@ impl<T: ScriptingInstance> ECS<T> {
 
     fn run_component_methods(&mut self, scripting: &mut T, method: ComponentFlags) {
         // Lets iterate over the entities and run the build step on each component
-        scripting.run_component_methods::<T>(self.runtime_entities.as_slice(), method);
+        scripting.run_component_methods::<T>(self.runtime_entities.as_mut_slice(), method);
     }
 
     pub fn clear(&mut self) {
@@ -119,6 +121,7 @@ fn init_entities<T>(proto_entities: Vec<Entity>, scripting: &mut T) -> Vec<Runti
             entity_proto: proto_entity.clone(),
             children: init_entities(proto_entity.children.clone(), scripting),
             component_flags: ComponentFlags::EMPTY,
+            is_new: true
         };
         
         for proto_component in runtime_entity.entity_proto.components.clone() {
