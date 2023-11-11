@@ -58,7 +58,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     log!("Running event loop...");
     let mut ecs_initialized = false;
     let mut drawables = Vec::<Box<dyn Drawable>>::new();
-    let debug = Box::new(crate::rendering::drawable::DebugDrawable {});
+    let mut debug = Box::new(crate::rendering::drawable::DebugDrawable::new());
     debug.init(&device, &shader_manager);
     drawables.push(debug);
     event_loop.run(move |event, _, control_flow| {
@@ -181,4 +181,44 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu
 
     queue.submit(Some(encoder.finish()));
     frame.present();
+}
+
+pub fn get_camera_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("Camera Bind Group Layout"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
+                count: None
+            },
+        ],
+    })
+}
+
+pub fn get_sprite_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("Sprite Bind Group Layout"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float {filterable: true}, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false },
+                count: None
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
+                count: None
+            }
+        ],
+    })
 }

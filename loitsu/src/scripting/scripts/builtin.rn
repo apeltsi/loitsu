@@ -1,0 +1,28 @@
+// Some built-in components and methods
+
+pub fn register_drawable(type, data) {
+    return 0;
+}
+
+pub fn unregister_drawable(id) {
+    
+}
+
+struct SpriteRenderer {
+    sprite
+}
+
+impl SpriteRenderer {
+	pub fn new() {
+		SpriteRenderer {
+            sprite: "" 
+        }
+	}
+
+    pub fn build(self) {
+        require_asset(self.sprite);
+    }
+
+	pub fn frame(self) {
+	}
+}

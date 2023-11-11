@@ -1,7 +1,7 @@
 use rune::{Context, Diagnostics, Source, Sources, ContextError, Module, BuildError, Vm, ToValue};
 use rune::runtime::{Value, Struct, VmError, Shared, Args, VmResult};
 use rune::diagnostics::EmitError;
-use crate::ScriptingInstance;
+use crate::{ScriptingInstance, log, error};
 use crate::scripting::{ScriptingError, ScriptingSource, ScriptingData};
 use rune::termcolor::{StandardStream, ColorChoice};
 use crate::scene_management::Component;
@@ -151,8 +151,9 @@ impl ScriptingInstance for RuneInstance {
         context.install(&core_module)?;
         let runtime = context.runtime()?;
         let mut rune_sources = Sources::new();
+        rune_sources.insert(Source::new("loitsu_builtin", include_str!("scripts/builtin.rn"))?).unwrap();
         for source in sources {
-            let _ = rune_sources.insert(Source::new(source.name, source.source)?);
+            rune_sources.insert(Source::new(source.name, source.source)?).unwrap();
         }
         let mut diagnostics = Diagnostics::without_warnings();
         let result = rune::prepare(&mut rune_sources)
@@ -187,6 +188,7 @@ impl ScriptingInstance for RuneInstance {
         context.install(&core_module)?;
         let runtime = context.runtime()?;
         let mut rune_sources = Sources::new();
+        rune_sources.insert(Source::new("loitsu_builtin", include_str!("scripts/builtin.rn"))?).unwrap();
         for source in sources {
             let _ = rune_sources.insert(Source::new(source.name, source.source)?);
         }
@@ -311,8 +313,8 @@ pub unsafe fn clear_required_assets() {
 
 fn core_module() -> Result<Module> {
     let mut m = Module::new();
-    m.function("print", | log: &str | crate::logging::log(log)).build()?;
-    m.function("error", | log: &str | crate::logging::error(log)).build()?;
+    m.function("print", | log: &str | log!("[RUNE] {}", log)).build()?;
+    m.function("error", | log: &str | error!("[RUNE] {}", log)).build()?;
     // Math Constants
     m.constant("PI", std::f64::consts::PI).build()?;
     m.constant("E", std::f64::consts::E).build()?;

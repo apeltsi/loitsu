@@ -1,13 +1,16 @@
+use super::vertex::Vertex;
 use std::collections::HashMap;
 
 use wgpu::{Device, ShaderModule, RenderPipeline, PrimitiveState};
 
 use crate::log;
+
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct Shader {
     shader: ShaderModule,
-    pipeline: RenderPipeline
+    pipeline: RenderPipeline,
+    bindings: Vec<wgpu::BindGroupLayout>
 }
 
 
@@ -29,22 +32,40 @@ impl<'a> ShaderManager<'a> {
     }
     
     pub fn load_default_shaders(&mut self, device: &Device) {
-        self.load_shader(device, "debug", include_str!("shaders/debug.wgsl"));
+        self.load_shader(device, "debug", include_str!("shaders/debug.wgsl"), vec![]);
+        {
+            // spriterenderer
+            let mut bindings = Vec::new();
+            bindings.push(crate::rendering::core::get_camera_bind_group_layout(device));
+            bindings.push(crate::rendering::core::get_sprite_bind_group_layout(device));
+            self.load_shader(device, "sprite", include_str!("shaders/sprite.wgsl"), bindings);
+        }
         log!("Default shaders loaded");
     }
 
-    pub fn load_shader(&mut self, device: &Device, name: &'a str, shader: &str) {
+    pub fn load_shader(&mut self, device: &Device, name: &'a str, shader: &str, bindings: Vec<wgpu::BindGroupLayout>) {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some(format!("{}_shader", name).as_str()),
             source: wgpu::ShaderSource::Wgsl(shader.into()),
         });
+        
+        let mut render_pipeline_layout = None;
+        if bindings.len() > 0 {
+            let bind_group_layouts: Vec<&wgpu::BindGroupLayout> = bindings.iter().collect();
+            render_pipeline_layout = Some(device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some(format!("{}_pipeline_layout", name).as_str()),
+                bind_group_layouts: bind_group_layouts.as_slice(),
+                push_constant_ranges: &[],
+            }));
+        }
+            
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some(format!("{}_pipeline", name).as_str()),
-            layout: None,
+            layout: render_pipeline_layout.as_ref(),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[],
+                buffers: &[Vertex::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -72,6 +93,7 @@ impl<'a> ShaderManager<'a> {
         self.shaders.insert(name, Shader {
             shader,
             pipeline,
+            bindings
         });
     }
 
