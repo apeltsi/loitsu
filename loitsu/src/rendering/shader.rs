@@ -36,7 +36,7 @@ impl<'a> ShaderManager<'a> {
         {
             // spriterenderer
             let mut bindings = Vec::new();
-            bindings.push(crate::rendering::core::get_camera_bind_group_layout(device));
+            bindings.push(crate::rendering::core::get_global_bind_group_layout(device));
             bindings.push(crate::rendering::core::get_sprite_bind_group_layout(device));
             self.load_shader(device, "sprite", include_str!("shaders/sprite.wgsl"), bindings);
         }
@@ -98,6 +98,6 @@ impl<'a> ShaderManager<'a> {
     }
 
     pub fn get_shader(&self, name: &str) -> Option<&Shader> {
-        self.shaders.get(name).map(|s| s)
+        self.shaders.get(name)
     }
 } 

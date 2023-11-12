@@ -8,6 +8,8 @@ use crate::ecs::ECS;
 
 pub static mut TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 
+static mut DEFAULT_SAMPLER: Option<wgpu::Sampler> = None;
+
 #[cfg(target_arch = "wasm32")]
 use crate::web::update_loading_status;
 
@@ -54,11 +56,49 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     let mut shader_manager = crate::rendering::shader::ShaderManager::new();
     shader_manager.load_default_shaders(&device);
 
+    // lets init the global bind group
+    let camera_matrix_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Camera Matrix Buffer"),
+        size: std::mem::size_of::<[[f32; 4]; 4]>() as u64,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    let global_bind_group_layout = get_global_bind_group_layout(&device);
+    let global_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &global_bind_group_layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                buffer: &camera_matrix_buffer,
+                offset: 0,
+                size: wgpu::BufferSize::new(std::mem::size_of::<[[f32; 4]; 4]>() as u64),
+            }),
+        }],
+        label: None,
+    });
 
+    // lets create the default sampler
+
+    unsafe { 
+        DEFAULT_SAMPLER = Some(device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Default Sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            anisotropy_clamp: 0,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            border_color: None,
+            compare: None,
+            lod_min_clamp: 0.0,
+            lod_max_clamp: 0.0,
+        }));
+    }
     log!("Running event loop...");
     let mut ecs_initialized = false;
     let mut drawables = Vec::<Box<dyn Drawable>>::new();
-    let mut debug = Box::new(crate::rendering::drawable::DebugDrawable::new());
+    let mut debug = Box::new(crate::rendering::drawable::sprite::SpriteDrawable::new("sprites/backgrounds/LaptopIntroShot.png"));
     debug.init(&device, &shader_manager);
     drawables.push(debug);
     event_loop.run(move |event, _, control_flow| {
@@ -110,7 +150,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     asset_manager.initialize_shards(&device, &queue);
                     ecs.run_frame(&mut scripting);
                 }
-                render_frame(&surface, &device, &queue, &drawables, &shader_manager, ecs_initialized);
+                render_frame(&surface, &device, &queue, &drawables, &shader_manager, &global_bind_group,ecs_initialized);
             }
             Event::WindowEvent {
                 ref event,
@@ -127,7 +167,10 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
 static mut HAS_RENDERED: bool = false;
 static mut HAS_LOADED: bool = false;
 
-pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu::Queue, drawables: &Vec<Box<dyn Drawable>>, shader_manager: &ShaderManager, ecs_initialized: bool) {
+pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, 
+                    queue: &wgpu::Queue, drawables: &Vec<Box<dyn Drawable>>, 
+                    shader_manager: &ShaderManager, global_bind_group: &wgpu::BindGroup,
+                    ecs_initialized: bool) {
     #[cfg(target_arch = "wasm32")]
     {
         if !unsafe { HAS_RENDERED } { 
@@ -175,7 +218,7 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu
         });
 
         for drawable in drawables {
-            drawable.draw(&mut r_pass, &shader_manager);
+            drawable.draw(&mut r_pass, &shader_manager, global_bind_group);
         }
     }
 
@@ -183,7 +226,7 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, queue: &wgpu
     frame.present();
 }
 
-pub fn get_camera_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+pub fn get_global_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Camera Bind Group Layout"),
         entries: &[
@@ -221,4 +264,8 @@ pub fn get_sprite_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLay
             }
         ],
     })
+}
+
+pub fn get_default_sampler(device: &wgpu::Device) -> Option<&wgpu::Sampler> {
+    unsafe { DEFAULT_SAMPLER.as_ref() }
 }

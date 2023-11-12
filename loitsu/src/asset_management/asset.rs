@@ -1,7 +1,8 @@
 use crate::asset_management::AssetError;
 use std::sync::{Arc, Mutex};
+use std::any::Any;
 
-pub trait Asset: Send + Sync {
+pub trait Asset: Send + Sync + Any {
     fn from_bytes(bytes: Vec<u8>, name: &str) -> Self where Self: Sized;
     fn get_name(&self) -> &str;
     fn initialize(&mut self, graphics_device: &wgpu::Device, queue: &wgpu::Queue) -> Result<(), AssetError>;
@@ -13,6 +14,18 @@ pub struct ImageAsset {
     texture: Arc<Mutex<Option<wgpu::Texture>>>,
     texture_view: Arc<Mutex<Option<wgpu::TextureView>>>,
     dimensions: (u32, u32)
+}
+
+impl ImageAsset {
+    pub fn get_texture(&self) -> Option<&wgpu::Texture> {
+        let texture = self.texture.lock().unwrap();
+        texture.as_ref()
+    }
+
+    pub fn get_texture_view(&self) -> Option<&wgpu::TextureView> {
+        let texture_view = self.texture_view.lock().unwrap();
+        texture_view.as_ref()
+    }
 }
 
 impl Asset for ImageAsset {

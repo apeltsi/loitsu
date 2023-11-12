@@ -1,6 +1,8 @@
 use self::static_shard::StaticShard;
 use crate::log;
 use lazy_static::lazy_static;
+use std::any::Any;
+
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_futures::spawn_local;
 
@@ -110,6 +112,17 @@ impl AssetManager {
             }
             shard.initialize(device, queue);
         }
+    }
+
+    pub fn get_asset<T>(&self, name: &str) -> Option<&Box<T>> {
+        let assets = self.assets.lock().unwrap();
+        for shard in &assets.shards {
+            if let Some(asset) = shard.get_asset(name) {
+                // lets convert it
+                return <dyn Any>::downcast_ref::<Box<T>>(asset)
+            }
+        }
+        None
     }
 }
 

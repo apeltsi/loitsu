@@ -93,4 +93,8 @@ impl ConsumedShard {
         }
         self.is_initialized = true;
     }
+
+    pub fn get_asset(&self, name: &str) -> Option<&Box<dyn Asset>> {
+        self.assets.get(name)
+    }
 }
