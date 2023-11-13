@@ -114,11 +114,11 @@ impl AssetManager {
         }
     }
 
-    pub fn get_asset(&self, name: &str) -> Option<&Box<Asset>>  {
+    pub fn get_asset(&self, name: &str) -> Option<Arc<Mutex<Asset>>>  {
         let assets = self.assets.lock().unwrap();
         for shard in &assets.shards {
             if let Some(asset) = shard.get_asset(name) {
-
+                return Some(asset.clone());
             }
         }
         None

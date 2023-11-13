@@ -53,9 +53,8 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     surface.configure(&device, &config);
     
     // lets load our default shaders
-    let shader_manager: &'static mut ShaderManager<'static> = Box::leak(Box::new(crate::rendering::shader::ShaderManager::new()));
+    let mut shader_manager: ShaderManager = crate::rendering::shader::ShaderManager::new();
     shader_manager.load_default_shaders(&device);
-
     // lets init the global bind group
     let camera_matrix_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Camera Matrix Buffer"),
@@ -98,12 +97,9 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     log!("Running event loop...");
     let mut ecs_initialized = false;
     let mut drawables = Vec::<Box<dyn Drawable>>::new();
-    let mut debug = Box::new(crate::rendering::drawable::sprite::SpriteDrawable::new("sprites/backgrounds/LaptopIntroShot.png"));
-    //debug.init(&device, shader_manager);
-    //drawables.push(debug);
+    let mut frame_count = 0;
     event_loop.run(move |event, _, control_flow| {
         let _ = (&instance, &adapter);
-
         *control_flow = ControlFlow::Poll;
         match event {
             Event::MainEventsCleared => {
@@ -150,7 +146,13 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     asset_manager.initialize_shards(&device, &queue);
                     ecs.run_frame(&mut scripting);
                 }
-                render_frame(&surface, &device, &queue, &drawables, shader_manager, &global_bind_group,ecs_initialized);
+                if frame_count == 100 {
+                    let mut debug = Box::new(crate::rendering::drawable::sprite::SpriteDrawable::new("sprites/test.png"));
+                    debug.init(&device, &shader_manager);
+                    //drawables.push(debug); uncommenting this will lead to the compiler complaining :sob:
+                }
+                render_frame(&surface, &device, &queue, &drawables, &shader_manager, &global_bind_group,ecs_initialized);
+                frame_count += 1;
             }
             Event::WindowEvent {
                 ref event,

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::io::{Write, Read};
+use std::sync::{Arc, Mutex};
 use super::AssetError;
 use super::asset::{Asset, image_from_bytes};
 
@@ -60,9 +61,9 @@ impl Shard {
     pub fn consume(&mut self) -> Result<ConsumedShard, AssetError> {
         let mut assets = HashMap::new();
         for (name, file) in self.assets.drain() {
-            let asset: Box<Asset> = match name.split(".").last().unwrap() {
+            let asset: Arc<Mutex<Asset>> = match name.split(".").last().unwrap() {
                 "png" => {
-                   Box::new(image_from_bytes(file.data, &file.name))
+                   Arc::new(Mutex::new(image_from_bytes(file.data, &file.name)))
                 },
                 _ => {
                     return Err(AssetError::new("Unknown file type"));
@@ -80,7 +81,7 @@ impl Shard {
 
 pub struct ConsumedShard {
     pub name: String,
-    pub assets: HashMap<String, Box<Asset>>,
+    pub assets: HashMap<String, Arc<Mutex<Asset>>>,
     pub is_initialized: bool
 }
 
@@ -89,12 +90,12 @@ impl ConsumedShard {
         // assets such as sprites have to be initialized 
         // (with access to the graphics device)
         for (_, asset) in self.assets.iter_mut() {
-            asset.initialize(graphics_device, queue).unwrap();
+            asset.lock().unwrap().initialize(graphics_device, queue).unwrap();
         }
         self.is_initialized = true;
     }
 
-    pub fn get_asset(&self, name: &str) -> Option<&Box<Asset>> {
+    pub fn get_asset(&self, name: &str) -> Option<&Arc<Mutex<Asset>>> {
         self.assets.get(name)
     }
 }

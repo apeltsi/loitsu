@@ -1,14 +1,13 @@
 use wgpu::util::DeviceExt;
 use wgpu::RenderPass;
 use super::{Drawable, QUAD_INDICES, QUAD_VERTICES};
-use crate::{rendering::shader::ShaderManager, asset_management::asset::{ImageAsset, Asset}};
+use crate::{rendering::shader::ShaderManager, asset_management::asset::Asset};
 pub struct SpriteDrawable<'a> {
     vertex_buffer: Option<wgpu::Buffer>,
     index_buffer: Option<wgpu::Buffer>,
     shader: Option<&'a crate::rendering::shader::Shader>,
     bind_group: Option<wgpu::BindGroup>,
     sprite: String,
-    sprite_asset: Option<&'a ImageAsset>
 }
 
 impl<'a> SpriteDrawable<'a> {
@@ -19,7 +18,6 @@ impl<'a> SpriteDrawable<'a> {
             shader: None,
             bind_group: None,
             sprite: sprite.to_string(),
-            sprite_asset: None
         }
     }
 }
@@ -39,22 +37,18 @@ impl<'b> Drawable<'b> for SpriteDrawable<'b> {
         }));
         self.shader = shader_manager.get_shader("sprite");
         let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
-        self.sprite_asset = match asset_manager.get_asset(&self.sprite) {
-            Some(asset) => {
-                match asset.as_ref() {
-                    Asset::Image(image_asset) => Some(image_asset),
-                    _ => None
-                }
-            },
-            None => None
+        let asset = asset_manager.get_asset(&self.sprite).expect("Asset not found!");
+        let locked_asset = asset.lock().unwrap();
+        let sprite_asset = match *locked_asset {
+            Asset::Image(ref image_asset) => Some(image_asset),
+            _ => None,
         };
-        
         self.bind_group = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &crate::rendering::core::get_sprite_bind_group_layout(device),
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(self.sprite_asset.unwrap().get_texture_view().unwrap()),
+                    resource: wgpu::BindingResource::TextureView(sprite_asset.unwrap().get_texture_view().unwrap()),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
