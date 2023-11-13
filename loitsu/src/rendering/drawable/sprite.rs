@@ -2,7 +2,6 @@ use wgpu::util::DeviceExt;
 use wgpu::RenderPass;
 use super::{Drawable, QUAD_INDICES, QUAD_VERTICES};
 use crate::{rendering::shader::ShaderManager, asset_management::asset::ImageAsset};
-
 pub struct SpriteDrawable<'a> {
     vertex_buffer: Option<wgpu::Buffer>,
     index_buffer: Option<wgpu::Buffer>,
@@ -38,7 +37,7 @@ impl<'b> Drawable for SpriteDrawable<'b> {
             contents: bytemuck::cast_slice(QUAD_INDICES),
             usage: wgpu::BufferUsages::INDEX,
         }));
-        self.shader = shader_manager.get_shader("sprite").as_deref();
+        self.shader = shader_manager.get_shader("sprite");
         self.sprite_asset = crate::asset_management::ASSET_MANAGER.lock().unwrap().get_asset::<ImageAsset>(&self.sprite);
         
         self.bind_group = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -58,7 +57,7 @@ impl<'b> Drawable for SpriteDrawable<'b> {
     }
 
     fn draw<'a>(&'a self, pass: &mut RenderPass<'a>, shader_manager: &'a ShaderManager<'a>, global_bind_group: &'a wgpu::BindGroup) {
-        pass.set_pipeline(self.shader.unwrap().get_pipeline());
+        pass.set_pipeline(shader_manager.get_shader("sprite").unwrap().get_pipeline());
         pass.set_vertex_buffer(0, self.vertex_buffer.as_ref().unwrap().slice(..));
         pass.set_index_buffer(self.index_buffer.as_ref().unwrap().slice(..), wgpu::IndexFormat::Uint16);
         pass.set_bind_group(0, global_bind_group, &[]);
