@@ -1,14 +1,14 @@
 use wgpu::util::DeviceExt;
 use wgpu::RenderPass;
 use super::{Drawable, QUAD_INDICES, QUAD_VERTICES};
-use crate::{rendering::shader::ShaderManager, asset_management::asset::ImageAsset};
+use crate::{rendering::shader::ShaderManager, asset_management::asset::{ImageAsset, Asset}};
 pub struct SpriteDrawable<'a> {
     vertex_buffer: Option<wgpu::Buffer>,
     index_buffer: Option<wgpu::Buffer>,
     shader: Option<&'a crate::rendering::shader::Shader>,
     bind_group: Option<wgpu::BindGroup>,
     sprite: String,
-    sprite_asset: Option<&'a Box<ImageAsset>>
+    sprite_asset: Option<&'a ImageAsset>
 }
 
 impl<'a> SpriteDrawable<'a> {
@@ -24,8 +24,8 @@ impl<'a> SpriteDrawable<'a> {
     }
 }
 
-impl<'b> Drawable for SpriteDrawable<'b> {
-    fn init<'a>(&mut self, device: &wgpu::Device, shader_manager: &'a ShaderManager<'a>) {
+impl<'b> Drawable<'b> for SpriteDrawable<'b> {
+    fn init<'a>(&mut self, device: &wgpu::Device, shader_manager: &'a ShaderManager<'a>) where 'a: 'b {
         // init vertex buffer
         self.vertex_buffer = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
@@ -38,7 +38,16 @@ impl<'b> Drawable for SpriteDrawable<'b> {
             usage: wgpu::BufferUsages::INDEX,
         }));
         self.shader = shader_manager.get_shader("sprite");
-        self.sprite_asset = crate::asset_management::ASSET_MANAGER.lock().unwrap().get_asset::<ImageAsset>(&self.sprite);
+        let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
+        self.sprite_asset = match asset_manager.get_asset(&self.sprite) {
+            Some(asset) => {
+                match asset.as_ref() {
+                    Asset::Image(image_asset) => Some(image_asset),
+                    _ => None
+                }
+            },
+            None => None
+        };
         
         self.bind_group = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &crate::rendering::core::get_sprite_bind_group_layout(device),

@@ -53,7 +53,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     surface.configure(&device, &config);
     
     // lets load our default shaders
-    let mut shader_manager = crate::rendering::shader::ShaderManager::new();
+    let shader_manager: &'static mut ShaderManager<'static> = Box::leak(Box::new(crate::rendering::shader::ShaderManager::new()));
     shader_manager.load_default_shaders(&device);
 
     // lets init the global bind group
@@ -99,8 +99,8 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     let mut ecs_initialized = false;
     let mut drawables = Vec::<Box<dyn Drawable>>::new();
     let mut debug = Box::new(crate::rendering::drawable::sprite::SpriteDrawable::new("sprites/backgrounds/LaptopIntroShot.png"));
-    debug.init(&device, &shader_manager);
-    drawables.push(debug);
+    //debug.init(&device, shader_manager);
+    //drawables.push(debug);
     event_loop.run(move |event, _, control_flow| {
         let _ = (&instance, &adapter);
 
@@ -150,7 +150,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     asset_manager.initialize_shards(&device, &queue);
                     ecs.run_frame(&mut scripting);
                 }
-                render_frame(&surface, &device, &queue, &drawables, &shader_manager, &global_bind_group,ecs_initialized);
+                render_frame(&surface, &device, &queue, &drawables, shader_manager, &global_bind_group,ecs_initialized);
             }
             Event::WindowEvent {
                 ref event,

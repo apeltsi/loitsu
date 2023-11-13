@@ -1,7 +1,6 @@
-use self::static_shard::StaticShard;
+use self::{static_shard::StaticShard, asset::Asset};
 use crate::log;
 use lazy_static::lazy_static;
-use std::any::Any;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_futures::spawn_local;
@@ -15,6 +14,7 @@ pub mod shard;
 pub mod static_shard;
 pub mod get_file;
 pub mod asset;
+pub mod image_asset;
 
 lazy_static!{
     pub static ref ASSET_MANAGER: Arc<Mutex<AssetManager>> = Arc::new(Mutex::new(AssetManager::new()));
@@ -114,12 +114,11 @@ impl AssetManager {
         }
     }
 
-    pub fn get_asset<T>(&self, name: &str) -> Option<&Box<T>> {
+    pub fn get_asset(&self, name: &str) -> Option<&Box<Asset>>  {
         let assets = self.assets.lock().unwrap();
         for shard in &assets.shards {
             if let Some(asset) = shard.get_asset(name) {
-                // lets convert it
-                return <dyn Any>::downcast_ref::<Box<T>>(asset)
+
             }
         }
         None

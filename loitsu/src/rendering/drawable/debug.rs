@@ -15,8 +15,8 @@ impl DebugDrawable {
         }
     }
 }
-impl Drawable for DebugDrawable {
-    fn init(&mut self, device: &wgpu::Device, _shader_manager: &ShaderManager) {
+impl<'b> Drawable<'b> for DebugDrawable {
+    fn init<'a>(&mut self, device: &wgpu::Device, _shader_manager: &ShaderManager) where 'a: 'b {
         // init vertex buffer
         self.vertex_buffer = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),

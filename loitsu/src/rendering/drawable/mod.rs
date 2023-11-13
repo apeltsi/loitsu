@@ -13,7 +13,7 @@ pub const QUAD_VERTICES: &[Vertex] = &[
 
 pub const QUAD_INDICES: &[u16] = &[0, 1, 2, 2, 1, 3];
 
-pub trait Drawable {
-    fn init<'a>(&mut self, device: &wgpu::Device, shader_manager: &'a ShaderManager<'a>);
+pub trait Drawable<'b> {
+    fn init<'a>(&mut self, device: &wgpu::Device, shader_manager: &'a ShaderManager<'a>) where 'a: 'b; 
     fn draw<'a>(&'a self, pass: &mut RenderPass<'a>, shader_manager: &'a ShaderManager<'a>, global_bind_group: &'a wgpu::BindGroup);
 }

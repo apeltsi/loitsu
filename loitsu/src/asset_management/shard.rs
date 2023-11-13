@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::io::{Write, Read};
 use super::AssetError;
-use super::asset::{Asset, ImageAsset};
+use super::asset::{Asset, image_from_bytes};
 
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
 pub struct Shard {
@@ -60,9 +60,9 @@ impl Shard {
     pub fn consume(&mut self) -> Result<ConsumedShard, AssetError> {
         let mut assets = HashMap::new();
         for (name, file) in self.assets.drain() {
-            let asset: Box<dyn Asset> = match name.split(".").last().unwrap() {
+            let asset: Box<Asset> = match name.split(".").last().unwrap() {
                 "png" => {
-                   Box::new(ImageAsset::from_bytes(file.data, &file.name))
+                   Box::new(image_from_bytes(file.data, &file.name))
                 },
                 _ => {
                     return Err(AssetError::new("Unknown file type"));
@@ -80,7 +80,7 @@ impl Shard {
 
 pub struct ConsumedShard {
     pub name: String,
-    pub assets: HashMap<String, Box<dyn Asset>>,
+    pub assets: HashMap<String, Box<Asset>>,
     pub is_initialized: bool
 }
 
@@ -94,7 +94,7 @@ impl ConsumedShard {
         self.is_initialized = true;
     }
 
-    pub fn get_asset(&self, name: &str) -> Option<&Box<dyn Asset>> {
+    pub fn get_asset(&self, name: &str) -> Option<&Box<Asset>> {
         self.assets.get(name)
     }
 }
