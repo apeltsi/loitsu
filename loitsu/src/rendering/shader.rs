@@ -1,5 +1,6 @@
 use super::vertex::Vertex;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use wgpu::{Device, ShaderModule, RenderPipeline, PrimitiveState};
 
@@ -15,7 +16,7 @@ pub struct Shader {
 
 
 pub struct ShaderManager<'a> {
-    shaders: HashMap<&'a str, Shader>,
+    shaders: HashMap<&'a str, Rc<Shader>>,
 }
 
 impl Shader {
@@ -90,14 +91,14 @@ impl<'a> ShaderManager<'a> {
             }
         });
         
-        self.shaders.insert(name, Shader {
+        self.shaders.insert(name, Rc::new(Shader {
             shader,
             pipeline,
             bindings
-        });
+        }));
     }
 
-    pub fn get_shader(&self, name: &str) -> Option<&Shader> {
-        self.shaders.get(name)
+    pub fn get_shader(&self, name: &str) -> Option<Rc<Shader>> {
+        self.shaders.get(name).cloned()
     }
 } 
