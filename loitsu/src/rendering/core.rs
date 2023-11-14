@@ -5,6 +5,7 @@ use winit::{
 };
 use crate::{log, scripting::ScriptingInstance, scene_management::Scene};
 use crate::ecs::ECS;
+use std::cmp::max;
 
 pub static mut TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 
@@ -113,6 +114,19 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 config.width = size.width;
                 config.height = size.height;
                 surface.configure(&device, &config);
+
+                // okay gamers lets resize the screen & camera matrix buffers
+                // from atlas :D
+                let max = max(size.width, size.height);
+                queue.write_buffer(&camera_matrix_buffer, 0, bytemuck::cast_slice(&[CameraMatrix {
+                    view: [
+                        [(size.height as f32) / max as f32, 0.0, 0.0, 0.0], 
+                        [0.0, (size.width as f32) / max as f32, 0.0, 0.0],
+                        [0.0, 0.0, 1.0, 0.0],
+                        [0.0, 0.0, 0.0, 1.0]
+                    ]
+                }]));
+
                 // On macos the window needs to be redrawn manually after resizing
                 window.request_redraw();
             }
@@ -147,7 +161,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     ecs.run_frame(&mut scripting);
                 }
                 if frame_count == 100 {
-                    let mut debug = Box::new(crate::rendering::drawable::sprite::SpriteDrawable::new("sprites/test.png", &shader_manager));
+                    let mut debug = Box::new(crate::rendering::drawable::sprite::SpriteDrawable::new("sprites/backgrounds/the_gas_chamber.png", &shader_manager));
                     debug.init(&device);
                     drawables.push(debug);
                 }
@@ -164,6 +178,12 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
             _ => {}
         }
     });
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct CameraMatrix {
+    view: [[f32; 4]; 4],
 }
 
 static mut HAS_RENDERED: bool = false;
@@ -188,11 +208,10 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device,
         .create_view(&wgpu::TextureViewDescriptor::default());
 
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-    let mut clear_color = wgpu::Color::RED;
+    let clear_color = wgpu::Color::BLACK;
     {
         let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
         if asset_manager.pending_tasks.load(std::sync::atomic::Ordering::SeqCst) == 0 && ecs_initialized {
-            clear_color = wgpu::Color::BLUE;
             #[cfg(target_arch = "wasm32")]
             {
                 if !unsafe { HAS_LOADED } { 
