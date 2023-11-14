@@ -59,7 +59,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     // lets init the global bind group
     let camera_matrix_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Camera Matrix Buffer"),
-        size: std::mem::size_of::<[[f32; 4]; 4]>() as u64,
+        size: (std::mem::size_of::<[[f32; 4]; 4]>() as u64) * 2,
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
@@ -71,7 +71,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
             resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                 buffer: &camera_matrix_buffer,
                 offset: 0,
-                size: wgpu::BufferSize::new(std::mem::size_of::<[[f32; 4]; 4]>() as u64),
+                size: wgpu::BufferSize::new((std::mem::size_of::<[[f32; 4]; 4]>() as u64) * 2),
             }),
         }],
         label: None,
@@ -99,6 +99,11 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     let mut ecs_initialized = false;
     let mut drawables = Vec::<Box<dyn Drawable>>::new();
     let mut frame_count = 0;
+    let mut state = State {
+        camera: CameraState::new()
+    };
+    state.camera.set_scale(2.0);
+    state.camera.set_position([0.0, 0.0].into());
     event_loop.run(move |event, _, control_flow| {
         let _ = (&instance, &adapter);
         *control_flow = ControlFlow::Poll;
@@ -124,7 +129,8 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         [0.0, (size.width as f32) / max as f32, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
                         [0.0, 0.0, 0.0, 1.0]
-                    ]
+                    ],
+                    camera: state.camera.get_transformation_matrix()
                 }]));
 
                 // On macos the window needs to be redrawn manually after resizing
@@ -160,8 +166,8 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     asset_manager.initialize_shards(&device, &queue);
                     ecs.run_frame(&mut scripting);
                 }
-                if frame_count == 100 {
-                    let mut debug = Box::new(crate::rendering::drawable::sprite::SpriteDrawable::new("sprites/backgrounds/the_gas_chamber.png", &shader_manager));
+                if frame_count == 10 {
+                    let mut debug = Box::new(crate::rendering::drawable::sprite::SpriteDrawable::new("sprites/test.png", &shader_manager));
                     debug.init(&device);
                     drawables.push(debug);
                 }
@@ -184,6 +190,42 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct CameraMatrix {
     view: [[f32; 4]; 4],
+    camera: [[f32; 4]; 4],
+}
+
+struct State {
+    camera: CameraState
+}
+
+struct CameraState {
+    position: cgmath::Vector2<f32>,
+    scale: f32
+}
+
+impl CameraState {
+    fn new() -> CameraState {
+        CameraState {
+            position: cgmath::Vector2::<f32> {x: 0.0, y: 0.0},
+            scale: 1.0
+        }
+    }
+
+    fn set_position(&mut self, position: cgmath::Vector2<f32>) {
+        self.position = position;
+    }
+
+    fn set_scale(&mut self, scale: f32) {
+        self.scale = scale;
+    }
+
+    fn get_transformation_matrix(&self) -> [[f32; 4]; 4] {
+        [
+            [self.scale, 0.0, 0.0, -self.position.x], // position is inverted because we want to move the world, not the camera
+            [0.0, self.scale, 0.0, -self.position.y],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    }
 }
 
 static mut HAS_RENDERED: bool = false;
@@ -239,7 +281,7 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device,
         });
 
         for drawable in drawables {
-            drawable.draw(&mut r_pass, global_bind_group);
+            drawable.draw(&queue, &mut r_pass, global_bind_group);
         }
     }
 
@@ -267,18 +309,24 @@ pub fn get_sprite_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLay
         entries: &[
             wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float {filterable: true}, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false },
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
                 count: None
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 1,
                 visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                ty: wgpu::BindingType::Texture { sample_type: wgpu::TextureSampleType::Float {filterable: true}, view_dimension: wgpu::TextureViewDimension::D2, multisampled: false },
                 count: None
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 3,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
                 count: None

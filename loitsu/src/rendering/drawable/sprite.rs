@@ -1,8 +1,7 @@
 use std::rc::Rc;
-
 use wgpu::util::DeviceExt;
 use wgpu::RenderPass;
-use super::{Drawable, QUAD_INDICES, QUAD_VERTICES};
+use super::{Drawable, QUAD_INDICES, QUAD_VERTICES, TransformUniform};
 use crate::{rendering::shader::ShaderManager, asset_management::asset::Asset};
 pub struct SpriteDrawable {
     vertex_buffer: Option<wgpu::Buffer>,
@@ -10,6 +9,7 @@ pub struct SpriteDrawable {
     shader: Rc<crate::rendering::shader::Shader>,
     bind_group: Option<wgpu::BindGroup>,
     uniform_buffer: Option<wgpu::Buffer>,
+    transform_buffer: Option<wgpu::Buffer>,
     sprite: String,
 }
 #[repr(C)]
@@ -26,6 +26,7 @@ impl<'a> SpriteDrawable {
             shader: shader_manager.get_shader("sprite").unwrap(),
             bind_group: None,
             uniform_buffer: None,
+            transform_buffer: None,
             sprite: sprite.to_string(),
         }
     }
@@ -58,19 +59,33 @@ impl<'b> Drawable<'b> for SpriteDrawable {
             }]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         }));
+        let initial_transform = TransformUniform::new();
+        self.transform_buffer = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Sprite Transform Buffer"),
+            contents: bytemuck::cast_slice(&[initial_transform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        }));
         self.bind_group = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &crate::rendering::core::get_sprite_bind_group_layout(device),
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(sprite_asset.unwrap().get_texture_view().unwrap()),
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: self.transform_buffer.as_ref().unwrap(),
+                        offset: 0,
+                        size: wgpu::BufferSize::new(std::mem::size_of::<[[f32; 4]; 4]>() as u64),
+                    }),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(crate::rendering::core::get_default_sampler().unwrap()),
+                    resource: wgpu::BindingResource::TextureView(sprite_asset.unwrap().get_texture_view().unwrap()),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
+                    resource: wgpu::BindingResource::Sampler(crate::rendering::core::get_default_sampler().unwrap()),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                         buffer: self.uniform_buffer.as_ref().unwrap(),
                         offset: 0,
@@ -82,7 +97,7 @@ impl<'b> Drawable<'b> for SpriteDrawable {
         }));
     }
 
-    fn draw<'a>(&'a self, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup) {
+    fn draw<'a>(&'a self, queue: &wgpu::Queue, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup) {
         pass.set_pipeline(self.shader.get_pipeline());
         pass.set_vertex_buffer(0, self.vertex_buffer.as_ref().unwrap().slice(..));
         pass.set_index_buffer(self.index_buffer.as_ref().unwrap().slice(..), wgpu::IndexFormat::Uint16);

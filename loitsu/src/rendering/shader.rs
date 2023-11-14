@@ -31,7 +31,6 @@ impl<'a> ShaderManager<'a> {
     }
     
     pub fn load_default_shaders(&mut self, device: &Device) {
-        self.load_shader(device, "debug", include_str!("shaders/debug.wgsl"), vec![]);
         {
             // spriterenderer
             let mut bindings = Vec::new();

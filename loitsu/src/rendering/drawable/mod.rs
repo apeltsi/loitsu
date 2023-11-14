@@ -11,7 +11,24 @@ pub const QUAD_VERTICES: &[Vertex] = &[
 
 pub const QUAD_INDICES: &[u16] = &[0, 1, 2, 2, 1, 3];
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct TransformUniform {
+    transform: [[f32; 4]; 4],
+}
+impl TransformUniform {
+    pub fn new() -> Self {
+        Self {
+            transform: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ]
+        }
+    }
+}
 pub trait Drawable<'b> {
     fn init<'a>(&mut self, device: &wgpu::Device) where 'a: 'b; 
-    fn draw<'a>(&'a self, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup);
+    fn draw<'a>(&'a self, queue: &wgpu::Queue, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup);
 }
