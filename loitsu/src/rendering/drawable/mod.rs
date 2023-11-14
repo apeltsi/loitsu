@@ -1,7 +1,6 @@
-pub mod debug;
+//pub mod debug;
 pub mod sprite;
 use wgpu::RenderPass;
-use super::shader::ShaderManager;
 use super::vertex::Vertex;
 
 pub const QUAD_VERTICES: &[Vertex] = &[
@@ -14,6 +13,6 @@ pub const QUAD_VERTICES: &[Vertex] = &[
 pub const QUAD_INDICES: &[u16] = &[0, 1, 2, 2, 1, 3];
 
 pub trait Drawable<'b> {
-    fn init<'a>(&mut self, device: &wgpu::Device, shader_manager: &'a ShaderManager<'a>) where 'a: 'b; 
-    fn draw<'a>(&'a self, pass: &mut RenderPass<'a>, shader_manager: &'a ShaderManager<'a>, global_bind_group: &'a wgpu::BindGroup);
+    fn init<'a>(&mut self, device: &wgpu::Device) where 'a: 'b; 
+    fn draw<'a>(&'a self, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup);
 }

@@ -86,7 +86,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Nearest,
             min_filter: wgpu::FilterMode::Nearest,
-            anisotropy_clamp: 0,
+            anisotropy_clamp: 1,
             mipmap_filter: wgpu::FilterMode::Nearest,
             border_color: None,
             compare: None,
@@ -147,11 +147,11 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     ecs.run_frame(&mut scripting);
                 }
                 if frame_count == 100 {
-                    let mut debug = Box::new(crate::rendering::drawable::sprite::SpriteDrawable::new("sprites/test.png"));
-                    debug.init(&device, &shader_manager);
-                    //drawables.push(debug); uncommenting this will lead to the compiler complaining :sob:
+                    let mut debug = Box::new(crate::rendering::drawable::sprite::SpriteDrawable::new("sprites/test.png", &shader_manager));
+                    debug.init(&device);
+                    drawables.push(debug);
                 }
-                render_frame(&surface, &device, &queue, &drawables, &shader_manager, &global_bind_group,ecs_initialized);
+                render_frame(&surface, &device, &queue, &drawables, &global_bind_group,ecs_initialized);
                 frame_count += 1;
             }
             Event::WindowEvent {
@@ -171,7 +171,7 @@ static mut HAS_LOADED: bool = false;
 
 pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, 
                     queue: &wgpu::Queue, drawables: &Vec<Box<dyn Drawable>>, 
-                    shader_manager: &ShaderManager, global_bind_group: &wgpu::BindGroup,
+                     global_bind_group: &wgpu::BindGroup,
                     ecs_initialized: bool) {
     #[cfg(target_arch = "wasm32")]
     {
@@ -220,7 +220,7 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device,
         });
 
         for drawable in drawables {
-            drawable.draw(&mut r_pass, &shader_manager, global_bind_group);
+            drawable.draw(&mut r_pass, global_bind_group);
         }
     }
 
@@ -268,6 +268,6 @@ pub fn get_sprite_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLay
     })
 }
 
-pub fn get_default_sampler(device: &wgpu::Device) -> Option<&wgpu::Sampler> {
+pub fn get_default_sampler() -> Option<&'static wgpu::Sampler> {
     unsafe { DEFAULT_SAMPLER.as_ref() }
 }

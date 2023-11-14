@@ -30,8 +30,8 @@ impl<'b> Drawable<'b> for DebugDrawable {
         }));
     }
 
-    fn draw<'a>(&'a self, pass: &mut RenderPass<'a>, shader_manager: &'a ShaderManager<'a>, _global_bind_group: &'a wgpu::BindGroup){
-        pass.set_pipeline(shader_manager.get_shader("debug").unwrap().get_pipeline());
+    fn draw<'a>(&'a self, pass: &mut RenderPass<'a>, shader_manager: &ShaderManager<'a>, _global_bind_group: &'a wgpu::BindGroup){
+        //pass.set_pipeline(shader_manager.get_shader("debug").unwrap().get_pipeline());
         pass.set_vertex_buffer(0, self.vertex_buffer.as_ref().unwrap().slice(..));
         pass.set_index_buffer(self.index_buffer.as_ref().unwrap().slice(..), wgpu::IndexFormat::Uint16);
         pass.draw(0..3, 0..1);

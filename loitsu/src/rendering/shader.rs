@@ -1,5 +1,5 @@
 use super::vertex::Vertex;
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 use wgpu::{Device, ShaderModule, RenderPipeline, PrimitiveState};
 
@@ -13,9 +13,8 @@ pub struct Shader {
     bindings: Vec<wgpu::BindGroupLayout>
 }
 
-
 pub struct ShaderManager<'a> {
-    shaders: HashMap<&'a str, Shader>,
+    shaders: HashMap<&'a str, Rc<Shader>>,
 }
 
 impl Shader {
@@ -89,15 +88,15 @@ impl<'a> ShaderManager<'a> {
                 unclipped_depth: false
             }
         });
-        
-        self.shaders.insert(name, Shader {
+        let shader = Shader {
             shader,
             pipeline,
             bindings
-        });
+        };
+        self.shaders.insert(name, Rc::new(shader));
     }
 
-    pub fn get_shader(&self, name: &str) -> Option<&Shader> {
-        self.shaders.get(name)
+    pub fn get_shader(&self, name: &str) -> Option<Rc<Shader>> {
+        self.shaders.get(name).cloned()
     }
 } 
