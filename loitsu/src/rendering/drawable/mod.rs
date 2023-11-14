@@ -1,13 +1,12 @@
-//pub mod debug;
 pub mod sprite;
 use wgpu::RenderPass;
 use super::vertex::Vertex;
 
 pub const QUAD_VERTICES: &[Vertex] = &[
-    Vertex { position: [-0.5, 0.5, 0.0], tex_coords: [0.0, 1.0] }, // A
-    Vertex { position: [-0.5, -0.5, 0.0], tex_coords: [0.0, 0.0] }, // B
-    Vertex { position: [0.5, 0.5, 0.0], tex_coords: [1.0, 1.0] }, // C
-    Vertex { position: [0.5, -0.5, 0.0], tex_coords: [1.0, 0.0] }, // D
+    Vertex { position: [-0.5, 0.5, 0.0], tex_coords: [0.0, 0.0] }, // A
+    Vertex { position: [-0.5, -0.5, 0.0], tex_coords: [0.0, 1.0] }, // B
+    Vertex { position: [0.5, 0.5, 0.0], tex_coords: [1.0, 0.0] }, // C
+    Vertex { position: [0.5, -0.5, 0.0], tex_coords: [1.0, 1.0] }, // D
 ];
 
 pub const QUAD_INDICES: &[u16] = &[0, 1, 2, 2, 1, 3];

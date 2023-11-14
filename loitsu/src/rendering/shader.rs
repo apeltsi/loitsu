@@ -78,9 +78,9 @@ impl<'a> ShaderManager<'a> {
             depth_stencil: None,
             multisample: wgpu::MultisampleState::default(),
             multiview: Default::default(),
-            primitive: PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
+            primitive: PrimitiveState { // we have a list of indices and vertices
+                topology: wgpu::PrimitiveTopology::TriangleStrip,
+                strip_index_format: Some(wgpu::IndexFormat::Uint16),
                 front_face: wgpu::FrontFace::Ccw,
                 cull_mode: None,
                 polygon_mode: wgpu::PolygonMode::Fill,

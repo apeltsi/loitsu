@@ -88,6 +88,6 @@ impl<'b> Drawable<'b> for SpriteDrawable {
         pass.set_index_buffer(self.index_buffer.as_ref().unwrap().slice(..), wgpu::IndexFormat::Uint16);
         pass.set_bind_group(0, global_bind_group, &[]);
         pass.set_bind_group(1, self.bind_group.as_ref().unwrap(), &[]);
-        pass.draw(0..6, 0..1);
+        pass.draw(0..4, 0..1);
     }
 }
