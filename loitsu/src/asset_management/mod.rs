@@ -66,6 +66,7 @@ impl AssetManager {
 
     pub fn request_shards(&mut self, shards: Vec<String>) {
         let assets = self.assets.clone();
+        self.pending_tasks.fetch_add(shards.len(), Ordering::SeqCst);
         let pending_tasks = self.pending_tasks.clone();
         spawn_local(async move {
             let mut assets = assets.lock().unwrap();
@@ -74,7 +75,6 @@ impl AssetManager {
             let mut futures = Vec::new();
             for shard in shards {
                 futures.push(get_file::get_file(shard + ".shard"));
-                pending_tasks.fetch_add(1, Ordering::SeqCst);
             }
             let mut results = Vec::new();
             for future in futures {
@@ -86,11 +86,11 @@ impl AssetManager {
             for result in results {
                 match result {
                     Ok(file) => {
-                        log!("Successfully loaded shard");
                         let mut shard = shard::Shard::decode(&file);
                         let consumed_shard = shard.consume().unwrap();
                         assets.shards.push(consumed_shard);
                         pending_tasks.fetch_sub(1, Ordering::SeqCst);
+                        log!("Successfully loaded shard");
                     },
                     Err(e) => {
                         log!("Failed to load shard: {:?}", e.message);
@@ -111,6 +111,7 @@ impl AssetManager {
                 continue;
             }
             shard.initialize(device, queue);
+            log!("Shard initialized");
         }
     }
 

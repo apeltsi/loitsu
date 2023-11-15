@@ -6,6 +6,7 @@ use winit::{
 use crate::{log, scripting::ScriptingInstance, scene_management::Scene};
 use crate::ecs::ECS;
 use std::cmp::max;
+use crate::asset_management::ASSET_MANAGER;
 
 pub static mut TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 
@@ -147,10 +148,10 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                             let default_scene_name = static_shard.get_preferences().default_scene.as_str();
                             let scene = static_shard.get_scene(default_scene_name);
                             Some(scene.expect(
-                            format!("Default scene wasn't included in the static shard! Expected to find scene '{}'. Available scenes are '{}'", 
-                                    default_scene_name,
-                                    static_shard.get_available_scene_names().join("', '")
-                            ).as_str()).clone())
+                                    format!("Default scene wasn't included in the static shard! Expected to find scene '{}'. Available scenes are '{}'", 
+                                            default_scene_name,
+                                            static_shard.get_available_scene_names().join("', '")
+                                           ).as_str()).clone())
                         } else {
                             None
                         }; x
@@ -166,12 +167,15 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     asset_manager.initialize_shards(&device, &queue);
                     ecs.run_frame(&mut scripting);
                 }
-                if frame_count == 10 {
+                {
+                    log!("{}, {}, {}", ASSET_MANAGER.lock().unwrap().pending_tasks.load(std::sync::atomic::Ordering::SeqCst), frame_count, drawables.len());
+                }
+                if frame_count > 100 && drawables.len() == 0 && ecs_initialized && ASSET_MANAGER.lock().unwrap().pending_tasks.load(std::sync::atomic::Ordering::SeqCst) == 0 {
                     let mut debug = Box::new(crate::rendering::drawable::sprite::SpriteDrawable::new("sprites/test.png", &shader_manager));
                     debug.init(&device);
                     drawables.push(debug);
                 }
-                render_frame(&surface, &device, &queue, &drawables, &global_bind_group,ecs_initialized);
+                render_frame(&surface, &device, &queue, &drawables, &global_bind_group, ecs_initialized);
                 frame_count += 1;
             }
             Event::WindowEvent {
@@ -252,7 +256,7 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device,
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
     let clear_color = wgpu::Color::BLACK;
     {
-        let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
+        let asset_manager = ASSET_MANAGER.lock().unwrap();
         if asset_manager.pending_tasks.load(std::sync::atomic::Ordering::SeqCst) == 0 && ecs_initialized {
             #[cfg(target_arch = "wasm32")]
             {
