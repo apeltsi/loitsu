@@ -99,10 +99,10 @@ impl<'b> Drawable<'b> for SpriteDrawable {
 
     fn draw<'a>(&'a self, queue: &wgpu::Queue, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup) {
         pass.set_pipeline(self.shader.get_pipeline());
-        pass.set_vertex_buffer(0, self.vertex_buffer.as_ref().unwrap().slice(..));
-        pass.set_index_buffer(self.index_buffer.as_ref().unwrap().slice(..), wgpu::IndexFormat::Uint16);
         pass.set_bind_group(0, global_bind_group, &[]);
         pass.set_bind_group(1, self.bind_group.as_ref().unwrap(), &[]);
-        pass.draw(0..4, 0..1);
+        pass.set_vertex_buffer(0, self.vertex_buffer.as_ref().unwrap().slice(..));
+        pass.set_index_buffer(self.index_buffer.as_ref().unwrap().slice(..), wgpu::IndexFormat::Uint16);
+        pass.draw_indexed(0..QUAD_INDICES.len() as u32, 0, 0..1);
     }
 }

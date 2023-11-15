@@ -8,9 +8,15 @@ use crate::ecs::ECS;
 use std::cmp::max;
 use crate::asset_management::ASSET_MANAGER;
 
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::wasm_bindgen;
+
 pub static mut TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 
 static mut DEFAULT_SAMPLER: Option<wgpu::Sampler> = None;
+
+#[cfg(target_arch = "wasm32")]
+static mut WEB_RESIZED: bool = true;
 
 #[cfg(target_arch = "wasm32")]
 use crate::web::update_loading_status;
@@ -108,6 +114,28 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     event_loop.run(move |event, _, control_flow| {
         let _ = (&instance, &adapter);
         *control_flow = ControlFlow::Poll;
+        #[cfg(target_arch = "wasm32")] {
+            if unsafe {WEB_RESIZED} {
+                let window_size = {
+                    let win = web_sys::window().unwrap();
+                    winit::dpi::LogicalSize::new(win.inner_width().unwrap().as_f64().unwrap(), win.inner_height().unwrap().as_f64().unwrap())
+                };
+                window.set_inner_size(window_size);
+                if frame_count == 0 {
+                    let max = max(window_size.width as i32, window_size.height as i32);
+                    queue.write_buffer(&camera_matrix_buffer, 0, bytemuck::cast_slice(&[CameraMatrix {
+                        view: [
+                            [(size.height as f32) / max as f32, 0.0, 0.0, 0.0], 
+                            [0.0, (size.width as f32) / max as f32, 0.0, 0.0],
+                            [0.0, 0.0, 1.0, 0.0],
+                            [0.0, 0.0, 0.0, 1.0]
+                        ],
+                        camera: state.camera.get_transformation_matrix()
+                    }]));
+                }
+                unsafe {WEB_RESIZED = false;}
+            }
+        }
         match event {
             Event::MainEventsCleared => {
                 window.request_redraw();
@@ -133,7 +161,6 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     ],
                     camera: state.camera.get_transformation_matrix()
                 }]));
-
                 // On macos the window needs to be redrawn manually after resizing
                 window.request_redraw();
             }
@@ -167,10 +194,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     asset_manager.initialize_shards(&device, &queue);
                     ecs.run_frame(&mut scripting);
                 }
-                {
-                    log!("{}, {}, {}", ASSET_MANAGER.lock().unwrap().pending_tasks.load(std::sync::atomic::Ordering::SeqCst), frame_count, drawables.len());
-                }
-                if frame_count > 100 && drawables.len() == 0 && ecs_initialized && ASSET_MANAGER.lock().unwrap().pending_tasks.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+                if frame_count > 1 && drawables.len() == 0 && ecs_initialized && ASSET_MANAGER.lock().unwrap().pending_tasks.load(std::sync::atomic::Ordering::SeqCst) == 0 {
                     let mut debug = Box::new(crate::rendering::drawable::sprite::SpriteDrawable::new("sprites/test.png", &shader_manager));
                     debug.init(&device);
                     drawables.push(debug);
@@ -341,4 +365,10 @@ pub fn get_sprite_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLay
 
 pub fn get_default_sampler() -> Option<&'static wgpu::Sampler> {
     unsafe { DEFAULT_SAMPLER.as_ref() }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn resize() {
+    unsafe { WEB_RESIZED = true; }
 }
