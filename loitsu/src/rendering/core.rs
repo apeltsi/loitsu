@@ -109,7 +109,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     let mut state = State {
         camera: CameraState::new()
     };
-    state.camera.set_scale(2.0);
+    state.camera.set_scale(1.0);
     state.camera.set_position([0.0, 0.0].into());
     event_loop.run(move |event, _, control_flow| {
         let _ = (&instance, &adapter);
@@ -194,19 +194,21 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     asset_manager.initialize_shards(&device, &queue);
                     if frame_count > 1 && ecs_initialized && asset_manager.pending_tasks.load(std::sync::atomic::Ordering::SeqCst) == 0 {
                         let updates = ecs.run_frame(&mut scripting);
-                        for update in updates {
-                            match update {
-                                EntityUpdate::AddDrawable(drawable) => {
-                                    match drawable {
-                                        DrawablePrototype::Sprite {sprite, color} => {
-                                            let mut drawable = Box::new(SpriteDrawable::new(sprite.as_str(), color, &shader_manager));
-                                            drawable.init(&device, &asset_manager);
-                                            drawables.push(drawable);
+                        for entity_updates in updates {
+                            for update in entity_updates.1 {
+                                match update {
+                                    EntityUpdate::AddDrawable(drawable) => {
+                                        match drawable {
+                                            DrawablePrototype::Sprite {sprite, color} => {
+                                                let mut drawable = Box::new(SpriteDrawable::new(sprite.as_str(), color, &shader_manager));
+                                                drawable.init(&device, &asset_manager, entity_updates.0.clone());
+                                                drawables.push(drawable);
+                                            }
                                         }
+                                    },
+                                    EntityUpdate::RemoveDrawable(_id) => {
+                                        // TODO: This
                                     }
-                                },
-                                EntityUpdate::RemoveDrawable(_id) => {
-                                    // TODO: This
                                 }
                             }
                         }

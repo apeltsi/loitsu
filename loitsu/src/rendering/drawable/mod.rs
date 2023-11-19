@@ -1,6 +1,8 @@
 pub mod sprite;
+use std::{rc::Rc, cell::RefCell};
+
 use wgpu::RenderPass;
-use crate::asset_management::AssetManager;
+use crate::{asset_management::AssetManager, ecs::Transform};
 
 use super::vertex::Vertex;
 
@@ -23,18 +25,33 @@ pub struct TransformUniform {
     transform: [[f32; 4]; 4],
 }
 impl TransformUniform {
-    pub fn new() -> Self {
-        Self {
-            transform: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ]
+    pub fn new(transform: Transform) -> Self {
+        match transform {
+            Transform::Transform2D { position, scale, .. } => {
+                Self {
+                    transform: [ // TODO: Rotation here
+                        [scale.0, 0.0, 0.0, position.0],
+                        [0.0, scale.1, 0.0, position.1],
+                        [0.0, 0.0, 1.0 , 0.0],
+                        [0.0, 0.0, 0.0, 1.0],
+                    ]
+                }
+            },
+            Transform::RectTransform { position } => {
+                Self {
+                    // TODO: THIS
+                    transform: [
+                        [1.0, 0.0, 0.0, position.0],
+                        [0.0, 1.0, 0.0, position.1],
+                        [0.0, 0.0, 1.0, 0.0],
+                        [0.0, 0.0, 0.0, 1.0],
+                    ]
+                }
+            }
         }
     }
 }
 pub trait Drawable<'b> {
-    fn init<'a>(&mut self, device: &wgpu::Device, asset_manager: &AssetManager) where 'a: 'b; 
+    fn init<'a>(&mut self, device: &wgpu::Device, asset_manager: &AssetManager, transform: Rc<RefCell<Transform>>) where 'a: 'b; 
     fn draw<'a>(&'a self, queue: &wgpu::Queue, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup);
 }

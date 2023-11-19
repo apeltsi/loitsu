@@ -1,8 +1,8 @@
-use std::rc::Rc;
+use std::{rc::Rc, cell::RefCell};
 use wgpu::util::DeviceExt;
 use wgpu::RenderPass;
 use super::{Drawable, QUAD_INDICES, QUAD_VERTICES, TransformUniform};
-use crate::{rendering::shader::ShaderManager, asset_management::{asset::Asset, AssetManager}};
+use crate::{rendering::shader::ShaderManager, asset_management::{asset::Asset, AssetManager}, ecs::Transform};
 pub struct SpriteDrawable {
     vertex_buffer: Option<wgpu::Buffer>,
     index_buffer: Option<wgpu::Buffer>,
@@ -37,7 +37,7 @@ impl<'a> SpriteDrawable {
 }
 
 impl<'b> Drawable<'b> for SpriteDrawable {
-    fn init<'a>(&mut self, device: &wgpu::Device, asset_manager: &AssetManager) where 'a: 'b {
+    fn init<'a>(&mut self, device: &wgpu::Device, asset_manager: &AssetManager, transform: Rc<RefCell<Transform>>) where 'a: 'b {
         // init vertex buffer
         self.vertex_buffer = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
@@ -59,7 +59,7 @@ impl<'b> Drawable<'b> for SpriteDrawable {
             contents: bytemuck::cast_slice(&[self.initial_uniform]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         }));
-        let initial_transform = TransformUniform::new();
+        let initial_transform = TransformUniform::new(transform.borrow().clone());
         self.transform_buffer = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Sprite Transform Buffer"),
             contents: bytemuck::cast_slice(&[initial_transform]),

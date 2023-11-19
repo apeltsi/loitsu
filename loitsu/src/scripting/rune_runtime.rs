@@ -6,7 +6,9 @@ use crate::{ScriptingInstance, log, error};
 use crate::scripting::{ScriptingError, ScriptingSource, ScriptingData};
 use rune::termcolor::{StandardStream, ColorChoice};
 use crate::scene_management::{Property, Component};
+use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
+use std::rc::Rc;
 use std::sync::Arc;
 use crate::ecs::{ComponentFlags, Transform, RuntimeEntity};
 use rune::alloc::fmt::TryWrite;
@@ -438,29 +440,31 @@ impl ScriptingInstance for RuneInstance {
         Ok(result)
     }
 
-    fn run_component_methods<RuneComponent>(&mut self, entities: &mut [crate::ecs::RuntimeEntity<Self>], method: ComponentFlags) -> Vec<EntityUpdate> {
+    fn run_component_methods<RuneComponent>(&mut self, entities: &mut [crate::ecs::RuntimeEntity<Self>], method: ComponentFlags) -> Vec<(Rc<RefCell<crate::ecs::Transform>>, Vec<EntityUpdate>)> {
         let mut updates = Vec::new();
         for mut entity in entities {
+            let mut entity_updates = Vec::new();
             if entity.is_new {
                 if entity.component_flags & ComponentFlags::START == ComponentFlags::START {
-                    updates.extend(self.run_component_methods_on_entity(&mut entity, ComponentFlags::START));
+                    entity_updates.extend(self.run_component_methods_on_entity(&mut entity, ComponentFlags::START));
                 }
                 entity.is_new = false;
             }
             if entity.component_flags & method == method {
-                updates.extend(self.run_component_methods_on_entity(&mut entity, method));
+                entity_updates.extend(self.run_component_methods_on_entity(&mut entity, method));
             }
             for child in &mut entity.children {
                 if child.is_new {
                     if child.component_flags & ComponentFlags::START == ComponentFlags::START {
-                        updates.extend(self.run_component_methods_on_entity(child, ComponentFlags::START));
+                        entity_updates.extend(self.run_component_methods_on_entity(child, ComponentFlags::START));
                     }
                     child.is_new = false;
                 }
                 if child.component_flags & method == method {
-                    updates.extend(self.run_component_methods_on_entity(child, method));
+                    entity_updates.extend(self.run_component_methods_on_entity(child, method));
                 }
             }
+            updates.push((entity.transform.clone(), entity_updates));
         }
         updates
     }

@@ -3,6 +3,10 @@ use std::rc::Rc;
 
 #[cfg(not(feature = "scene_generation"))]
 use crate::asset_management::ASSET_MANAGER;
+
+
+#[cfg(feature = "scene_generation")]
+use serde_json::{Value, Map, Number};
 use crate::scene_management::{Scene, Entity, Component};
 use crate::scripting::{ScriptingData, ScriptingInstance, EntityUpdate};
 use bitflags::bitflags;
@@ -25,7 +29,8 @@ bitflags! {
         const DESTROY =     0b00100000;
     }
 }
-#[derive(Debug, Clone)]
+
+#[derive(Debug, Clone, bitcode::Encode, bitcode::Decode)]
 pub enum Transform {
     Transform2D {
         position: (f32, f32),
@@ -36,6 +41,43 @@ pub enum Transform {
     RectTransform {
         // TODO: Implement this :D
         position: (f32, f32)
+    }
+}
+
+impl Transform {
+    #[cfg(feature = "scene_generation")]
+    pub fn to_json(self) -> Value {
+        match self {
+            Transform::Transform2D { position, rotation, scale, r#static } => {
+                let mut map = Map::new();
+                map.insert("position".to_string(), 
+                           Value::Array(vec![Value::Number(Number::from_f64(position.0 as f64).unwrap()), 
+                                             Value::Number(Number::from_f64(position.1 as f64).unwrap())]));
+                map.insert("rotation".to_string(), Value::Number(Number::from_f64(rotation as f64).unwrap()));
+                map.insert("scale".to_string(), 
+                           Value::Array(vec![Value::Number(Number::from_f64(scale.0 as f64).unwrap()), 
+                                             Value::Number(Number::from_f64(scale.1 as f64).unwrap())]));
+                map.insert("static".to_string(), Value::Bool(r#static));
+                Value::Object(map)
+            },
+            Transform::RectTransform { position } => {
+                let mut map = Map::new();
+                map.insert("position".to_string(), 
+                           Value::Array(vec![Value::Number(Number::from_f64(position.0 as f64).unwrap()), 
+                                             Value::Number(Number::from_f64(position.1 as f64).unwrap())]));
+                Value::Object(map)
+            }
+        }
+    }
+    #[cfg(feature = "scene_generation")]
+    pub fn from_json(json: &Map<String, Value>) -> Transform {
+        let position = json["position"].as_array().unwrap();
+        let position = (position[0].as_f64().unwrap() as f32, position[1].as_f64().unwrap() as f32);
+        let rotation = json["rotation"].as_f64().unwrap() as f32;
+        let scale = json["scale"].as_array().unwrap();
+        let scale = (scale[0].as_f64().unwrap() as f32, scale[1].as_f64().unwrap() as f32);
+        let r#static = json["static"].as_bool().unwrap();
+        Transform::Transform2D { position, rotation, scale, r#static }
     }
 }
 
@@ -92,11 +134,11 @@ impl<T: ScriptingInstance> ECS<T> {
         self.run_component_methods(scripting, ComponentFlags::BUILD);
     }
 
-    pub fn run_frame(&mut self, scripting: &mut T) -> Vec<EntityUpdate> {
+    pub fn run_frame(&mut self, scripting: &mut T) -> Vec<(Rc<RefCell<Transform>>, Vec<EntityUpdate>)> {
         self.run_component_methods(scripting, ComponentFlags::FRAME)
     }
 
-    fn run_component_methods(&mut self, scripting: &mut T, method: ComponentFlags) -> Vec<EntityUpdate> {
+    fn run_component_methods(&mut self, scripting: &mut T, method: ComponentFlags) -> Vec<(Rc<RefCell<Transform>>, Vec<EntityUpdate>)>  {
         // Lets iterate over the entities and run the build step on each component
         scripting.run_component_methods::<T>(self.runtime_entities.as_mut_slice(), method)
     }
@@ -126,6 +168,7 @@ impl<T: ScriptingInstance> RuntimeEntity<T> {
             id: self.id.clone(),
             components: self.components.iter().map(|runtime_component| runtime_component.as_component()).collect(),
             children: self.children.iter().map(|runtime_entity| runtime_entity.as_entity()).collect(),
+            transform: self.transform.borrow().clone(),
         }
     }
 }
@@ -148,12 +191,7 @@ fn init_entities<T>(proto_entities: Vec<Entity>, scripting: &mut T) -> Vec<Runti
             entity_proto: proto_entity.clone(),
             children: init_entities(proto_entity.children.clone(), scripting),
             component_flags: ComponentFlags::EMPTY,
-            transform: Rc::new(RefCell::new(Transform::Transform2D {
-                position: (0.0, 0.0),
-                rotation: 0.0,
-                scale: (1.0, 1.0),
-                r#static: false
-            })),
+            transform: Rc::new(RefCell::new(proto_entity.transform.clone())),
             is_new: true
         };
         
