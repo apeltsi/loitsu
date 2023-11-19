@@ -1,6 +1,7 @@
 use rune::{Context, Diagnostics, Source, Sources, ContextError, Module, BuildError, Vm, ToValue, Any};
 use rune::runtime::{Value, Struct, VmError, Shared, Args, VmResult, AnyObj};
 use rune::diagnostics::EmitError;
+use crate::rendering::drawable::DrawablePrototype;
 use crate::{ScriptingInstance, log, error};
 use crate::scripting::{ScriptingError, ScriptingSource, ScriptingData};
 use rune::termcolor::{StandardStream, ColorChoice};
@@ -9,6 +10,8 @@ use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use crate::ecs::{ComponentFlags, Transform, RuntimeEntity};
 use rune::alloc::fmt::TryWrite;
+
+use super::EntityUpdate;
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
 #[cfg(feature = "scene_generation")]
@@ -79,6 +82,86 @@ impl Display for Vec2 {
     }
 }
 
+#[derive(Debug, Clone, Any, PartialEq)]
+#[rune(constructor)]
+pub struct Color {
+    #[rune(get, set, copy)]
+    pub r: f32,
+    #[rune(get, set, copy)]
+    pub g: f32,
+    #[rune(get, set, copy)]
+    pub b: f32,
+    #[rune(get, set, copy)]
+    pub a: f32
+}
+
+impl Color {
+    #[rune::function(path = Self::black)]
+    fn black() -> Color {
+        Color {
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+            a: 1.0
+        }
+    }
+
+    #[rune::function(path = Self::white)]
+    fn white() -> Color {
+        Color {
+            r: 1.0,
+            g: 1.0,
+            b: 1.0,
+            a: 1.0
+        }
+    }
+
+    #[rune::function(path = Self::rgb)]
+    fn rgb(r: f32, g: f32, b: f32) -> Color {
+        Color {
+            r,
+            g,
+            b,
+            a: 1.0
+        }
+    }
+
+    #[rune::function(path = Self::rgba)]
+    fn rgba(r: f32, g: f32, b: f32, a: f32) -> Color {
+        Color {
+            r,
+            g,
+            b,
+            a
+        }
+    }
+
+    #[rune::function(path = Self::hex)]
+    fn hex(hex: String) -> Color {
+        let hex = hex.trim_start_matches("#");
+        let r = u8::from_str_radix(&hex[0..2], 16).unwrap() as f32 / 255.0;
+        let g = u8::from_str_radix(&hex[2..4], 16).unwrap() as f32 / 255.0;
+        let b = u8::from_str_radix(&hex[4..6], 16).unwrap() as f32 / 255.0;
+        let a = if hex.len() > 6 {
+            u8::from_str_radix(&hex[6..8], 16).unwrap() as f32 / 255.0
+        } else {
+            1.0
+        };
+        Color {
+            r,
+            g,
+            b,
+            a
+        }
+    }
+} 
+
+impl Display for Color {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {}, {}, {})", self.r, self.g, self.b, self.a)
+    }
+}
+
 #[derive(Debug, Clone, Any)]
 struct RuneEntity {
     #[rune(get)]
@@ -88,6 +171,39 @@ struct RuneEntity {
     // avoid circular references
     #[rune(get, set)]
     pub transform: Shared<AnyObj>,
+    drawables: Vec<Drawable>
+}
+
+impl RuneEntity {
+    #[rune::function]
+    fn register_drawable(&mut self, drawable: Drawable) -> String {
+        self.drawables.push(drawable);
+        "asdfkljasklfjoiwqj".to_string() // TODO: return unique id
+    }
+}
+
+#[derive(Debug, Clone, Any)]
+enum Drawable {
+    #[rune(constructor)]
+    Sprite (
+        #[rune(get, set)]
+        String,
+        #[rune(get, set)]
+        Color
+    )
+}
+
+impl From<&Drawable> for DrawablePrototype {
+    fn from(drawable: &Drawable) -> Self {
+        match drawable {
+            Drawable::Sprite(sprite, color) => {
+                DrawablePrototype::Sprite {
+                    sprite: sprite.to_string(),
+                    color: [color.r, color.g, color.b, color.a]
+                }
+            }
+        }
+    }
 }
 
 impl From<Transform> for RuneTransform {
@@ -322,29 +438,31 @@ impl ScriptingInstance for RuneInstance {
         Ok(result)
     }
 
-    fn run_component_methods<RuneComponent>(&mut self, entities: &mut [crate::ecs::RuntimeEntity<Self>], method: ComponentFlags) {
+    fn run_component_methods<RuneComponent>(&mut self, entities: &mut [crate::ecs::RuntimeEntity<Self>], method: ComponentFlags) -> Vec<EntityUpdate> {
+        let mut updates = Vec::new();
         for mut entity in entities {
             if entity.is_new {
                 if entity.component_flags & ComponentFlags::START == ComponentFlags::START {
-                    self.run_component_methods_on_entity(&mut entity, ComponentFlags::START);
+                    updates.extend(self.run_component_methods_on_entity(&mut entity, ComponentFlags::START));
                 }
                 entity.is_new = false;
             }
             if entity.component_flags & method == method {
-                self.run_component_methods_on_entity(&mut entity, method);
+                updates.extend(self.run_component_methods_on_entity(&mut entity, method));
             }
             for child in &mut entity.children {
                 if child.is_new {
                     if child.component_flags & ComponentFlags::START == ComponentFlags::START {
-                        self.run_component_methods_on_entity(child, ComponentFlags::START);
+                        updates.extend(self.run_component_methods_on_entity(child, ComponentFlags::START));
                     }
                     child.is_new = false;
                 }
                 if child.component_flags & method == method {
-                    self.run_component_methods_on_entity(child, method);
+                    updates.extend(self.run_component_methods_on_entity(child, method));
                 }
             }
         }
+        updates
     }
 
     fn get_component_flags(&self, component_name: &str) -> ComponentFlags {
@@ -376,12 +494,13 @@ fn convert_entity(entity: &RuntimeEntity<RuneInstance>) -> RuneEntity {
             AnyObj::new(
                 Into::<RuneTransform>::into(entity.transform.borrow().clone()))
             .unwrap()
-            ).unwrap()
+            ).unwrap(),
+        drawables: Vec::new()
     }
 }
 
 impl RuneInstance {
-    fn run_component_methods_on_entity(&mut self, entity: &mut crate::ecs::RuntimeEntity<Self>, c_flags: ComponentFlags) {
+    fn run_component_methods_on_entity(&mut self, entity: &mut crate::ecs::RuntimeEntity<Self>, c_flags: ComponentFlags) -> Vec<EntityUpdate> {
         let mut entity_obj = convert_entity(&entity);
         let (shared, _guard) = unsafe { Shared::from_mut(&mut entity_obj).unwrap() };
         let method = flags_to_method(c_flags);
@@ -411,6 +530,11 @@ impl RuneInstance {
         let entity_obj = shared.downcast_borrow_ref::<RuneEntity>().unwrap();
         let rune_transform: RuneTransform = entity_obj.clone().transform.take_downcast().unwrap();
         *entity.transform.borrow_mut() = rune_transform.into();
+        let mut updates = Vec::new();
+        for drawable in &entity_obj.drawables {
+            updates.push(EntityUpdate::AddDrawable(Into::<DrawablePrototype>::into(drawable)));
+        }
+        updates
     }
 }
 
@@ -443,7 +567,16 @@ fn core_module() -> Result<Module> {
     m.ty::<RuneEntity>()?;
     m.ty::<RuneTransform>()?;
     m.ty::<Vec2>()?;
+    m.ty::<Color>()?;
+    m.ty::<Drawable>()?;
     m.function_meta(Vec2::string_display)?;
+    m.function_meta(RuneEntity::register_drawable)?;
+    m.function_meta(Color::hex)?;
+    m.function_meta(Color::rgba)?;
+    m.function_meta(Color::rgb)?;
+    m.function_meta(Color::black)?;
+    m.function_meta(Color::white)?;
+
     m.function("print", | log: &str | log!("[RUNE] {}", log)).build()?;
     m.function("error", | log: &str | error!("[RUNE] {}", log)).build()?;
     // Math Constants

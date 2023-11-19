@@ -1,13 +1,5 @@
 // Some built-in components and methods
 
-pub fn register_drawable(type, data) {
-
-}
-
-pub fn unregister_drawable(id) {
-    
-}
-
 pub fn v2(x, y) {
     Vec2 {x, y}
 }
@@ -24,9 +16,8 @@ impl SpriteRenderer {
 	}
 
     pub fn start(self, entity) {
-        register_drawable("sprite", #{
-            sprite: self.sprite,
-        });
+        let drawable = Drawable::Sprite ("sprites/test.png", Color::white());
+        entity.register_drawable(drawable);
     }
 
     pub fn build(self, entity) {

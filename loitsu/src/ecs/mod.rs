@@ -4,7 +4,7 @@ use std::rc::Rc;
 #[cfg(not(feature = "scene_generation"))]
 use crate::asset_management::ASSET_MANAGER;
 use crate::scene_management::{Scene, Entity, Component};
-use crate::scripting::{ScriptingData, ScriptingInstance};
+use crate::scripting::{ScriptingData, ScriptingInstance, EntityUpdate};
 use bitflags::bitflags;
 
 pub struct ECS<T> where T: ScriptingInstance {
@@ -92,13 +92,13 @@ impl<T: ScriptingInstance> ECS<T> {
         self.run_component_methods(scripting, ComponentFlags::BUILD);
     }
 
-    pub fn run_frame(&mut self, scripting: &mut T) {
-        self.run_component_methods(scripting, ComponentFlags::FRAME);
+    pub fn run_frame(&mut self, scripting: &mut T) -> Vec<EntityUpdate> {
+        self.run_component_methods(scripting, ComponentFlags::FRAME)
     }
 
-    fn run_component_methods(&mut self, scripting: &mut T, method: ComponentFlags) {
+    fn run_component_methods(&mut self, scripting: &mut T, method: ComponentFlags) -> Vec<EntityUpdate> {
         // Lets iterate over the entities and run the build step on each component
-        scripting.run_component_methods::<T>(self.runtime_entities.as_mut_slice(), method);
+        scripting.run_component_methods::<T>(self.runtime_entities.as_mut_slice(), method)
     }
 
     pub fn clear(&mut self) {

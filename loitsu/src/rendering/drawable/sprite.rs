@@ -2,7 +2,7 @@ use std::rc::Rc;
 use wgpu::util::DeviceExt;
 use wgpu::RenderPass;
 use super::{Drawable, QUAD_INDICES, QUAD_VERTICES, TransformUniform};
-use crate::{rendering::shader::ShaderManager, asset_management::asset::Asset};
+use crate::{rendering::shader::ShaderManager, asset_management::{asset::Asset, AssetManager}};
 pub struct SpriteDrawable {
     vertex_buffer: Option<wgpu::Buffer>,
     index_buffer: Option<wgpu::Buffer>,
@@ -10,6 +10,7 @@ pub struct SpriteDrawable {
     bind_group: Option<wgpu::BindGroup>,
     uniform_buffer: Option<wgpu::Buffer>,
     transform_buffer: Option<wgpu::Buffer>,
+    initial_uniform: SpriteUniform,
     sprite: String,
 }
 #[repr(C)]
@@ -19,7 +20,7 @@ pub struct SpriteUniform {
 }
 
 impl<'a> SpriteDrawable {
-    pub fn new(sprite: &str, shader_manager: &ShaderManager) -> Self {
+    pub fn new(sprite: &str, color: [f32; 4], shader_manager: &ShaderManager) -> Self {
         Self {
             vertex_buffer: None,
             index_buffer: None,
@@ -27,13 +28,16 @@ impl<'a> SpriteDrawable {
             bind_group: None,
             uniform_buffer: None,
             transform_buffer: None,
+            initial_uniform: SpriteUniform {
+                color,
+            },
             sprite: sprite.to_string(),
         }
     }
 }
 
 impl<'b> Drawable<'b> for SpriteDrawable {
-    fn init<'a>(&mut self, device: &wgpu::Device) where 'a: 'b {
+    fn init<'a>(&mut self, device: &wgpu::Device, asset_manager: &AssetManager) where 'a: 'b {
         // init vertex buffer
         self.vertex_buffer = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
@@ -45,18 +49,14 @@ impl<'b> Drawable<'b> for SpriteDrawable {
             contents: bytemuck::cast_slice(QUAD_INDICES),
             usage: wgpu::BufferUsages::INDEX,
         }));
-        let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
         let asset = asset_manager.get_asset(&self.sprite).expect("Asset not found!");
         let locked_asset = asset.lock().unwrap();
         let sprite_asset = match *locked_asset {
             Asset::Image(ref image_asset) => Some(image_asset),
-            _ => None,
         };
         self.uniform_buffer = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Sprite Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[SpriteUniform {
-                color: [1.0, 1.0, 1.0, 1.0],
-            }]),
+            contents: bytemuck::cast_slice(&[self.initial_uniform]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         }));
         let initial_transform = TransformUniform::new();

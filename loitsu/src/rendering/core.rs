@@ -3,7 +3,7 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
-use crate::{log, scripting::ScriptingInstance, scene_management::Scene};
+use crate::{log, scripting::{ScriptingInstance, EntityUpdate}, scene_management::Scene, rendering::drawable::{sprite::SpriteDrawable, DrawablePrototype}};
 use crate::ecs::ECS;
 use std::cmp::max;
 use crate::asset_management::ASSET_MANAGER;
@@ -192,12 +192,25 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 } else {
                     let mut asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
                     asset_manager.initialize_shards(&device, &queue);
-                    ecs.run_frame(&mut scripting);
-                }
-                if frame_count > 1 && drawables.len() == 0 && ecs_initialized && ASSET_MANAGER.lock().unwrap().pending_tasks.load(std::sync::atomic::Ordering::SeqCst) == 0 {
-                    let mut debug = Box::new(crate::rendering::drawable::sprite::SpriteDrawable::new("sprites/test.png", &shader_manager));
-                    debug.init(&device);
-                    drawables.push(debug);
+                    if frame_count > 1 && ecs_initialized && asset_manager.pending_tasks.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+                        let updates = ecs.run_frame(&mut scripting);
+                        for update in updates {
+                            match update {
+                                EntityUpdate::AddDrawable(drawable) => {
+                                    match drawable {
+                                        DrawablePrototype::Sprite {sprite, color} => {
+                                            let mut drawable = Box::new(SpriteDrawable::new(sprite.as_str(), color, &shader_manager));
+                                            drawable.init(&device, &asset_manager);
+                                            drawables.push(drawable);
+                                        }
+                                    }
+                                },
+                                EntityUpdate::RemoveDrawable(_id) => {
+                                    // TODO: This
+                                }
+                            }
+                        }
+                    }
                 }
                 render_frame(&surface, &device, &queue, &drawables, &global_bind_group, ecs_initialized);
                 frame_count += 1;
