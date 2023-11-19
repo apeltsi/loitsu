@@ -1,14 +1,14 @@
-use rune::{Context, Diagnostics, Source, Sources, ContextError, Module, BuildError, Vm, ToValue};
-use rune::runtime::{Value, Struct, VmError, Shared, Args, VmResult};
+use rune::{Context, Diagnostics, Source, Sources, ContextError, Module, BuildError, Vm, ToValue, Any};
+use rune::runtime::{Value, Struct, VmError, Shared, Args, VmResult, AnyObj};
 use rune::diagnostics::EmitError;
 use crate::{ScriptingInstance, log, error};
 use crate::scripting::{ScriptingError, ScriptingSource, ScriptingData};
 use rune::termcolor::{StandardStream, ColorChoice};
-use crate::scene_management::Component;
-use crate::scene_management::Property;
+use crate::scene_management::{Property, Component};
+use std::fmt::{Display, Formatter};
 use std::sync::Arc;
-use crate::ecs::ComponentFlags;
-
+use crate::ecs::{ComponentFlags, Transform, RuntimeEntity};
+use rune::alloc::fmt::TryWrite;
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
 #[cfg(feature = "scene_generation")]
@@ -20,6 +20,110 @@ pub struct RuneInstance {
 
 pub struct RuneComponent {
     pub data: Option<Shared<Struct>>
+}
+
+#[derive(Debug, Clone, Any)]
+struct RuneTransform {
+    #[rune(get, set)]
+    position: Shared<AnyObj>,
+    #[rune(get, set)]
+    rotation: f32,
+    #[rune(get, set)]
+    scale: Shared<AnyObj>,
+}
+
+#[derive(Debug, Clone, Any, PartialEq)]
+#[rune(constructor)]
+pub struct Vec2 {
+    #[rune(get, set, copy)]
+    pub x: f32,
+    #[rune(get, set, copy)]
+    pub y: f32
+}
+
+impl Vec2 {
+    pub fn new(x: f32, y: f32) -> Self {
+        Self {
+            x,
+            y
+        }
+    }
+
+    pub fn from_tuple(pos: (f32, f32)) -> Self {
+        Self {
+            x: pos.0,
+            y: pos.1
+        }
+    }
+
+    pub fn zero() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0
+        }
+    }
+
+    pub fn as_tuple(&self) -> (f32, f32) {
+        (self.x, self.y)
+    }
+
+    #[rune::function(protocol = STRING_DISPLAY)]
+    fn string_display(&self, f: &mut rune::runtime::Formatter) -> () {
+        write!(f, "({}, {})", self.x, self.y).unwrap();
+    }
+}
+
+impl Display for Vec2 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
+#[derive(Debug, Clone, Any)]
+struct RuneEntity {
+    #[rune(get)]
+    pub name: String,
+    // pub components: Vec<RuneComponent>, TODO: NOT IMPLEMENTED
+    // pub children: Vec<RuneEntity>, TODO: NOT IMPLEMENTED, should use a string id reference to
+    // avoid circular references
+    #[rune(get, set)]
+    pub transform: Shared<AnyObj>,
+}
+
+impl From<Transform> for RuneTransform {
+    fn from(transform: Transform) -> Self {
+        match transform {
+            Transform::Transform2D { position, rotation, scale, .. } => {
+                RuneTransform {
+                    position: Shared::new(AnyObj::new(Vec2::from_tuple(position)).unwrap()).unwrap(),
+                    rotation,
+                    scale: Shared::new(AnyObj::new(Vec2::from_tuple(scale)).unwrap()).unwrap()
+                }
+            },
+            Transform::RectTransform { position, .. } => {
+                RuneTransform {
+                    position: Shared::new(AnyObj::new(Vec2::from_tuple(position)).unwrap()).unwrap(),
+                    rotation: 0.0,
+                    scale: Shared::new(AnyObj::new(Vec2::new(1.0, 1.0)).unwrap()).unwrap()
+                }
+            }
+        }
+    }
+}
+
+fn as_vec2(vec: Shared<AnyObj>) -> Vec2 {
+    vec.take_downcast().unwrap()
+}
+
+impl From<RuneTransform> for Transform {
+    fn from(transform: RuneTransform) -> Self {
+        Transform::Transform2D {
+            position: as_vec2(transform.position).as_tuple(),
+            rotation: transform.rotation,
+            scale: as_vec2(transform.scale).as_tuple(),
+            r#static: false
+        }
+    }
 }
 
 impl ScriptingData<RuneInstance> for RuneComponent {
@@ -219,15 +323,15 @@ impl ScriptingInstance for RuneInstance {
     }
 
     fn run_component_methods<RuneComponent>(&mut self, entities: &mut [crate::ecs::RuntimeEntity<Self>], method: ComponentFlags) {
-        for entity in entities {
+        for mut entity in entities {
             if entity.is_new {
                 if entity.component_flags & ComponentFlags::START == ComponentFlags::START {
-                    self.run_component_methods_on_entity(&entity, ComponentFlags::START);
+                    self.run_component_methods_on_entity(&mut entity, ComponentFlags::START);
                 }
                 entity.is_new = false;
             }
             if entity.component_flags & method == method {
-                self.run_component_methods_on_entity(&entity, method);
+                self.run_component_methods_on_entity(&mut entity, method);
             }
             for child in &mut entity.children {
                 if child.is_new {
@@ -264,8 +368,22 @@ impl ScriptingInstance for RuneInstance {
         flags
     }
 }
+
+fn convert_entity(entity: &RuntimeEntity<RuneInstance>) -> RuneEntity {
+    RuneEntity {
+        name: entity.get_name().to_string(),
+        transform: Shared::new(
+            AnyObj::new(
+                Into::<RuneTransform>::into(entity.transform.borrow().clone()))
+            .unwrap()
+            ).unwrap()
+    }
+}
+
 impl RuneInstance {
-    fn run_component_methods_on_entity(&mut self, entity: &crate::ecs::RuntimeEntity<Self>, c_flags: ComponentFlags) {
+    fn run_component_methods_on_entity(&mut self, entity: &mut crate::ecs::RuntimeEntity<Self>, c_flags: ComponentFlags) {
+        let mut entity_obj = convert_entity(&entity);
+        let (shared, _guard) = unsafe { Shared::from_mut(&mut entity_obj).unwrap() };
         let method = flags_to_method(c_flags);
         for component in &entity.components {
             if component.flags & c_flags != c_flags {
@@ -273,19 +391,26 @@ impl RuneInstance {
             }
             match &component.data.data {
                 Some(data) => {
-                    let r = self.virtual_machine.as_mut().unwrap().call([component.component_proto.name.as_str(), method], (data.clone(), ));
+                    let r = self.virtual_machine.as_mut().unwrap().call(
+                        [component.component_proto.name.as_str(), method],
+                        (data.clone(), shared.clone()));
                     if let Err(error) = r {
                         crate::logging::error(&format!("Error running method {} on component {}: {}", method, component.component_proto.name, error));
                     }
                 },
                 None => {
-                    let r = self.virtual_machine.as_mut().unwrap().call([component.component_proto.name.as_str(), method], (rune::runtime::Value::EmptyTuple, ));
+                    let r = self.virtual_machine.as_mut().unwrap().call(
+                        [component.component_proto.name.as_str(), method],
+                        (rune::runtime::Value::EmptyTuple, shared.clone()));
                     if let Err(error) = r {
                         crate::logging::error(&format!("Error running method {} on component {}: {}", method, component.component_proto.name, error));
                     }
                 }
             }
         }
+        let entity_obj = shared.downcast_borrow_ref::<RuneEntity>().unwrap();
+        let rune_transform: RuneTransform = entity_obj.clone().transform.take_downcast().unwrap();
+        *entity.transform.borrow_mut() = rune_transform.into();
     }
 }
 
@@ -313,6 +438,12 @@ pub unsafe fn clear_required_assets() {
 
 fn core_module() -> Result<Module> {
     let mut m = Module::new();
+
+    // Types
+    m.ty::<RuneEntity>()?;
+    m.ty::<RuneTransform>()?;
+    m.ty::<Vec2>()?;
+    m.function_meta(Vec2::string_display)?;
     m.function("print", | log: &str | log!("[RUNE] {}", log)).build()?;
     m.function("error", | log: &str | error!("[RUNE] {}", log)).build()?;
     // Math Constants

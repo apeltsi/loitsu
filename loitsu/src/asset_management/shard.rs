@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io::{Write, Read};
 use std::sync::{Arc, Mutex};
+
 use super::AssetError;
 use super::asset::{Asset, image_from_bytes};
 
@@ -60,10 +61,11 @@ impl Shard {
     /// Consumes the shard, returning the parsed assets
     pub fn consume(&mut self) -> Result<ConsumedShard, AssetError> {
         let mut assets = HashMap::new();
+
         for (name, file) in self.assets.drain() {
             let asset: Arc<Mutex<Asset>> = match name.split(".").last().unwrap() {
                 "png" => {
-                   Arc::new(Mutex::new(image_from_bytes(file.data, &file.name)))
+                    Arc::new(Mutex::new(image_from_bytes(file.data, &file.name)))
                 },
                 _ => {
                     return Err(AssetError::new("Unknown file type"));

@@ -97,7 +97,7 @@ impl<'b> Drawable<'b> for SpriteDrawable {
         }));
     }
 
-    fn draw<'a>(&'a self, queue: &wgpu::Queue, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup) {
+    fn draw<'a>(&'a self, _queue: &wgpu::Queue, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup) {
         pass.set_pipeline(self.shader.get_pipeline());
         pass.set_bind_group(0, global_bind_group, &[]);
         pass.set_bind_group(1, self.bind_group.as_ref().unwrap(), &[]);

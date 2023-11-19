@@ -160,7 +160,7 @@ fn read_files(directory: &str) -> Vec<AssetFile> {
     // lets recursively walk the directory and read all the files, a bit heavy memory-wise but this
     // is a build step so it should be fine :D
     for entry in WalkDir::new(path) {
-        let entry = entry.unwrap();
+        let entry = entry.expect("Couldn't read assets directory! Are you in the correct directory?");
         let path = entry.path();
         if path.is_file() {
             let name = path.file_name().unwrap().to_str().unwrap().to_string();

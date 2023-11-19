@@ -1,11 +1,15 @@
 // Some built-in components and methods
 
 pub fn register_drawable(type, data) {
-    return 0;
+
 }
 
 pub fn unregister_drawable(id) {
     
+}
+
+pub fn v2(x, y) {
+    Vec2 {x, y}
 }
 
 struct SpriteRenderer {
@@ -19,10 +23,16 @@ impl SpriteRenderer {
         }
 	}
 
-    pub fn build(self) {
+    pub fn start(self, entity) {
+        register_drawable("sprite", #{
+            sprite: self.sprite,
+        });
+    }
+
+    pub fn build(self, entity) {
         require_asset(self.sprite);
     }
 
-	pub fn frame(self) {
+	pub fn frame(self, entity) {
 	}
 }

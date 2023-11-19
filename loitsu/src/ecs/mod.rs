@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 #[cfg(not(feature = "scene_generation"))]
 use crate::asset_management::ASSET_MANAGER;
 use crate::scene_management::{Scene, Entity, Component};
@@ -22,6 +25,19 @@ bitflags! {
         const DESTROY =     0b00100000;
     }
 }
+#[derive(Debug, Clone)]
+pub enum Transform {
+    Transform2D {
+        position: (f32, f32),
+        rotation: f32,
+        scale: (f32, f32),
+        r#static: bool
+    },
+    RectTransform {
+        // TODO: Implement this :D
+        position: (f32, f32)
+    }
+}
 
 #[allow(dead_code)]
 pub struct RuntimeEntity<T> where T: ScriptingInstance {
@@ -31,7 +47,18 @@ pub struct RuntimeEntity<T> where T: ScriptingInstance {
     entity_proto: Entity,
     pub children: Vec<RuntimeEntity<T>>,
     pub component_flags: ComponentFlags, // this is the union of all the component flags, so we can quickly check if we need to run a method
+    pub transform: Rc<RefCell<Transform>>,
     pub is_new: bool
+}
+
+impl<T> RuntimeEntity<T> where T: ScriptingInstance {
+    pub fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn get_id(&self) -> &str {
+        &self.id
+    }
 }
 
 #[allow(dead_code)]
@@ -121,6 +148,12 @@ fn init_entities<T>(proto_entities: Vec<Entity>, scripting: &mut T) -> Vec<Runti
             entity_proto: proto_entity.clone(),
             children: init_entities(proto_entity.children.clone(), scripting),
             component_flags: ComponentFlags::EMPTY,
+            transform: Rc::new(RefCell::new(Transform::Transform2D {
+                position: (0.0, 0.0),
+                rotation: 0.0,
+                scale: (1.0, 1.0),
+                r#static: false
+            })),
             is_new: true
         };
         
