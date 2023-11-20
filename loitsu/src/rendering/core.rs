@@ -199,15 +199,21 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                                 match update {
                                     EntityUpdate::AddDrawable(drawable) => {
                                         match drawable {
-                                            DrawablePrototype::Sprite {sprite, color} => {
-                                                let mut drawable = Box::new(SpriteDrawable::new(sprite.as_str(), color, &shader_manager));
+                                            DrawablePrototype::Sprite {sprite, color, id} => {
+                                                let mut drawable = Box::new(SpriteDrawable::new(sprite.as_str(), color, id, &shader_manager));
                                                 drawable.init(&device, &asset_manager, entity_updates.0.clone());
                                                 drawables.push(drawable);
                                             }
                                         }
                                     },
-                                    EntityUpdate::RemoveDrawable(_id) => {
-                                        // TODO: This
+                                    EntityUpdate::RemoveDrawable(id) => {
+                                        // TODO: Make this more efficient, maybe use a hashmap?
+                                        for i in 0..drawables.len() {
+                                            if drawables[i].get_uuid().to_string() == id {
+                                                drawables.remove(i);
+                                                break;
+                                            }
+                                        }
                                     }
                                 }
                             }

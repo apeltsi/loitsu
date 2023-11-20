@@ -12,7 +12,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use crate::ecs::{ComponentFlags, Transform, RuntimeEntity};
 use rune::alloc::fmt::TryWrite;
-
+use uuid::Uuid;
 use super::EntityUpdate;
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
@@ -173,14 +173,21 @@ struct RuneEntity {
     // avoid circular references
     #[rune(get, set)]
     pub transform: Shared<AnyObj>,
-    drawables: Vec<Drawable>
+    drawables: Vec<(Drawable, Uuid)>,
+    remove_drawables: Vec<String>,
 }
 
 impl RuneEntity {
     #[rune::function]
     fn register_drawable(&mut self, drawable: Drawable) -> String {
-        self.drawables.push(drawable);
-        "asdfkljasklfjoiwqj".to_string() // TODO: return unique id
+        let id = crate::util::random::uuid();
+        self.drawables.push((drawable, id));
+        id.to_string()
+    }
+
+    #[rune::function]
+    fn unregister_drawable(&mut self, uuid: &str) {
+        self.remove_drawables.push(uuid.to_string());
     }
 }
 
@@ -202,13 +209,14 @@ impl Drawable {
     }
 }
 
-impl From<&Drawable> for DrawablePrototype {
-    fn from(drawable: &Drawable) -> Self {
-        match drawable {
+impl From<&(Drawable, Uuid)> for DrawablePrototype {
+    fn from(drawable: &(Drawable, Uuid)) -> Self {
+        match &drawable.0 {
             Drawable::Sprite(sprite, color) => {
                 DrawablePrototype::Sprite {
                     sprite: sprite.to_string(),
-                    color: [color.r, color.g, color.b, color.a]
+                    color: [color.r, color.g, color.b, color.a],
+                    id: drawable.1
                 }
             }
         }
@@ -506,7 +514,8 @@ fn convert_entity(entity: &RuntimeEntity<RuneInstance>) -> RuneEntity {
                 Into::<RuneTransform>::into(entity.transform.borrow().clone()))
             .unwrap()
             ).unwrap(),
-        drawables: Vec::new()
+        drawables: Vec::new(),
+        remove_drawables: Vec::new(),
     }
 }
 
@@ -545,6 +554,9 @@ impl RuneInstance {
         for drawable in &entity_obj.drawables {
             updates.push(EntityUpdate::AddDrawable(Into::<DrawablePrototype>::into(drawable)));
         }
+        for drawable in &entity_obj.remove_drawables {
+            updates.push(EntityUpdate::RemoveDrawable(drawable.clone()));
+        }
         updates
     }
 }
@@ -582,6 +594,7 @@ fn core_module() -> Result<Module> {
     m.ty::<Drawable>()?;
     m.function_meta(Vec2::string_display)?;
     m.function_meta(RuneEntity::register_drawable)?;
+    m.function_meta(RuneEntity::unregister_drawable)?;
     m.function_meta(Color::hex)?;
     m.function_meta(Color::rgba)?;
     m.function_meta(Color::rgb)?;

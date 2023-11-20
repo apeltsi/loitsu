@@ -12,6 +12,7 @@ pub struct SpriteDrawable {
     transform_buffer: Option<wgpu::Buffer>,
     initial_uniform: SpriteUniform,
     sprite: String,
+    uuid: uuid::Uuid,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -20,7 +21,7 @@ pub struct SpriteUniform {
 }
 
 impl<'a> SpriteDrawable {
-    pub fn new(sprite: &str, color: [f32; 4], shader_manager: &ShaderManager) -> Self {
+    pub fn new(sprite: &str, color: [f32; 4], uuid: uuid::Uuid, shader_manager: &ShaderManager) -> Self {
         Self {
             vertex_buffer: None,
             index_buffer: None,
@@ -32,6 +33,7 @@ impl<'a> SpriteDrawable {
                 color,
             },
             sprite: sprite.to_string(),
+            uuid
         }
     }
 }
@@ -104,5 +106,9 @@ impl<'b> Drawable<'b> for SpriteDrawable {
         pass.set_vertex_buffer(0, self.vertex_buffer.as_ref().unwrap().slice(..));
         pass.set_index_buffer(self.index_buffer.as_ref().unwrap().slice(..), wgpu::IndexFormat::Uint16);
         pass.draw_indexed(0..QUAD_INDICES.len() as u32, 0, 0..1);
+    }
+
+    fn get_uuid(&self) -> uuid::Uuid {
+        self.uuid
     }
 }

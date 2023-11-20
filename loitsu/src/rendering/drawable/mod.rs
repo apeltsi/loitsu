@@ -16,7 +16,7 @@ pub const QUAD_VERTICES: &[Vertex] = &[
 pub const QUAD_INDICES: &[u16] = &[0, 1, 2, 2, 1, 3];
 
 pub enum DrawablePrototype {
-    Sprite {sprite: String, color: [f32; 4]}
+    Sprite {sprite: String, color: [f32; 4], id: uuid::Uuid},
 }
 
 #[repr(C)]
@@ -54,4 +54,5 @@ impl TransformUniform {
 pub trait Drawable<'b> {
     fn init<'a>(&mut self, device: &wgpu::Device, asset_manager: &AssetManager, transform: Rc<RefCell<Transform>>) where 'a: 'b; 
     fn draw<'a>(&'a self, queue: &wgpu::Queue, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup);
+    fn get_uuid(&self) -> uuid::Uuid;
 }

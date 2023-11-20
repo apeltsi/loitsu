@@ -5,19 +5,21 @@ pub fn v2(x, y) {
 }
 
 struct SpriteRenderer {
-    sprite
+    sprite,
+    drawable
 }
 
 impl SpriteRenderer {
 	pub fn new() {
 		SpriteRenderer {
-            sprite: "" 
+            sprite: "",
+            drawable: ""
         }
 	}
 
     pub fn start(self, entity) {
         let drawable = Drawable::sprite(self.sprite, Color::white());
-        entity.register_drawable(drawable);
+        self.drawable = entity.register_drawable(drawable);
     }
 
     pub fn build(self, entity) {
@@ -26,4 +28,8 @@ impl SpriteRenderer {
 
 	pub fn frame(self, entity) {
 	}
+
+    pub fn destroy(self, entity) {
+        entity.unregister_drawable(self.drawable);
+    }
 }
