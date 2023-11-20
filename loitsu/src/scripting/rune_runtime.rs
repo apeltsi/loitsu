@@ -195,6 +195,13 @@ enum Drawable {
     )
 }
 
+impl Drawable {
+    #[rune::function(path = Self::sprite)]
+    fn sprite(sprite: &str, color: Color) -> Self {
+        Drawable::Sprite(sprite.to_string(), color)
+    }
+}
+
 impl From<&Drawable> for DrawablePrototype {
     fn from(drawable: &Drawable) -> Self {
         match drawable {
@@ -580,6 +587,7 @@ fn core_module() -> Result<Module> {
     m.function_meta(Color::rgb)?;
     m.function_meta(Color::black)?;
     m.function_meta(Color::white)?;
+    m.function_meta(Drawable::sprite)?;
 
     m.function("print", | log: &str | log!("[RUNE] {}", log)).build()?;
     m.function("error", | log: &str | error!("[RUNE] {}", log)).build()?;
