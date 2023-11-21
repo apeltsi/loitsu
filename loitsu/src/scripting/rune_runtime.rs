@@ -254,7 +254,9 @@ impl From<RuneTransform> for Transform {
             position: as_vec2(transform.position).as_tuple(),
             rotation: transform.rotation,
             scale: as_vec2(transform.scale).as_tuple(),
-            r#static: false
+            r#static: false,
+            has_changed: false,
+            changed_frame: 0
         }
     }
 }
@@ -549,7 +551,18 @@ impl RuneInstance {
         }
         let entity_obj = shared.downcast_borrow_ref::<RuneEntity>().unwrap();
         let rune_transform: RuneTransform = entity_obj.clone().transform.take_downcast().unwrap();
-        *entity.transform.borrow_mut() = rune_transform.into();
+        let mut new_transform: Transform = rune_transform.into();
+        if *entity.transform.borrow() != new_transform {
+            match new_transform {
+                Transform::Transform2D { ref mut has_changed, ..} => {
+                    *has_changed = true;
+                },
+                Transform::RectTransform { ref mut has_changed, .. } => {
+                    *has_changed = true;
+                }
+            }
+            *entity.transform.borrow_mut() = new_transform;
+        }
         let mut updates = Vec::new();
         for drawable in &entity_obj.drawables {
             updates.push(EntityUpdate::AddDrawable(Into::<DrawablePrototype>::into(drawable)));

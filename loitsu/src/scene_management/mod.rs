@@ -122,7 +122,9 @@ impl Entity {
                 position: (0.0, 0.0),
                 rotation: 0.0,
                 scale: (1.0, 1.0),
-                r#static: false
+                r#static: false,
+                has_changed: true,
+                changed_frame: 0
             }
         }
     }

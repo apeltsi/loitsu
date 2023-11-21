@@ -12,6 +12,7 @@ pub struct SpriteDrawable {
     transform_buffer: Option<wgpu::Buffer>,
     initial_uniform: SpriteUniform,
     sprite: String,
+    transform: Option<Rc<RefCell<Transform>>>,
     uuid: uuid::Uuid,
 }
 #[repr(C)]
@@ -33,6 +34,7 @@ impl<'a> SpriteDrawable {
                 color,
             },
             sprite: sprite.to_string(),
+            transform: None,
             uuid
         }
     }
@@ -62,6 +64,7 @@ impl<'b> Drawable<'b> for SpriteDrawable {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         }));
         let initial_transform = TransformUniform::new(transform.borrow().clone());
+        self.transform = Some(transform.clone());
         self.transform_buffer = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Sprite Transform Buffer"),
             contents: bytemuck::cast_slice(&[initial_transform]),
@@ -99,7 +102,14 @@ impl<'b> Drawable<'b> for SpriteDrawable {
         }));
     }
 
-    fn draw<'a>(&'a self, _queue: &wgpu::Queue, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup) {
+    fn draw<'a>(&'a self, frame_num: u64, queue: &wgpu::Queue, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup) {
+        if self.transform.is_none() {
+            return;
+        }
+        if self.transform.clone().unwrap().borrow_mut().check_changed(frame_num) {
+            let transform = TransformUniform::new(self.transform.clone().unwrap().borrow().clone());
+            queue.write_buffer(self.transform_buffer.as_ref().unwrap(), 0, bytemuck::cast_slice(&[transform]));
+        }
         pass.set_pipeline(self.shader.get_pipeline());
         pass.set_bind_group(0, global_bind_group, &[]);
         pass.set_bind_group(1, self.bind_group.as_ref().unwrap(), &[]);

@@ -37,7 +37,7 @@ impl TransformUniform {
                     ]
                 }
             },
-            Transform::RectTransform { position } => {
+            Transform::RectTransform { position, .. } => {
                 Self {
                     // TODO: THIS
                     transform: [
@@ -53,6 +53,6 @@ impl TransformUniform {
 }
 pub trait Drawable<'b> {
     fn init<'a>(&mut self, device: &wgpu::Device, asset_manager: &AssetManager, transform: Rc<RefCell<Transform>>) where 'a: 'b; 
-    fn draw<'a>(&'a self, queue: &wgpu::Queue, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup);
+    fn draw<'a>(&'a self, frame_num: u64, queue: &wgpu::Queue, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup);
     fn get_uuid(&self) -> uuid::Uuid;
 }

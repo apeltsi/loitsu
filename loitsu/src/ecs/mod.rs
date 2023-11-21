@@ -36,11 +36,29 @@ pub enum Transform {
         position: (f32, f32),
         rotation: f32,
         scale: (f32, f32),
-        r#static: bool
+        r#static: bool,
+        changed_frame: u64,
+        has_changed: bool
     },
     RectTransform {
         // TODO: Implement this :D
-        position: (f32, f32)
+        position: (f32, f32),
+        changed_frame: u64,
+        has_changed: bool
+    }
+}
+
+impl PartialEq for Transform {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Transform::Transform2D { position: (x1, y1), rotation: r1, scale: (sx1, sy1), .. }, Transform::Transform2D { position: (x2, y2), rotation: r2, scale: (sx2, sy2), .. }) => {
+                x1 == x2 && y1 == y2 && r1 == r2 && sx1 == sx2 && sy1 == sy2
+            },
+            (Transform::RectTransform { position: (x1, y1), .. }, Transform::RectTransform { position: (x2, y2), .. }) => {
+                x1 == x2 && y1 == y2
+            },
+            _ => false
+        }
     }
 }
 
@@ -48,7 +66,7 @@ impl Transform {
     #[cfg(feature = "scene_generation")]
     pub fn to_json(self) -> Value {
         match self {
-            Transform::Transform2D { position, rotation, scale, r#static } => {
+            Transform::Transform2D { position, rotation, scale, r#static, .. } => {
                 let mut map = Map::new();
                 map.insert("position".to_string(), 
                            Value::Array(vec![Value::Number(Number::from_f64(position.0 as f64).unwrap()), 
@@ -60,7 +78,7 @@ impl Transform {
                 map.insert("static".to_string(), Value::Bool(r#static));
                 Value::Object(map)
             },
-            Transform::RectTransform { position } => {
+            Transform::RectTransform { position, .. } => {
                 let mut map = Map::new();
                 map.insert("position".to_string(), 
                            Value::Array(vec![Value::Number(Number::from_f64(position.0 as f64).unwrap()), 
@@ -77,7 +95,38 @@ impl Transform {
         let scale = json["scale"].as_array().unwrap();
         let scale = (scale[0].as_f64().unwrap() as f32, scale[1].as_f64().unwrap() as f32);
         let r#static = json["static"].as_bool().unwrap();
-        Transform::Transform2D { position, rotation, scale, r#static }
+        Transform::Transform2D { position, rotation, scale, r#static, changed_frame: 0, has_changed: true }
+    }
+
+    pub fn check_changed(&mut self, frame_num: u64) -> bool {
+        match self {
+            Transform::Transform2D { changed_frame, has_changed, .. } => {
+                if *changed_frame == frame_num {
+                    return true
+                } else {
+                    if *has_changed {
+                        *changed_frame = frame_num;
+                        *has_changed = false;
+                        return true
+                    } else {
+                        return false
+                    }
+                }
+            },
+            Transform::RectTransform { changed_frame, has_changed, .. } => {
+                if *changed_frame == frame_num {
+                    return true
+                } else {
+                    if *has_changed {
+                        *changed_frame = frame_num;
+                        *has_changed = false;
+                        return true
+                    } else {
+                        return false
+                    }
+                }
+            }
+        }
     }
 }
 

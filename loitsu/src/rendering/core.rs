@@ -105,7 +105,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     log!("Running event loop...");
     let mut ecs_initialized = false;
     let mut drawables = Vec::<Box<dyn Drawable>>::new();
-    let mut frame_count = 0;
+    let mut frame_count: u64 = 0;
     let mut state = State {
         camera: CameraState::new()
     };
@@ -220,7 +220,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         }
                     }
                 }
-                render_frame(&surface, &device, &queue, &drawables, &global_bind_group, ecs_initialized);
+                render_frame(&surface, &device, &queue, &drawables, &global_bind_group, ecs_initialized, frame_count);
                 frame_count += 1;
             }
             Event::WindowEvent {
@@ -282,8 +282,8 @@ static mut HAS_LOADED: bool = false;
 
 pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, 
                     queue: &wgpu::Queue, drawables: &Vec<Box<dyn Drawable>>, 
-                     global_bind_group: &wgpu::BindGroup,
-                    ecs_initialized: bool) {
+                    global_bind_group: &wgpu::BindGroup,
+                    ecs_initialized: bool, frame_num: u64) {
     #[cfg(target_arch = "wasm32")]
     {
         if !unsafe { HAS_RENDERED } { 
@@ -330,7 +330,7 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device,
         });
 
         for drawable in drawables {
-            drawable.draw(&queue, &mut r_pass, global_bind_group);
+            drawable.draw(frame_num, &queue, &mut r_pass, global_bind_group);
         }
     }
 
