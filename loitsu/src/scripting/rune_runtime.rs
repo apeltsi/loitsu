@@ -614,9 +614,14 @@ fn core_module() -> Result<Module> {
     m.function_meta(Color::black)?;
     m.function_meta(Color::white)?;
     m.function_meta(Drawable::sprite)?;
-
+    
     m.function("print", | log: &str | log!("[RUNE] {}", log)).build()?;
     m.function("error", | log: &str | error!("[RUNE] {}", log)).build()?;
+    let start = Arc::new(instant::Instant::now());
+    m.function("get_time", move || {
+        let duration = start.elapsed();
+        duration.as_secs_f64()
+    }).build()?;
     // Math Constants
     m.constant("PI", std::f64::consts::PI).build()?;
     m.constant("E", std::f64::consts::E).build()?;
