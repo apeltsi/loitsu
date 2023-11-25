@@ -17,6 +17,10 @@ impl SpriteRenderer {
         }
 	}
 
+    pub fn set_color(self, entity, color) {
+        self.drawable = entity.set_drawable_color("color", color);
+    }
+
     pub fn start(self, entity) {
         let drawable = Drawable::sprite(self.sprite, Color::white());
         self.drawable = entity.register_drawable(drawable);

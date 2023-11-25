@@ -19,6 +19,12 @@ pub enum DrawablePrototype {
     Sprite {sprite: String, color: [f32; 4], id: uuid::Uuid},
 }
 
+#[derive(Debug, Clone)]
+pub enum DrawableProperty {
+    Sprite (String),
+    Color ([f32; 4]),
+}
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct TransformUniform {
@@ -53,6 +59,7 @@ impl TransformUniform {
 }
 pub trait Drawable<'b> {
     fn init<'a>(&mut self, device: &wgpu::Device, asset_manager: &AssetManager, transform: Rc<RefCell<Transform>>) where 'a: 'b; 
-    fn draw<'a>(&'a self, frame_num: u64, queue: &wgpu::Queue, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup);
+    fn draw<'a>(&'a mut self, frame_num: u64, device: &wgpu::Device, queue: &wgpu::Queue, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup);
     fn get_uuid(&self) -> uuid::Uuid;
+    fn set_property(&mut self, name: String, property: DrawableProperty);
 }

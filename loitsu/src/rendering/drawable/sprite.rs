@@ -10,10 +10,12 @@ pub struct SpriteDrawable {
     bind_group: Option<wgpu::BindGroup>,
     uniform_buffer: Option<wgpu::Buffer>,
     transform_buffer: Option<wgpu::Buffer>,
-    initial_uniform: SpriteUniform,
+    uniform: SpriteUniform,
     sprite: String,
     transform: Option<Rc<RefCell<Transform>>>,
     uuid: uuid::Uuid,
+    uniform_dirty: bool,
+    sprite_dirty: bool,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -30,12 +32,14 @@ impl<'a> SpriteDrawable {
             bind_group: None,
             uniform_buffer: None,
             transform_buffer: None,
-            initial_uniform: SpriteUniform {
+            uniform: SpriteUniform {
                 color,
             },
             sprite: sprite.to_string(),
             transform: None,
-            uuid
+            uuid,
+            uniform_dirty: false,
+            sprite_dirty: false,
         }
     }
 }
@@ -60,7 +64,7 @@ impl<'b> Drawable<'b> for SpriteDrawable {
         };
         self.uniform_buffer = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Sprite Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[self.initial_uniform]),
+            contents: bytemuck::cast_slice(&[self.uniform]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         }));
         let initial_transform = TransformUniform::new(transform.borrow().clone());
@@ -70,6 +74,64 @@ impl<'b> Drawable<'b> for SpriteDrawable {
             contents: bytemuck::cast_slice(&[initial_transform]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         }));
+        self.create_bind_group(device, sprite_asset);
+    }
+
+    fn draw<'a>(&'a mut self, frame_num: u64, device: &wgpu::Device, queue: &wgpu::Queue, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup) {
+        if self.transform.is_none() {
+            return;
+        }
+        if self.transform.clone().unwrap().borrow_mut().check_changed(frame_num) {
+            let transform = TransformUniform::new(self.transform.clone().unwrap().borrow().clone());
+            queue.write_buffer(self.transform_buffer.as_ref().unwrap(), 0, bytemuck::cast_slice(&[transform]));
+        }
+        if self.uniform_dirty {
+            queue.write_buffer(self.uniform_buffer.as_ref().unwrap(), 0, bytemuck::cast_slice(&[self.uniform]));
+            self.uniform_dirty = false;
+        }
+        if self.sprite_dirty {
+            let asset = crate::asset_management::ASSET_MANAGER.lock().unwrap().get_asset(&self.sprite).unwrap();
+            let locked_asset = asset.lock().unwrap();
+            let sprite_asset = match *locked_asset {
+                Asset::Image(ref image_asset) => Some(image_asset),
+            };
+            self.create_bind_group(device, sprite_asset);
+            self.sprite_dirty = false;
+        }
+        pass.set_pipeline(self.shader.get_pipeline());
+        pass.set_bind_group(0, global_bind_group, &[]);
+        pass.set_bind_group(1, self.bind_group.as_ref().unwrap(), &[]);
+        pass.set_vertex_buffer(0, self.vertex_buffer.as_ref().unwrap().slice(..));
+        pass.set_index_buffer(self.index_buffer.as_ref().unwrap().slice(..), wgpu::IndexFormat::Uint16);
+        pass.draw_indexed(0..QUAD_INDICES.len() as u32, 0, 0..1);
+    }
+
+    fn get_uuid(&self) -> uuid::Uuid {
+        self.uuid
+    }
+
+    fn set_property(&mut self, name: String, property: super::DrawableProperty) {
+        match name.as_str() {
+            "color" => {
+                if let super::DrawableProperty::Color(color) = property {
+                    self.uniform.color = color;
+                    self.uniform_dirty = true;
+                }
+            },
+            "sprite" => {
+                if let super::DrawableProperty::Sprite(sprite) = property {
+                    self.sprite = sprite;
+                    self.sprite_dirty = true;
+                }
+            }
+            _ => {}
+        }
+    }
+
+}
+
+impl SpriteDrawable {
+    fn create_bind_group(&mut self, device: &wgpu::Device, sprite_asset: Option<&crate::asset_management::image_asset::ImageAsset>) {
         self.bind_group = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &crate::rendering::core::get_sprite_bind_group_layout(device),
             entries: &[
@@ -100,25 +162,5 @@ impl<'b> Drawable<'b> for SpriteDrawable {
             ],
             label: Some("sprite_bind_group"),
         }));
-    }
-
-    fn draw<'a>(&'a self, frame_num: u64, queue: &wgpu::Queue, pass: &mut RenderPass<'a>, global_bind_group: &'a wgpu::BindGroup) {
-        if self.transform.is_none() {
-            return;
-        }
-        if self.transform.clone().unwrap().borrow_mut().check_changed(frame_num) {
-            let transform = TransformUniform::new(self.transform.clone().unwrap().borrow().clone());
-            queue.write_buffer(self.transform_buffer.as_ref().unwrap(), 0, bytemuck::cast_slice(&[transform]));
-        }
-        pass.set_pipeline(self.shader.get_pipeline());
-        pass.set_bind_group(0, global_bind_group, &[]);
-        pass.set_bind_group(1, self.bind_group.as_ref().unwrap(), &[]);
-        pass.set_vertex_buffer(0, self.vertex_buffer.as_ref().unwrap().slice(..));
-        pass.set_index_buffer(self.index_buffer.as_ref().unwrap().slice(..), wgpu::IndexFormat::Uint16);
-        pass.draw_indexed(0..QUAD_INDICES.len() as u32, 0, 0..1);
-    }
-
-    fn get_uuid(&self) -> uuid::Uuid {
-        self.uuid
     }
 }

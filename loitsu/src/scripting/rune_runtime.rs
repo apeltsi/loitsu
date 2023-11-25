@@ -1,7 +1,7 @@
 use rune::{Context, Diagnostics, Source, Sources, ContextError, Module, BuildError, Vm, ToValue, Any};
 use rune::runtime::{Value, Struct, VmError, Shared, Args, VmResult, AnyObj};
 use rune::diagnostics::EmitError;
-use crate::rendering::drawable::DrawablePrototype;
+use crate::rendering::drawable::{DrawablePrototype, DrawableProperty};
 use crate::{ScriptingInstance, log, error};
 use crate::scripting::{ScriptingError, ScriptingSource, ScriptingData};
 use rune::termcolor::{StandardStream, ColorChoice};
@@ -164,6 +164,12 @@ impl Display for Color {
     }
 }
 
+impl From<&Color> for [f32; 4] {
+    fn from(color: &Color) -> Self {
+        [color.r, color.g, color.b, color.a]
+    }
+}
+
 #[derive(Debug, Clone, Any)]
 struct RuneEntity {
     #[rune(get)]
@@ -175,6 +181,7 @@ struct RuneEntity {
     pub transform: Shared<AnyObj>,
     drawables: Vec<(Drawable, Uuid)>,
     remove_drawables: Vec<String>,
+    property_updates: Vec<(String, String, DrawableProperty)>
 }
 
 impl RuneEntity {
@@ -188,6 +195,16 @@ impl RuneEntity {
     #[rune::function]
     fn unregister_drawable(&mut self, uuid: &str) {
         self.remove_drawables.push(uuid.to_string());
+    }
+
+    #[rune::function]
+    fn set_drawable_color(&mut self, drawable: &str, property: &str, color: Color) {
+        self.property_updates.push((drawable.to_string(), property.to_string(), DrawableProperty::Color((&color).into())));
+    }
+
+    #[rune::function]
+    fn set_drawable_sprite(&mut self, drawable: &str, property: &str, sprite: &str) {
+        self.property_updates.push((drawable.to_string(), property.to_string(), DrawableProperty::Sprite(sprite.to_string())));
     }
 }
 
@@ -518,6 +535,7 @@ fn convert_entity(entity: &RuntimeEntity<RuneInstance>) -> RuneEntity {
             ).unwrap(),
         drawables: Vec::new(),
         remove_drawables: Vec::new(),
+        property_updates: Vec::new(),
     }
 }
 
@@ -569,6 +587,9 @@ impl RuneInstance {
         }
         for drawable in &entity_obj.remove_drawables {
             updates.push(EntityUpdate::RemoveDrawable(drawable.clone()));
+        }
+        for property_update in &entity_obj.property_updates {
+            updates.push(EntityUpdate::SetDrawableProperty(property_update.0.clone(), property_update.1.clone(), property_update.2.clone()));
         }
         updates
     }

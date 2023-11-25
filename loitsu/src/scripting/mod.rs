@@ -1,6 +1,6 @@
 pub mod rune_runtime;
 use std::{fmt, rc::Rc, cell::RefCell};
-use crate::{scene_management::Component, rendering::drawable::DrawablePrototype, ecs::Transform};
+use crate::{scene_management::Component, rendering::drawable::{DrawablePrototype, DrawableProperty}, ecs::Transform};
 use bitcode;
 use crate::ecs::ComponentFlags;
 
@@ -34,6 +34,7 @@ impl fmt::Display for ScriptingError {
 pub enum EntityUpdate {
     AddDrawable(DrawablePrototype),
     RemoveDrawable(String),
+    SetDrawableProperty(String, String, DrawableProperty),
 }
 
 pub trait ScriptingInstance: Sized {

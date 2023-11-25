@@ -207,10 +207,19 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                                         }
                                     },
                                     EntityUpdate::RemoveDrawable(id) => {
-                                        // TODO: Make this more efficient, maybe use a hashmap?
+                                        // NOTE: This could be more efficient, maybe use a hashmap?
                                         for i in 0..drawables.len() {
                                             if drawables[i].get_uuid().to_string() == id {
                                                 drawables.remove(i);
+                                                break;
+                                            }
+                                        }
+                                    },
+                                    EntityUpdate::SetDrawableProperty(id, field_name, property) => {
+                                        // NOTE: Same as above, maybe use a hashmap?
+                                        for i in 0..drawables.len() {
+                                            if drawables[i].get_uuid().to_string() == id {
+                                                drawables[i].set_property(field_name, property);
                                                 break;
                                             }
                                         }
@@ -220,7 +229,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         }
                     }
                 }
-                render_frame(&surface, &device, &queue, &drawables, &global_bind_group, ecs_initialized, frame_count);
+                render_frame(&surface, &device, &queue, &mut drawables, &global_bind_group, ecs_initialized, frame_count);
                 frame_count += 1;
             }
             Event::WindowEvent {
@@ -281,7 +290,7 @@ static mut HAS_RENDERED: bool = false;
 static mut HAS_LOADED: bool = false;
 
 pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device, 
-                    queue: &wgpu::Queue, drawables: &Vec<Box<dyn Drawable>>, 
+                    queue: &wgpu::Queue, drawables: &mut Vec<Box<dyn Drawable>>, 
                     global_bind_group: &wgpu::BindGroup,
                     ecs_initialized: bool, frame_num: u64) {
     #[cfg(target_arch = "wasm32")]
@@ -330,7 +339,7 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device,
         });
 
         for drawable in drawables {
-            drawable.draw(frame_num, &queue, &mut r_pass, global_bind_group);
+            drawable.draw(frame_num, &device, &queue, &mut r_pass, global_bind_group);
         }
     }
 
