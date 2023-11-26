@@ -1,17 +1,20 @@
-use self::static_shard::StaticShard;
+use self::{static_shard::StaticShard, asset::Asset};
 use crate::log;
 use lazy_static::lazy_static;
+
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_futures::spawn_local;
 
 #[cfg(not(target_arch = "wasm32"))]
-use futures::executor::block_on as spawn_local;
+use tokio::task::spawn as spawn_local;
 
 use std::sync::{Arc, Mutex, atomic::{AtomicUsize, Ordering}};
 
 pub mod shard;
 pub mod static_shard;
 pub mod get_file;
+pub mod asset;
+pub mod image_asset;
 
 lazy_static!{
     pub static ref ASSET_MANAGER: Arc<Mutex<AssetManager>> = Arc::new(Mutex::new(AssetManager::new()));
@@ -24,7 +27,7 @@ pub struct AssetManager {
 }
 
 pub struct Assets {
-    pub shards: Vec<shard::Shard>,
+    pub shards: Vec<shard::ConsumedShard>,
     pub static_shard: Option<static_shard::StaticShard>,
 }
 
@@ -60,42 +63,70 @@ impl AssetManager {
             assets,
         }
     }
+
     pub fn request_shards(&mut self, shards: Vec<String>) {
         let assets = self.assets.clone();
+        self.pending_tasks.fetch_add(shards.len(), Ordering::SeqCst);
         let pending_tasks = self.pending_tasks.clone();
         spawn_local(async move {
-            let mut assets = assets.lock().unwrap();
-            
             // now lets fetch the shards, and join the futures
             let mut futures = Vec::new();
             for shard in shards {
                 futures.push(get_file::get_file(shard + ".shard"));
-                pending_tasks.fetch_add(1, Ordering::SeqCst);
             }
             let mut results = Vec::new();
             for future in futures {
-                results.push(future.await);
+                let value = future.await;
+                results.push(value);
             }
 
             // now lets decode the shards
-            
-            for result in results {
-                match result {
-                    Ok(file) => {
-                        log!("Successfully loaded shard");
-                        let shard = shard::Shard::decode(&file);
-                        assets.shards.push(shard);
-                        pending_tasks.fetch_sub(1, Ordering::SeqCst);
-                    },
-                    Err(e) => {
-                        log!("Failed to load shard: {:?}", e.message);
+            for result in results.drain(..) {
+                let pending_tasks = pending_tasks.clone();
+                let assets = assets.clone();
+                spawn_local(async move {
+                    match result {
+                        Ok(file) => {
+                            let mut shard = shard::Shard::decode(&file);
+                            let consumed_shard = shard.consume().await.unwrap();
+                            let mut assets = assets.lock().unwrap();
+                            assets.shards.push(consumed_shard);
+                            pending_tasks.fetch_sub(1, Ordering::SeqCst);
+                            log!("Successfully loaded shard");
+                        },
+                        Err(e) => {
+                            log!("Failed to load shard: {:?}", e.message);
+                        }
                     }
-                }
+                });
             }
 
         });
     }
 
+    pub fn initialize_shards(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+        if self.pending_tasks.load(Ordering::SeqCst) > 0 {
+            return;
+        }
+        let mut assets = self.assets.lock().unwrap();
+        for shard in &mut assets.shards {
+            if shard.is_initialized {
+                continue;
+            }
+            shard.initialize(device, queue);
+            log!("Shard initialized");
+        }
+    }
+
+    pub fn get_asset(&self, name: &str) -> Option<Arc<Mutex<Asset>>>  {
+        let assets = self.assets.lock().unwrap();
+        for shard in &assets.shards {
+            if let Some(asset) = shard.get_asset(name) {
+                return Some(asset.clone());
+            }
+        }
+        None
+    }
 }
 
 #[derive(Debug)]
@@ -108,5 +139,18 @@ impl AssetError {
         AssetError {
             message: message.to_owned(),
         }
+    }
+}
+
+impl From<std::io::Error> for AssetError {
+    fn from(value: std::io::Error) -> Self {
+        AssetError::new(&format!("{:?}", value))
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl From<tokio::task::JoinError> for AssetError {
+    fn from(value: tokio::task::JoinError) -> Self {
+        AssetError::new(&format!("{:?}", value))
     }
 }

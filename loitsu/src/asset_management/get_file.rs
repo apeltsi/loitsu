@@ -15,13 +15,6 @@ impl From<JsValue> for AssetError {
         AssetError::new(&format!("{:?}", value))
     }
 }
-#[cfg(not(target_arch = "wasm32"))]
-impl From<std::io::Error> for AssetError {
-    fn from(value: std::io::Error) -> Self {
-        AssetError::new(&format!("{:?}", value))
-    }
-}
-
 #[cfg(target_arch = "wasm32")]
 pub async fn get_file(path: String) -> Result<Vec<u8>, AssetError> {
     let mut opts = RequestInit::new();

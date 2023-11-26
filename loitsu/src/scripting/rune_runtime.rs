@@ -1,13 +1,19 @@
-use rune::{Context, Diagnostics, Source, Sources, ContextError, Module, BuildError, Vm, ToValue};
-use rune::runtime::{Value, Struct, VmError, Shared, Args, VmResult};
+use rune::{Context, Diagnostics, Source, Sources, ContextError, Module, BuildError, Vm, ToValue, Any};
+use rune::runtime::{Value, Struct, VmError, Shared, Args, VmResult, AnyObj};
 use rune::diagnostics::EmitError;
-use crate::ScriptingInstance;
+use crate::rendering::drawable::{DrawablePrototype, DrawableProperty};
+use crate::{ScriptingInstance, log, error};
 use crate::scripting::{ScriptingError, ScriptingSource, ScriptingData};
 use rune::termcolor::{StandardStream, ColorChoice};
-use crate::scene_management::Component;
-use crate::scene_management::Property;
+use crate::scene_management::{Property, Component};
+use std::cell::RefCell;
+use std::fmt::{Display, Formatter};
+use std::rc::Rc;
 use std::sync::Arc;
-
+use crate::ecs::{ComponentFlags, Transform, RuntimeEntity};
+use rune::alloc::fmt::TryWrite;
+use uuid::Uuid;
+use super::EntityUpdate;
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
 #[cfg(feature = "scene_generation")]
@@ -19,6 +25,257 @@ pub struct RuneInstance {
 
 pub struct RuneComponent {
     pub data: Option<Shared<Struct>>
+}
+
+#[derive(Debug, Clone, Any)]
+struct RuneTransform {
+    #[rune(get, set)]
+    position: Shared<AnyObj>,
+    #[rune(get, set)]
+    rotation: f32,
+    #[rune(get, set)]
+    scale: Shared<AnyObj>,
+}
+
+#[derive(Debug, Clone, Any, PartialEq)]
+#[rune(constructor)]
+pub struct Vec2 {
+    #[rune(get, set, copy)]
+    pub x: f32,
+    #[rune(get, set, copy)]
+    pub y: f32
+}
+
+impl Vec2 {
+    pub fn new(x: f32, y: f32) -> Self {
+        Self {
+            x,
+            y
+        }
+    }
+
+    pub fn from_tuple(pos: (f32, f32)) -> Self {
+        Self {
+            x: pos.0,
+            y: pos.1
+        }
+    }
+
+    pub fn zero() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0
+        }
+    }
+
+    pub fn as_tuple(&self) -> (f32, f32) {
+        (self.x, self.y)
+    }
+
+    #[rune::function(protocol = STRING_DISPLAY)]
+    fn string_display(&self, f: &mut rune::runtime::Formatter) -> () {
+        write!(f, "({}, {})", self.x, self.y).unwrap();
+    }
+}
+
+impl Display for Vec2 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
+#[derive(Debug, Clone, Any, PartialEq)]
+#[rune(constructor)]
+pub struct Color {
+    #[rune(get, set, copy)]
+    pub r: f32,
+    #[rune(get, set, copy)]
+    pub g: f32,
+    #[rune(get, set, copy)]
+    pub b: f32,
+    #[rune(get, set, copy)]
+    pub a: f32
+}
+
+impl Color {
+    #[rune::function(path = Self::black)]
+    fn black() -> Color {
+        Color {
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+            a: 1.0
+        }
+    }
+
+    #[rune::function(path = Self::white)]
+    fn white() -> Color {
+        Color {
+            r: 1.0,
+            g: 1.0,
+            b: 1.0,
+            a: 1.0
+        }
+    }
+
+    #[rune::function(path = Self::rgb)]
+    fn rgb(r: f32, g: f32, b: f32) -> Color {
+        Color {
+            r,
+            g,
+            b,
+            a: 1.0
+        }
+    }
+
+    #[rune::function(path = Self::rgba)]
+    fn rgba(r: f32, g: f32, b: f32, a: f32) -> Color {
+        Color {
+            r,
+            g,
+            b,
+            a
+        }
+    }
+
+    #[rune::function(path = Self::hex)]
+    fn hex(hex: String) -> Color {
+        let hex = hex.trim_start_matches("#");
+        let r = u8::from_str_radix(&hex[0..2], 16).unwrap() as f32 / 255.0;
+        let g = u8::from_str_radix(&hex[2..4], 16).unwrap() as f32 / 255.0;
+        let b = u8::from_str_radix(&hex[4..6], 16).unwrap() as f32 / 255.0;
+        let a = if hex.len() > 6 {
+            u8::from_str_radix(&hex[6..8], 16).unwrap() as f32 / 255.0
+        } else {
+            1.0
+        };
+        Color {
+            r,
+            g,
+            b,
+            a
+        }
+    }
+} 
+
+impl Display for Color {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {}, {}, {})", self.r, self.g, self.b, self.a)
+    }
+}
+
+impl From<&Color> for [f32; 4] {
+    fn from(color: &Color) -> Self {
+        [color.r, color.g, color.b, color.a]
+    }
+}
+
+#[derive(Debug, Clone, Any)]
+struct RuneEntity {
+    #[rune(get)]
+    pub name: String,
+    // pub components: Vec<RuneComponent>, TODO: NOT IMPLEMENTED
+    // pub children: Vec<RuneEntity>, TODO: NOT IMPLEMENTED, should use a string id reference to
+    // avoid circular references
+    #[rune(get, set)]
+    pub transform: Shared<AnyObj>,
+    drawables: Vec<(Drawable, Uuid)>,
+    remove_drawables: Vec<String>,
+    property_updates: Vec<(String, String, DrawableProperty)>
+}
+
+impl RuneEntity {
+    #[rune::function]
+    fn register_drawable(&mut self, drawable: Drawable) -> String {
+        let id = crate::util::random::uuid();
+        self.drawables.push((drawable, id));
+        id.to_string()
+    }
+
+    #[rune::function]
+    fn unregister_drawable(&mut self, uuid: &str) {
+        self.remove_drawables.push(uuid.to_string());
+    }
+
+    #[rune::function]
+    fn set_drawable_color(&mut self, drawable: &str, property: &str, color: Color) {
+        self.property_updates.push((drawable.to_string(), property.to_string(), DrawableProperty::Color((&color).into())));
+    }
+
+    #[rune::function]
+    fn set_drawable_sprite(&mut self, drawable: &str, property: &str, sprite: &str) {
+        self.property_updates.push((drawable.to_string(), property.to_string(), DrawableProperty::Sprite(sprite.to_string())));
+    }
+}
+
+#[derive(Debug, Clone, Any)]
+enum Drawable {
+    #[rune(constructor)]
+    Sprite (
+        #[rune(get, set)]
+        String,
+        #[rune(get, set)]
+        Color
+    )
+}
+
+impl Drawable {
+    #[rune::function(path = Self::sprite)]
+    fn sprite(sprite: &str, color: Color) -> Self {
+        Drawable::Sprite(sprite.to_string(), color)
+    }
+}
+
+impl From<&(Drawable, Uuid)> for DrawablePrototype {
+    fn from(drawable: &(Drawable, Uuid)) -> Self {
+        match &drawable.0 {
+            Drawable::Sprite(sprite, color) => {
+                DrawablePrototype::Sprite {
+                    sprite: sprite.to_string(),
+                    color: [color.r, color.g, color.b, color.a],
+                    id: drawable.1
+                }
+            }
+        }
+    }
+}
+
+impl From<Transform> for RuneTransform {
+    fn from(transform: Transform) -> Self {
+        match transform {
+            Transform::Transform2D { position, rotation, scale, .. } => {
+                RuneTransform {
+                    position: Shared::new(AnyObj::new(Vec2::from_tuple(position)).unwrap()).unwrap(),
+                    rotation,
+                    scale: Shared::new(AnyObj::new(Vec2::from_tuple(scale)).unwrap()).unwrap()
+                }
+            },
+            Transform::RectTransform { position, .. } => {
+                RuneTransform {
+                    position: Shared::new(AnyObj::new(Vec2::from_tuple(position)).unwrap()).unwrap(),
+                    rotation: 0.0,
+                    scale: Shared::new(AnyObj::new(Vec2::new(1.0, 1.0)).unwrap()).unwrap()
+                }
+            }
+        }
+    }
+}
+
+fn as_vec2(vec: Shared<AnyObj>) -> Vec2 {
+    vec.take_downcast().unwrap()
+}
+
+impl From<RuneTransform> for Transform {
+    fn from(transform: RuneTransform) -> Self {
+        Transform::Transform2D {
+            position: as_vec2(transform.position).as_tuple(),
+            rotation: transform.rotation,
+            scale: as_vec2(transform.scale).as_tuple(),
+            r#static: false,
+            has_changed: false,
+            changed_frame: 0
+        }
+    }
 }
 
 impl ScriptingData<RuneInstance> for RuneComponent {
@@ -56,7 +313,7 @@ impl ScriptingData<RuneInstance> for RuneComponent {
                 proto.properties.insert(key.to_string(), value.clone().into());
             }
         }
-        Ok(proto.clone())
+        Ok(proto)
     }
 }
 
@@ -150,8 +407,9 @@ impl ScriptingInstance for RuneInstance {
         context.install(&core_module)?;
         let runtime = context.runtime()?;
         let mut rune_sources = Sources::new();
+        rune_sources.insert(Source::new("loitsu_builtin", include_str!("scripts/builtin.rn"))?).unwrap();
         for source in sources {
-            let _ = rune_sources.insert(Source::new(source.name, source.source)?);
+            rune_sources.insert(Source::new(source.name, source.source)?).unwrap();
         }
         let mut diagnostics = Diagnostics::without_warnings();
         let result = rune::prepare(&mut rune_sources)
@@ -186,6 +444,7 @@ impl ScriptingInstance for RuneInstance {
         context.install(&core_module)?;
         let runtime = context.runtime()?;
         let mut rune_sources = Sources::new();
+        rune_sources.insert(Source::new("loitsu_builtin", include_str!("scripts/builtin.rn"))?).unwrap();
         for source in sources {
             let _ = rune_sources.insert(Source::new(source.name, source.source)?);
         }
@@ -215,30 +474,139 @@ impl ScriptingInstance for RuneInstance {
         Ok(result)
     }
 
-    fn run_component_methods<RuneComponent>(&mut self, entities: &[crate::ecs::RuntimeEntity<Self>], method: &str) {
-        for entity in entities {
-            self.run_component_methods_on_entity(&entity, method);
-            for child in &entity.children {
-                self.run_component_methods_on_entity(child, method);
+    fn run_component_methods<RuneComponent>(&mut self, entities: &mut [crate::ecs::RuntimeEntity<Self>], method: ComponentFlags) -> Vec<(Rc<RefCell<crate::ecs::Transform>>, Vec<EntityUpdate>)> {
+        let mut updates = Vec::new();
+        for mut entity in entities {
+            let mut entity_updates = Vec::new();
+            if entity.is_new {
+                if entity.component_flags & ComponentFlags::START == ComponentFlags::START {
+                    entity_updates.extend(self.run_component_methods_on_entity(&mut entity, ComponentFlags::START));
+                }
+                entity.is_new = false;
             }
+            if entity.component_flags & method == method {
+                entity_updates.extend(self.run_component_methods_on_entity(&mut entity, method));
+            }
+            for child in &mut entity.children {
+                if child.is_new {
+                    if child.component_flags & ComponentFlags::START == ComponentFlags::START {
+                        entity_updates.extend(self.run_component_methods_on_entity(child, ComponentFlags::START));
+                    }
+                    child.is_new = false;
+                }
+                if child.component_flags & method == method {
+                    entity_updates.extend(self.run_component_methods_on_entity(child, method));
+                }
+            }
+            updates.push((entity.transform.clone(), entity_updates));
         }
+        updates
     }
 
-}
-impl RuneInstance {
-    fn run_component_methods_on_entity(&mut self, entity: &crate::ecs::RuntimeEntity<Self>, method: &str) {
-        for component in &entity.components {
-            match &component.data.data {
-                Some(data) => {
-                    let _ = self.virtual_machine.as_mut().unwrap().call([component.component_proto.name.as_str(), method], (data.clone(), ));
-                },
-                None => {
-                    let _ = self.virtual_machine.as_mut().unwrap().call([component.component_proto.name.as_str(), method], (rune::runtime::Value::EmptyTuple, ));
+    fn get_component_flags(&self, component_name: &str) -> ComponentFlags {
+        let mut flags = ComponentFlags::EMPTY;
+        if let Some(vm) = &self.virtual_machine {
+            let methods = vec![
+                ComponentFlags::BUILD,
+                ComponentFlags::FRAME,
+                ComponentFlags::LATE_FRAME,
+                ComponentFlags::TICK,
+                ComponentFlags::START,
+                ComponentFlags::DESTROY,
+            ];
+            for method in methods {
+                let result = vm.lookup_function([component_name, flags_to_method(method)]);
+                if let Ok(_) = result {
+                    flags |= method;
                 }
             }
         }
+        flags
     }
 }
+
+fn convert_entity(entity: &RuntimeEntity<RuneInstance>) -> RuneEntity {
+    RuneEntity {
+        name: entity.get_name().to_string(),
+        transform: Shared::new(
+            AnyObj::new(
+                Into::<RuneTransform>::into(entity.transform.borrow().clone()))
+            .unwrap()
+            ).unwrap(),
+        drawables: Vec::new(),
+        remove_drawables: Vec::new(),
+        property_updates: Vec::new(),
+    }
+}
+
+impl RuneInstance {
+    fn run_component_methods_on_entity(&mut self, entity: &mut crate::ecs::RuntimeEntity<Self>, c_flags: ComponentFlags) -> Vec<EntityUpdate> {
+        let mut entity_obj = convert_entity(&entity);
+        let (shared, _guard) = unsafe { Shared::from_mut(&mut entity_obj).unwrap() };
+        let method = flags_to_method(c_flags);
+        for component in &entity.components {
+            if component.flags & c_flags != c_flags {
+                continue;
+            }
+            match &component.data.data {
+                Some(data) => {
+                    let r = self.virtual_machine.as_mut().unwrap().call(
+                        [component.component_proto.name.as_str(), method],
+                        (data.clone(), shared.clone()));
+                    if let Err(error) = r {
+                        crate::logging::error(&format!("Error running method {} on component {}: {}", method, component.component_proto.name, error));
+                    }
+                },
+                None => {
+                    let r = self.virtual_machine.as_mut().unwrap().call(
+                        [component.component_proto.name.as_str(), method],
+                        (rune::runtime::Value::EmptyTuple, shared.clone()));
+                    if let Err(error) = r {
+                        crate::logging::error(&format!("Error running method {} on component {}: {}", method, component.component_proto.name, error));
+                    }
+                }
+            }
+        }
+        let entity_obj = shared.downcast_borrow_ref::<RuneEntity>().unwrap();
+        let rune_transform: RuneTransform = entity_obj.clone().transform.take_downcast().unwrap();
+        let mut new_transform: Transform = rune_transform.into();
+        if *entity.transform.borrow() != new_transform {
+            match new_transform {
+                Transform::Transform2D { ref mut has_changed, ..} => {
+                    *has_changed = true;
+                },
+                Transform::RectTransform { ref mut has_changed, .. } => {
+                    *has_changed = true;
+                }
+            }
+            *entity.transform.borrow_mut() = new_transform;
+        }
+        let mut updates = Vec::new();
+        for drawable in &entity_obj.drawables {
+            updates.push(EntityUpdate::AddDrawable(Into::<DrawablePrototype>::into(drawable)));
+        }
+        for drawable in &entity_obj.remove_drawables {
+            updates.push(EntityUpdate::RemoveDrawable(drawable.clone()));
+        }
+        for property_update in &entity_obj.property_updates {
+            updates.push(EntityUpdate::SetDrawableProperty(property_update.0.clone(), property_update.1.clone(), property_update.2.clone()));
+        }
+        updates
+    }
+}
+
+fn flags_to_method(flags: ComponentFlags) -> &'static str {
+    match flags {
+        ComponentFlags::BUILD => "build",
+        ComponentFlags::FRAME => "frame",
+        ComponentFlags::LATE_FRAME => "late_frame",
+        ComponentFlags::TICK => "tick",
+        ComponentFlags::START => "start",
+        ComponentFlags::DESTROY => "destroy",
+        _ => panic!("Invalid component flags"),
+    }
+}
+
 #[cfg(feature = "scene_generation")]
 pub unsafe fn get_required_assets() -> Vec<String> {
     REQUIRED_ASSETS.clone()
@@ -251,8 +619,30 @@ pub unsafe fn clear_required_assets() {
 
 fn core_module() -> Result<Module> {
     let mut m = Module::new();
-    m.function("print", | log: &str | crate::logging::log(log)).build()?;
-    m.function("error", | log: &str | crate::logging::error(log)).build()?;
+
+    // Types
+    m.ty::<RuneEntity>()?;
+    m.ty::<RuneTransform>()?;
+    m.ty::<Vec2>()?;
+    m.ty::<Color>()?;
+    m.ty::<Drawable>()?;
+    m.function_meta(Vec2::string_display)?;
+    m.function_meta(RuneEntity::register_drawable)?;
+    m.function_meta(RuneEntity::unregister_drawable)?;
+    m.function_meta(Color::hex)?;
+    m.function_meta(Color::rgba)?;
+    m.function_meta(Color::rgb)?;
+    m.function_meta(Color::black)?;
+    m.function_meta(Color::white)?;
+    m.function_meta(Drawable::sprite)?;
+    
+    m.function("print", | log: &str | log!("[RUNE] {}", log)).build()?;
+    m.function("error", | log: &str | error!("[RUNE] {}", log)).build()?;
+    let start = Arc::new(instant::Instant::now());
+    m.function("get_time", move || {
+        let duration = start.elapsed();
+        duration.as_secs_f64()
+    }).build()?;
     // Math Constants
     m.constant("PI", std::f64::consts::PI).build()?;
     m.constant("E", std::f64::consts::E).build()?;

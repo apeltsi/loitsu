@@ -10,3 +10,4 @@ pub mod core;
 
 pub mod drawable;
 pub mod shader;
+pub mod vertex;

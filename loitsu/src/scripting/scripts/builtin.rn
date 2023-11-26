@@ -1,0 +1,39 @@
+// Some built-in components and methods
+
+pub fn v2(x, y) {
+    Vec2 {x, y}
+}
+
+struct SpriteRenderer {
+    sprite,
+    drawable
+}
+
+impl SpriteRenderer {
+	pub fn new() {
+		SpriteRenderer {
+            sprite: "",
+            drawable: ""
+        }
+	}
+
+    pub fn set_color(self, entity, color) {
+        self.drawable = entity.set_drawable_color("color", color);
+    }
+
+    pub fn start(self, entity) {
+        let drawable = Drawable::sprite(self.sprite, Color::white());
+        self.drawable = entity.register_drawable(drawable);
+    }
+
+    pub fn build(self, entity) {
+        require_asset(self.sprite);
+    }
+
+	pub fn frame(self, entity) {
+	}
+
+    pub fn destroy(self, entity) {
+        entity.unregister_drawable(self.drawable);
+    }
+}

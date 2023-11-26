@@ -4,6 +4,8 @@ use serde_json::{Value, Map};
 use std::collections::HashMap;
 use bitcode;
 
+use crate::ecs::Transform;
+
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
 #[bitcode(recursive)]
 pub enum Property {
@@ -31,6 +33,7 @@ pub struct Entity {
     pub id: String,
     pub components: Vec<Component>,
     pub children: Vec<Entity>,
+    pub transform: Transform,
 }
 
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
@@ -98,6 +101,10 @@ fn collect_entities(entities: Vec<Value>) -> Vec<Entity> {
             out_entity.add_component(out_component);
         }
         out_entity.children = collect_entities(entity["children"].as_array().unwrap().to_vec());
+        
+        // lets parse the transform
+        let transform = entity["transform"].as_object().unwrap();
+        out_entity.transform = Transform::from_json(transform);
         out_entities.push(out_entity);
     }
     out_entities
@@ -111,6 +118,14 @@ impl Entity {
             id,
             components: Vec::new(),
             children: Vec::new(),
+            transform: Transform::Transform2D {
+                position: (0.0, 0.0),
+                rotation: 0.0,
+                scale: (1.0, 1.0),
+                r#static: false,
+                has_changed: true,
+                changed_frame: 0
+            }
         }
     }
 
@@ -128,6 +143,7 @@ impl Entity {
         entity.insert("name".to_string(), serde_json::Value::String(self.name.clone()));
         entity.insert("id".to_string(), serde_json::Value::String(self.id.clone()));
         entity.insert("components".to_string(), serde_json::Value::Array(components));
+        entity.insert("transform".to_string(), self.transform.clone().to_json());
         let mut children = Vec::new();
         for child in self.children.clone() {
             children.push(child.to_json());

@@ -3,6 +3,11 @@ macro_rules! log {
     ($($t:tt)*) => ($crate::logging::log(&format_args!($($t)*).to_string()))
 }
 
+#[macro_export]
+macro_rules! error {
+    ($($t:tt)*) => ($crate::logging::error(&format_args!($($t)*).to_string()))
+}
+
 pub fn log(s: &str) {
     #[cfg(target_arch = "wasm32")]
     {

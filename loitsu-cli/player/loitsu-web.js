@@ -1,4 +1,4 @@
-import init from "./{APP_NAME}.js";
+import init, {resize} from "./{APP_NAME}.js";
 const loadingText = document.getElementById("loadingText");
 export function set_status(status) {
     switch (status) {
@@ -18,8 +18,7 @@ export function set_status(status) {
     }
 }
 
-window.addEventListener('resize', function() {
-});
+window.addEventListener("resize", () => resize());
 
 window.set_status = set_status;
 async function run() {

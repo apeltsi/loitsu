@@ -1,7 +1,8 @@
 pub mod rune_runtime;
-use std::fmt;
-use crate::scene_management::Component;
+use std::{fmt, rc::Rc, cell::RefCell};
+use crate::{scene_management::Component, rendering::drawable::{DrawablePrototype, DrawableProperty}, ecs::Transform};
 use bitcode;
+use crate::ecs::ComponentFlags;
 
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
@@ -30,6 +31,11 @@ impl fmt::Display for ScriptingError {
     }
 }
 
+pub enum EntityUpdate {
+    AddDrawable(DrawablePrototype),
+    RemoveDrawable(String),
+    SetDrawableProperty(String, String, DrawableProperty),
+}
 
 pub trait ScriptingInstance: Sized {
     type Data: ScriptingData<Self>;
@@ -37,7 +43,8 @@ pub trait ScriptingInstance: Sized {
     fn new_uninitialized() -> Result<Self> where Self: Sized;
     fn initialize(&mut self, sources: Vec<ScriptingSource>) -> Result<()>;
     fn call<T>(&mut self, path: [&str; 2], args: T) -> Result<rune::runtime::Value> where T: rune::runtime::Args;
-    fn run_component_methods<T>(&mut self, entities: &[crate::ecs::RuntimeEntity<Self>], method: &str);
+    fn run_component_methods<T>(&mut self, entities: &mut [crate::ecs::RuntimeEntity<Self>], method: ComponentFlags) -> Vec<(Rc<RefCell<Transform>>, Vec<EntityUpdate>)>;
+    fn get_component_flags(&self, component_name: &str) -> ComponentFlags;
 }
 
 pub trait ScriptingData<T> where T: ScriptingInstance {

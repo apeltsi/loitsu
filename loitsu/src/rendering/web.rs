@@ -9,15 +9,10 @@ pub fn init_view<T>(scripting: T, ecs: ECS<T>) where T: ScriptingInstance + 'sta
     log!("Initializing web...");
     update_loading_status(1);
 
-    let window_size = || {
-        let win = web_sys::window().unwrap();
-        winit::dpi::LogicalSize::new(win.inner_width().unwrap().as_f64().unwrap(), win.inner_height().unwrap().as_f64().unwrap())
-    };
-
     let event_loop = EventLoop::new();
     let window = winit::window::WindowBuilder::new()
         .with_title("loitsu")
-        .with_inner_size(window_size())
+        .with_inner_size(winit::dpi::LogicalSize::new(20.0, 20.0))
         .build(&event_loop)
         .unwrap();
     // On wasm, append the canvas to the document body
