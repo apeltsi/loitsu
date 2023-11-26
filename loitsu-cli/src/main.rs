@@ -73,7 +73,25 @@ async fn build(target: &str, release: bool, run: bool, force: bool) {
                 let ver = &detail.version;
                 match ver {
                     Some(version) => version.to_owned(),
-                    None => "Unknown (CUSTOM/DEV)".to_string()
+                    None => {
+                        if let Some(path) = &detail.path {
+                            let path = Path::new(path);
+                            let mut path = path.to_path_buf();
+                            path.push("Cargo.toml");
+                            let manifest = Manifest::from_path(path.clone()).unwrap();
+                            let package_version = manifest.package.unwrap().version;
+                            match package_version {
+                                cargo_toml::Inheritable::Set(version) => {
+                                    format!("{}dev", version)
+                                },
+                                cargo_toml::Inheritable::Inherited { .. } => {
+                                    "Unknown (CUSTOM/DEV)".to_string()
+                                }
+                            }
+                        } else {
+                            "Unknown (CUSTOM/DEV)".to_string()
+                        }
+                    }
                 }
             }
         };
