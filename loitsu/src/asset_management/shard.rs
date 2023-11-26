@@ -5,6 +5,9 @@ use std::sync::{Arc, Mutex};
 use super::AssetError;
 use super::asset::{Asset, image_from_bytes};
 
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::task::spawn as spawn_local;
+
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
 pub struct Shard {
     name: String,
@@ -59,23 +62,44 @@ impl Shard {
     }
 
     /// Consumes the shard, returning the parsed assets
-    pub fn consume(&mut self) -> Result<ConsumedShard, AssetError> {
-        let mut assets = HashMap::new();
-
+    pub async fn consume(&mut self) -> Result<ConsumedShard, AssetError> {
+        let assets = Arc::new(Mutex::new(HashMap::new()));
+        #[cfg(not(target_arch = "wasm32"))]
+        let mut futures = Vec::new();
         for (name, file) in self.assets.drain() {
-            let asset: Arc<Mutex<Asset>> = match name.split(".").last().unwrap() {
-                "png" => {
-                    Arc::new(Mutex::new(image_from_bytes(file.data, &file.name)))
-                },
-                _ => {
-                    return Err(AssetError::new("Unknown file type"));
-                }
+            let assets = assets.clone();
+            let task = async move {
+                let asset: Arc<Mutex<Asset>> = match name.split(".").last().unwrap() {
+                    "png" => {
+                        Arc::new(Mutex::new(image_from_bytes(file.data, &file.name)))
+                    },
+                    _ => {
+                        #[cfg(not(target_arch = "wasm32"))]
+                        return Err(AssetError::new("Unknown file type"));
+                        #[cfg(target_arch = "wasm32")]
+                        return;
+                    }
+                };
+                assets.lock().unwrap().insert(name, asset);
+                #[cfg(not(target_arch = "wasm32"))]
+                Ok(())
             };
-            assets.insert(name, asset);
+            #[cfg(target_arch = "wasm32")]
+            task.await;
+            #[cfg(not(target_arch = "wasm32"))] {
+                let future = spawn_local(task);
+                futures.push(future);
+            }
+        }
+
+        // no multi-threading on wasm :(
+        #[cfg(not(target_arch = "wasm32"))]
+        for future in futures {
+            future.await??;
         }
         Ok(ConsumedShard {
             name: self.name.clone(),
-            assets,
+            assets: assets.clone().lock().unwrap().clone(),
             is_initialized: false
         })
     }

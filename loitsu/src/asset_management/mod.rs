@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 use wasm_bindgen_futures::spawn_local;
 
 #[cfg(not(target_arch = "wasm32"))]
-use futures::executor::block_on as spawn_local;
+use tokio::task::spawn as spawn_local;
 
 use std::sync::{Arc, Mutex, atomic::{AtomicUsize, Ordering}};
 
@@ -69,8 +69,6 @@ impl AssetManager {
         self.pending_tasks.fetch_add(shards.len(), Ordering::SeqCst);
         let pending_tasks = self.pending_tasks.clone();
         spawn_local(async move {
-            let mut assets = assets.lock().unwrap();
-            
             // now lets fetch the shards, and join the futures
             let mut futures = Vec::new();
             for shard in shards {
@@ -78,24 +76,29 @@ impl AssetManager {
             }
             let mut results = Vec::new();
             for future in futures {
-                results.push(future.await);
+                let value = future.await;
+                results.push(value);
             }
 
             // now lets decode the shards
-            
-            for result in results {
-                match result {
-                    Ok(file) => {
-                        let mut shard = shard::Shard::decode(&file);
-                        let consumed_shard = shard.consume().unwrap();
-                        assets.shards.push(consumed_shard);
-                        pending_tasks.fetch_sub(1, Ordering::SeqCst);
-                        log!("Successfully loaded shard");
-                    },
-                    Err(e) => {
-                        log!("Failed to load shard: {:?}", e.message);
+            for result in results.drain(..) {
+                let pending_tasks = pending_tasks.clone();
+                let assets = assets.clone();
+                spawn_local(async move {
+                    match result {
+                        Ok(file) => {
+                            let mut shard = shard::Shard::decode(&file);
+                            let consumed_shard = shard.consume().await.unwrap();
+                            let mut assets = assets.lock().unwrap();
+                            assets.shards.push(consumed_shard);
+                            pending_tasks.fetch_sub(1, Ordering::SeqCst);
+                            log!("Successfully loaded shard");
+                        },
+                        Err(e) => {
+                            log!("Failed to load shard: {:?}", e.message);
+                        }
                     }
-                }
+                });
             }
 
         });
@@ -136,5 +139,18 @@ impl AssetError {
         AssetError {
             message: message.to_owned(),
         }
+    }
+}
+
+impl From<std::io::Error> for AssetError {
+    fn from(value: std::io::Error) -> Self {
+        AssetError::new(&format!("{:?}", value))
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl From<tokio::task::JoinError> for AssetError {
+    fn from(value: tokio::task::JoinError) -> Self {
+        AssetError::new(&format!("{:?}", value))
     }
 }

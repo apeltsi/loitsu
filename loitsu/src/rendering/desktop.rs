@@ -14,6 +14,12 @@ pub fn init_window<T>(scripting: T, ecs: ECS<T>) where T: ScriptingInstance + 's
 
     log!("Preparing window...");
     env_logger::init();
-    pollster::block_on(crate::rendering::core::run(event_loop, window, scripting, ecs));
+    //pollster::block_on(crate::rendering::core::run(event_loop, window, scripting, ecs));
+    
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(crate::rendering::core::run(event_loop, window, scripting, ecs));
 }
 
