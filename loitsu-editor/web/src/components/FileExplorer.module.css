@@ -1,0 +1,16 @@
+.explorer {
+    background-color: var(--panel-bg-color);
+    opacity: var(--panel-bg-opacity);
+    overflow-y: scroll;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    transition-property: background-color;
+    transition-duration: 0.1s;
+}
+
+.explorer:hover {
+    background-color: var(--panel-bg-highlight-color);
+}

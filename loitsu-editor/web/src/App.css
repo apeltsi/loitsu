@@ -1,0 +1,34 @@
+.panel-shadow {
+    box-shadow: inset 0 -15vh 10vh 5vh var(--panel-bg-color);
+    height: calc(100vh - 30px);
+    width: 100vw;
+}
+.primary {
+    position: absolute;
+    top: 30px;
+    left: 0;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 0.4fr 1.2fr 0.5fr;
+    grid-template-rows: 1fr 0.35fr;
+    height: calc(100vh - 30px);
+    width: 100vw;
+}
+
+.inspector {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    border-left: 2px solid var(--line-color);
+}
+
+.file-explorer {
+    grid-column: 1 / 3;
+    grid-row: 2;
+    border-top: 2px solid var(--line-color);
+}
+
+.hierarchy {
+    grid-column: 1 / 2;
+    grid-row: 1;
+    border-right: 2px solid var(--line-color);
+}
