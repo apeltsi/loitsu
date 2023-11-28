@@ -125,6 +125,12 @@ impl AssetManager {
                 return Some(asset.clone());
             }
         }
+        #[cfg(feature = "direct_asset_management")]
+        {
+            // The asset wasn't in a shard, and we have direct asset management enabled
+            // so we'll try to load it from from the local asset server
+            log!("Asset not found in shards, trying to load from local asset server");
+        }
         None
     }
 }

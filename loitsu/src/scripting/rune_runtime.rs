@@ -541,6 +541,12 @@ fn convert_entity(entity: &RuntimeEntity<RuneInstance>) -> RuneEntity {
 
 impl RuneInstance {
     fn run_component_methods_on_entity(&mut self, entity: &mut crate::ecs::RuntimeEntity<Self>, c_flags: ComponentFlags) -> Vec<EntityUpdate> {
+        #[cfg(feature = "disable_common_ecs_methods")]
+        {
+            if c_flags == ComponentFlags::START || c_flags == ComponentFlags::DESTROY {
+                return Vec::new();
+            }
+        }
         let mut entity_obj = convert_entity(&entity);
         let (shared, _guard) = unsafe { Shared::from_mut(&mut entity_obj).unwrap() };
         let method = flags_to_method(c_flags);

@@ -190,9 +190,11 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         log!("ECS initialized");
                     }
                 } else {
+                    
                     let mut asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
                     asset_manager.initialize_shards(&device, &queue);
                     if frame_count > 1 && ecs_initialized && asset_manager.pending_tasks.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+                        #[cfg(feature = "direct_asset_management")]
                         let updates = ecs.run_frame(&mut scripting);
                         for entity_updates in updates {
                             for update in entity_updates.1 {

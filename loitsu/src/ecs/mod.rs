@@ -15,6 +15,8 @@ pub struct ECS<T> where T: ScriptingInstance {
     pub active_scene: Scene,
     pub static_scene: Option<Scene>,
     runtime_entities: Vec<RuntimeEntity<T>>,
+    #[cfg(feature = "editor")]
+    event_handler: crate::editor::EventHandler<T>
 }
 
 bitflags! {
@@ -160,6 +162,7 @@ pub struct RuntimeComponent<T> where T: ScriptingInstance {
 }
 
 impl<T: ScriptingInstance> ECS<T> {
+    #[cfg(not(feature = "editor"))]
     pub fn new() -> ECS<T> {
         ECS {
             active_scene: Scene::new("INITIAL_SCENE".to_string()),
@@ -168,15 +171,35 @@ impl<T: ScriptingInstance> ECS<T> {
         }
     }
 
+    #[cfg(feature = "editor")]
+    pub fn new(event_handler: crate::editor::EventHandler<T>) -> ECS<T> {
+        ECS {
+            active_scene: Scene::new("INITIAL_SCENE".to_string()),
+            static_scene: None,
+            runtime_entities: Vec::new(),
+            event_handler
+        }
+    }
+
     pub fn load_scene(&mut self, scene: Scene, scripting: &mut T) {
         self.active_scene = scene.clone();
-        self.runtime_entities = init_entities(scene.entities, scripting);
 
+        #[cfg(feature = "editor")]
+        self.emit(crate::editor::Event::SceneLoaded(scene.clone()));
+
+        self.runtime_entities = init_entities(scene.entities, scripting);
         // next up we'll have to figure out how to load our assets
         // lets start by requesting the appropriate shards
         
         #[cfg(not(feature = "scene_generation"))]
         ASSET_MANAGER.lock().unwrap().request_shards(scene.shards.clone());
+    }
+
+    #[cfg(feature = "editor")]
+    pub fn emit(&mut self, event: crate::editor::Event) {
+        for event_handler in &self.event_handler.event_handlers {
+            event_handler(&self, &event);
+        }
     }
 
     pub fn run_build_step(&mut self, scripting: &mut T) {

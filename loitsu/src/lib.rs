@@ -5,7 +5,8 @@ pub mod scene_management;
 pub mod ecs;
 pub mod asset_management;
 pub mod util;
-
+#[cfg(feature = "editor")]
+pub mod editor;
 use scripting::ScriptingInstance;
 
 #[cfg_attr(feature = "json_preference_parse", derive(serde::Deserialize))]
@@ -21,7 +22,10 @@ mod web;
 pub fn build_scenes(scenes: Vec<(String, String)>, scripts: Vec<scripting::ScriptingSource>) -> Vec<scene_management::Scene> {
     let mut rune = scripting::rune_runtime::
         RuneInstance::new_with_sources(scripts).unwrap();
+    #[cfg(not(feature = "editor"))]
     let mut e = ecs::ECS::new();
+    #[cfg(feature = "editor")]
+    let mut e = ecs::ECS::new(editor::EventHandler::new());
     let mut generated_scenes = Vec::new();
     for scene in scenes {
         let scene = scene_management::Scene::from_json(scene.0, scene.1);
@@ -36,8 +40,27 @@ pub fn build_scenes(scenes: Vec<(String, String)>, scripts: Vec<scripting::Scrip
     generated_scenes
 }
 
+#[cfg(feature = "editor")]
+pub fn load_scene_in_edit_mode(event_handler: editor::EventHandler<scripting::rune_runtime::RuneInstance>, scene: scene_management::Scene, scripts: Vec<scripting::ScriptingSource>) {
+    let mut rune = scripting::rune_runtime::RuneInstance::new_with_sources(scripts).unwrap();
+    let mut e = ecs::ECS::new(event_handler);
+    e.load_scene(scene, &mut rune);
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use rendering::desktop;
+        desktop::init_window(rune, e);
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        use rendering::web;
+        web::init_view(rune, e);
+    }
+}
+
 /// Initializes the core systems of loitsu.
 /// This function should be called before any other loitsu functions.
+#[cfg(not(feature = "editor"))]
 pub fn init_engine() {
     #[cfg(target_arch = "wasm32")]
     {

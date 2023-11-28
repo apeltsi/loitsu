@@ -7,6 +7,9 @@ authors = ["Amos Peltonen"]
 [features]
 scene_generation = ["dep:serde_json"]
 json_preference_parse = ["dep:serde_json", "dep:serde"]
+disable_common_ecs_methods = []
+editor = ["disable_common_ecs_methods", "scene_generation", "direct_asset_management"]
+direct_asset_management = []
 
 [dependencies]
 env_logger = "0.10.0"
