@@ -3,9 +3,9 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
-use crate::{log, scripting::{ScriptingInstance, EntityUpdate}, scene_management::Scene, rendering::drawable::{sprite::SpriteDrawable, DrawablePrototype}};
+use crate::{log, scripting::{ScriptingInstance, EntityUpdate}, scene_management::Scene, rendering::drawable::{sprite::SpriteDrawable, DrawablePrototype}, asset_management::AssetManager, ecs::Transform};
 use crate::ecs::ECS;
-use std::cmp::max;
+use std::{cmp::max, cell::RefCell, rc::Rc};
 use crate::asset_management::ASSET_MANAGER;
 
 #[cfg(target_arch = "wasm32")]
@@ -165,6 +165,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
+                let mut updates = Vec::new();
                 if !ecs_initialized {
                     let scene: Option<Scene> = {
                         let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
@@ -188,48 +189,24 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                             scene, &mut scripting);
                         ecs_initialized = true;
                         log!("ECS initialized");
+                        #[cfg(feature = "editor")]
+                        {
+                            updates.extend(ecs.run_component_methods(&mut scripting, crate::ecs::ComponentFlags::EDITOR_START));
+                        }
                     }
                 } else {
-                    
                     let mut asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
                     asset_manager.initialize_shards(&device, &queue);
                     if frame_count > 1 && ecs_initialized && asset_manager.pending_tasks.load(std::sync::atomic::Ordering::SeqCst) == 0 {
-                        #[cfg(feature = "direct_asset_management")]
-                        let updates = ecs.run_frame(&mut scripting);
-                        for entity_updates in updates {
-                            for update in entity_updates.1 {
-                                match update {
-                                    EntityUpdate::AddDrawable(drawable) => {
-                                        match drawable {
-                                            DrawablePrototype::Sprite {sprite, color, id} => {
-                                                let mut drawable = Box::new(SpriteDrawable::new(sprite.as_str(), color, id, &shader_manager));
-                                                drawable.init(&device, &asset_manager, entity_updates.0.clone());
-                                                drawables.push(drawable);
-                                            }
-                                        }
-                                    },
-                                    EntityUpdate::RemoveDrawable(id) => {
-                                        // NOTE: This could be more efficient, maybe use a hashmap?
-                                        for i in 0..drawables.len() {
-                                            if drawables[i].get_uuid().to_string() == id {
-                                                drawables.remove(i);
-                                                break;
-                                            }
-                                        }
-                                    },
-                                    EntityUpdate::SetDrawableProperty(id, field_name, property) => {
-                                        // NOTE: Same as above, maybe use a hashmap?
-                                        for i in 0..drawables.len() {
-                                            if drawables[i].get_uuid().to_string() == id {
-                                                drawables[i].set_property(field_name, property);
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                        #[cfg(not(feature = "disable_common_ecs_methods"))]
+                        {
+                            updates.extend(ecs.run_frame(&mut scripting));
                         }
                     }
+                }
+                {
+                    let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
+                    process_entity_updates(&device, &asset_manager, &shader_manager, &mut drawables, updates);
                 }
                 render_frame(&surface, &device, &queue, &mut drawables, &global_bind_group, ecs_initialized, frame_count);
                 frame_count += 1;
@@ -244,6 +221,46 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
             _ => {}
         }
     });
+}
+
+fn process_entity_updates(device: &wgpu::Device, 
+                          asset_manager: &AssetManager, 
+                          shader_manager: &ShaderManager,
+                          drawables: &mut Vec<Box<dyn Drawable>>,
+                          updates: Vec<(Rc<RefCell<Transform>>, Vec<EntityUpdate>)>) {
+    for entity_updates in updates {
+        for update in entity_updates.1 {
+            match update {
+                EntityUpdate::AddDrawable(drawable) => {
+                    match drawable {
+                        DrawablePrototype::Sprite {sprite, color, id} => {
+                            let mut drawable = Box::new(SpriteDrawable::new(sprite.as_str(), color, id, &shader_manager));
+                            drawable.init(&device, &asset_manager, entity_updates.0.clone());
+                            drawables.push(drawable);
+                        }
+                    }
+                },
+                EntityUpdate::RemoveDrawable(id) => {
+                    // NOTE: This could be more efficient, maybe use a hashmap?
+                    for i in 0..drawables.len() {
+                        if drawables[i].get_uuid().to_string() == id {
+                            drawables.remove(i);
+                            break;
+                        }
+                    }
+                },
+                EntityUpdate::SetDrawableProperty(id, field_name, property) => {
+                    // NOTE: Same as above, maybe use a hashmap?
+                    for i in 0..drawables.len() {
+                        if drawables[i].get_uuid().to_string() == id {
+                            drawables[i].set_property(field_name, property);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[repr(C)]

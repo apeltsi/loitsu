@@ -513,6 +513,10 @@ impl ScriptingInstance for RuneInstance {
                 ComponentFlags::TICK,
                 ComponentFlags::START,
                 ComponentFlags::DESTROY,
+                #[cfg(feature = "editor")]
+                ComponentFlags::EDITOR_START,
+                #[cfg(feature = "editor")]
+                ComponentFlags::EDITOR_DESTROY,
             ];
             for method in methods {
                 let result = vm.lookup_function([component_name, flags_to_method(method)]);
@@ -609,6 +613,10 @@ fn flags_to_method(flags: ComponentFlags) -> &'static str {
         ComponentFlags::TICK => "tick",
         ComponentFlags::START => "start",
         ComponentFlags::DESTROY => "destroy",
+        #[cfg(feature = "editor")]
+        ComponentFlags::EDITOR_START => "editor_start",
+        #[cfg(feature = "editor")]
+        ComponentFlags::EDITOR_DESTROY => "editor_destroy",
         _ => panic!("Invalid component flags"),
     }
 }

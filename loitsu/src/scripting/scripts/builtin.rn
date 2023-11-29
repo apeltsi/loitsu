@@ -26,12 +26,18 @@ impl SpriteRenderer {
         self.drawable = entity.register_drawable(drawable);
     }
 
+    pub fn editor_start(self, entity) {
+        let drawable = Drawable::sprite(self.sprite, Color::white());
+        self.drawable = entity.register_drawable(drawable);
+    }
+
+    pub fn editor_destroy(self, entity) {
+        entity.unregister_drawable(self.drawable);
+    }
+
     pub fn build(self, entity) {
         require_asset(self.sprite);
     }
-
-	pub fn frame(self, entity) {
-	}
 
     pub fn destroy(self, entity) {
         entity.unregister_drawable(self.drawable);

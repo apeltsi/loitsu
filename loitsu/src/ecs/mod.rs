@@ -22,13 +22,17 @@ pub struct ECS<T> where T: ScriptingInstance {
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct ComponentFlags: u32 {
-        const EMPTY =       0b00000000;
-        const BUILD =       0b00000001;
-        const FRAME =       0b00000010;
-        const LATE_FRAME =  0b00000100;
-        const TICK =        0b00001000;
-        const START =       0b00010000;
-        const DESTROY =     0b00100000;
+        const EMPTY =           0b00000000;
+        const BUILD =           0b00000001;
+        const FRAME =           0b00000010;
+        const LATE_FRAME =      0b00000100;
+        const TICK =            0b00001000;
+        const START =           0b00010000;
+        const DESTROY =         0b00100000;
+        #[cfg(feature = "editor")]
+        const EDITOR_START =    0b01000000;
+        #[cfg(feature = "editor")]
+        const EDITOR_DESTROY =  0b10000000;
     }
 }
 
@@ -210,7 +214,7 @@ impl<T: ScriptingInstance> ECS<T> {
         self.run_component_methods(scripting, ComponentFlags::FRAME)
     }
 
-    fn run_component_methods(&mut self, scripting: &mut T, method: ComponentFlags) -> Vec<(Rc<RefCell<Transform>>, Vec<EntityUpdate>)>  {
+    pub fn run_component_methods(&mut self, scripting: &mut T, method: ComponentFlags) -> Vec<(Rc<RefCell<Transform>>, Vec<EntityUpdate>)>  {
         // Lets iterate over the entities and run the build step on each component
         scripting.run_component_methods::<T>(self.runtime_entities.as_mut_slice(), method)
     }
