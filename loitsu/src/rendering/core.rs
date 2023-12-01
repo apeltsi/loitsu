@@ -3,7 +3,7 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
-use crate::{log, scripting::{ScriptingInstance, EntityUpdate}, scene_management::Scene, rendering::drawable::{sprite::SpriteDrawable, DrawablePrototype}, asset_management::AssetManager, ecs::Transform};
+use crate::{log_render as log, scripting::{ScriptingInstance, EntityUpdate}, scene_management::Scene, rendering::drawable::{sprite::SpriteDrawable, DrawablePrototype}, asset_management::AssetManager, ecs::Transform};
 use crate::ecs::ECS;
 use std::{cmp::max, cell::RefCell, rc::Rc};
 use crate::asset_management::ASSET_MANAGER;
@@ -165,6 +165,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
+                #[allow(unused_mut)]
                 let mut updates = Vec::new();
                 if !ecs_initialized {
                     let scene: Option<Scene> = {
