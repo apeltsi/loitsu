@@ -44,3 +44,4 @@ zstd = "0.13"
 instant = "0.1"
 tokio = { version = "1.0", features=["full"]}
 colored = "2.0.4"
+futures = "0.3.29"
