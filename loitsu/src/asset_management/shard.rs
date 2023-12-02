@@ -94,9 +94,7 @@ impl Shard {
 
         // no multi-threading on wasm :(
         #[cfg(not(target_arch = "wasm32"))]
-        for future in futures {
-            future.await??;
-        }
+        futures::future::join_all(futures).await;
         Ok(ConsumedShard {
             name: self.name.clone(),
             assets: assets.clone().lock().unwrap().clone(),

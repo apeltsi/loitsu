@@ -25,7 +25,7 @@
 				position: absolute;
 				top: 0;
 				left: 0;
-				z-index: 100;
+				z-index: 10;
 				background-color: black;
 			}
 			.logo {
@@ -35,6 +35,32 @@
 				animation-duration: 0.4s;
 				animation-timing-function: ease-out;
 			}
+            #log_container {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 50vw;
+                height: 100vh;
+                display: flex;
+                overflow: hidden;
+                flex-direction: column;
+                align-items: flex-start;
+                justify-content: flex-end;
+                pointer-events: none;
+            }
+            #log_container p {
+                margin: 0;
+                padding: 0;
+                color: white;
+                z-index: 100;
+                font-family: "Roboto Mono", monospace;
+                background-color: #000000aa;
+                animation-name: logFade;
+                animation-duration: 0.5s;
+                animation-delay: 19.5s;
+                animation-fill-mode: forwards;
+                animation-timing-function: ease-in;
+            }
 			canvas {
 				position: absolute;
 				top: 0;
@@ -55,6 +81,16 @@
 					opacity: 1;
 				}
 			}
+            @keyframes logFade {
+                from {
+                    opacity: 1;
+                    transform: translateX(0);
+                }
+                to {
+                    opacity: 0;
+                    transform: translateX(-50px);
+                }
+            }
 			.doneLoading {
 				filter: opacity(0);
 				pointer-events: none;
@@ -65,10 +101,11 @@
 		<div class="loadingContainer" id="loading">
 			<img src="./loitsu.png" class="logo" alt="Loitsu Logo" />
 			<h1 id="loadingText">Loading Loitsu runtime...</h1>
-			<p>Loitsu web 0.1.1</p>
+			<p>Loitsu web 0.1.2</p>
 			<p>Loitsu runtime {LOITSU_VERSION}</p>
 			<p>Built on {BUILD_DATE}</p>
 		</div>
+        <div id="log_container"></div>
 		<script type="module" src="./loitsu-web.js"></script>
 	</body>
 </html>

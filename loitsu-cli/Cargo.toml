@@ -16,7 +16,7 @@ warp = "0.3"
 tokio = { version = "1.33.0", features = ["full"] }
 chrono = "0.4.31"
 walkdir = "2"
-loitsu = { path = "../loitsu", features = ["scene_generation", "json_preference_parse"] }
+loitsu = { path = "../loitsu", features = ["scene_generation", "json_preference_parse", "disable_common_ecs_methods"] }
 serde_json = "1.0"
 image = "0.24.7"
 checksumdir = "0.3.0"

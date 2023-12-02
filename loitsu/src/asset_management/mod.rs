@@ -1,5 +1,5 @@
 use self::{static_shard::StaticShard, asset::Asset};
-use crate::log;
+use crate::log_asset as log;
 use lazy_static::lazy_static;
 
 #[cfg(target_arch = "wasm32")]

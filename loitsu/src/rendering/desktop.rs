@@ -1,5 +1,5 @@
 use winit::event_loop::EventLoop;
-use crate::log;
+use crate::log_render as log;
 use crate::scripting::ScriptingInstance;
 use crate::ecs::ECS;
 

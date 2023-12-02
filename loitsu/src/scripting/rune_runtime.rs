@@ -2,7 +2,7 @@ use rune::{Context, Diagnostics, Source, Sources, ContextError, Module, BuildErr
 use rune::runtime::{Value, Struct, VmError, Shared, Args, VmResult, AnyObj};
 use rune::diagnostics::EmitError;
 use crate::rendering::drawable::{DrawablePrototype, DrawableProperty};
-use crate::{ScriptingInstance, log, error};
+use crate::{ScriptingInstance, log_scripting as log, error};
 use crate::scripting::{ScriptingError, ScriptingSource, ScriptingData};
 use rune::termcolor::{StandardStream, ColorChoice};
 use crate::scene_management::{Property, Component};

@@ -3,7 +3,7 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
-use crate::{log, scripting::{ScriptingInstance, EntityUpdate}, scene_management::Scene, rendering::drawable::{sprite::SpriteDrawable, DrawablePrototype}, asset_management::AssetManager, ecs::Transform};
+use crate::{log_render as log, scripting::{ScriptingInstance, EntityUpdate}, scene_management::Scene, rendering::drawable::{sprite::SpriteDrawable, DrawablePrototype}, asset_management::AssetManager, ecs::Transform, log_scripting};
 use crate::ecs::ECS;
 use std::{cmp::max, cell::RefCell, rc::Rc};
 use crate::asset_management::ASSET_MANAGER;
@@ -165,6 +165,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
+                #[allow(unused_mut)]
                 let mut updates = Vec::new();
                 if !ecs_initialized {
                     let scene: Option<Scene> = {
@@ -172,7 +173,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         let x = if let Some(static_shard) = &asset_manager.assets.lock().unwrap().static_shard {
                             // init scripts
                             scripting.initialize(static_shard.get_scripts().clone()).unwrap();
-                            log!("Scripting initialized");
+                            log_scripting!("Scripting initialized");
                             let default_scene_name = static_shard.get_preferences().default_scene.as_str();
                             let scene = static_shard.get_scene(default_scene_name);
                             Some(scene.expect(
