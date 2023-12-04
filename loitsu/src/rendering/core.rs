@@ -167,6 +167,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
             Event::RedrawRequested(_) => {
                 #[allow(unused_mut)]
                 let mut updates = Vec::new();
+                #[cfg(not(feature = "direct_asset_management"))]
                 if !ecs_initialized {
                     let scene: Option<Scene> = {
                         let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();

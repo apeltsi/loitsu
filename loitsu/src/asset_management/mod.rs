@@ -1,5 +1,5 @@
 use self::{static_shard::StaticShard, asset::Asset};
-use crate::log_asset as log;
+use crate::{log_asset as log, error};
 use lazy_static::lazy_static;
 
 #[cfg(target_arch = "wasm32")]
@@ -41,8 +41,9 @@ impl AssetManager {
         let assets = Arc::new(Mutex::new(assets));
         let assets_clone = assets.clone();
         let pending_tasks_clone = pending_tasks.clone();
+        #[cfg(not(feature = "direct_asset_management"))]
         spawn_local(async move {
-            let result = get_file::get_file("static.shard".to_string()).await;
+            let result = get_file::get_file("shards/static.shard".to_string()).await;
 
             match result {
                 Ok(file) => {
@@ -53,7 +54,7 @@ impl AssetManager {
                     pending_tasks_clone.fetch_sub(1, Ordering::SeqCst);
                 },
                 Err(e) => {
-                    log!("Failed to load static shard: {:?}", e.message);
+                    error!("Failed to load static shard: {:?}", e.message);
                     // TODO: On web platforms this could show some error to the user
                 }
             }
@@ -72,7 +73,7 @@ impl AssetManager {
             // now lets fetch the shards, and join the futures
             let mut futures = Vec::new();
             for shard in shards {
-                futures.push(get_file::get_file(shard + ".shard"));
+                futures.push(get_file::get_file(format!("shards/{}", shard + ".shard")));
             }
             let mut results = Vec::new();
             for future in futures {
@@ -95,7 +96,7 @@ impl AssetManager {
                             log!("Successfully loaded shard");
                         },
                         Err(e) => {
-                            log!("Failed to load shard: {:?}", e.message);
+                            error!("Failed to load shard: {:?}", e.message);
                         }
                     }
                 });

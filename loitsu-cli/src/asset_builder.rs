@@ -49,16 +49,11 @@ pub fn build_assets(out_dir: &PathBuf, force: bool) {
     }
 
     let mut scripts = Vec::new();
-    let mut script_sources = Vec::new();
     for file in files {
         if file.name.ends_with(".rn") {
             scripts.push(ScriptingSource {
                 name: file.name.clone(),
                 source: String::from_utf8(file.data.clone()).unwrap(),
-            });
-            script_sources.push(ScriptingSource {
-                name: file.name,
-                source: String::from_utf8(file.data).unwrap(),
             });
         }
     }
@@ -78,9 +73,9 @@ pub fn build_assets(out_dir: &PathBuf, force: bool) {
     };
 
     info!("Building {} scenes and {} scripts...", scenes.len(), scripts.len());
-    let scenes = loitsu::build_scenes(scenes, scripts);
+    let scenes = loitsu::build_scenes(scenes, scripts.clone());
     info!("Generating shards...");
-    let (shards, static_shard) = shard_gen::generate_shards(scenes, script_sources, &preferences);
+    let (shards, static_shard) = shard_gen::generate_shards(scenes, scripts, &preferences);
 
     let overrides = get_asset_overrides(&asset_path);
     // lets make sure the shard dir exists

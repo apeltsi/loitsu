@@ -21,7 +21,7 @@ pub async fn get_file(path: String) -> Result<Vec<u8>, AssetError> {
     opts.method("GET");
     opts.mode(RequestMode::Cors);
 
-    let url = format!("./shards/{}", path);
+    let url = format!("./{}", path);
     let request = Request::new_with_str_and_init(&url, &opts)?;
     
     let window = web_sys::window().unwrap();
@@ -45,7 +45,6 @@ pub async fn get_file(path: String) -> Result<Vec<u8>, AssetError> {
 pub async fn get_file(path: String) -> Result<Vec<u8>, AssetError> {
     let mut path_buf = std::env::current_exe().unwrap();
     path_buf.pop();
-    path_buf.push("shards");
     path_buf.push(path);
     let data = std::fs::read(path_buf)?;
     Ok(data)

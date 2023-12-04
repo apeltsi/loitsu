@@ -1,5 +1,5 @@
 .panel-shadow {
-    box-shadow: inset 0 -15vh 10vh 5vh var(--panel-bg-color);
+    box-shadow: inset 0 -12vh 8vh 5vh var(--panel-bg-color);
     height: calc(100vh - 30px);
     width: 100vw;
 }
