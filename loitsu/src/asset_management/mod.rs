@@ -20,7 +20,6 @@ lazy_static!{
     pub static ref ASSET_MANAGER: Arc<Mutex<AssetManager>> = Arc::new(Mutex::new(AssetManager::new()));
 }
 
-
 pub struct AssetManager {
     pub pending_tasks: Arc<AtomicUsize>,
     pub assets: Arc<Mutex<Assets>>
@@ -33,7 +32,11 @@ pub struct Assets {
 
 impl AssetManager {
     pub fn new() -> AssetManager {
+        #[cfg(not(feature = "direct_asset_management"))]
         let pending_tasks = Arc::new(AtomicUsize::new(1));
+        // If direct asset management is not in use, we'll have to wait for the static shard
+        #[cfg(feature = "direct_asset_management")]
+        let pending_tasks = Arc::new(AtomicUsize::new(0));
         let assets = Assets {
             shards: Vec::new(),
             static_shard: None,
@@ -93,7 +96,7 @@ impl AssetManager {
                             let mut assets = assets.lock().unwrap();
                             assets.shards.push(consumed_shard);
                             pending_tasks.fetch_sub(1, Ordering::SeqCst);
-                            log!("Successfully loaded shard");
+                            log!("Successfully loaded shard: '{}'", shard.get_name());
                         },
                         Err(e) => {
                             error!("Failed to load shard: {:?}", e.message);
@@ -115,17 +118,21 @@ impl AssetManager {
                 continue;
             }
             shard.initialize(device, queue);
-            log!("Shard initialized");
+            log!("Shard '{}' initialized", shard.name);
         }
     }
 
     pub fn get_asset(&self, name: &str) -> Option<Arc<Mutex<Asset>>>  {
-        let assets = self.assets.lock().unwrap();
-        for shard in &assets.shards {
-            if let Some(asset) = shard.get_asset(name) {
-                return Some(asset.clone());
+        #[cfg(not(feature = "direct_asset_management"))]
+        {
+            let assets = self.assets.lock().unwrap();
+            for shard in &assets.shards {
+                if let Some(asset) = shard.get_asset(name) {
+                    return Some(asset.clone());
+                }
             }
         }
+        #[cfg(target_arch = "wasm32")] // currently we only support direct asset management on web
         #[cfg(feature = "direct_asset_management")]
         {
             // The asset wasn't in a shard, and we have direct asset management enabled

@@ -206,6 +206,13 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         }
                     }
                 }
+                #[cfg(feature = "editor")]
+                {
+                    if !ecs_initialized {
+                        updates.extend(ecs.run_component_methods(&mut scripting, crate::ecs::ComponentFlags::EDITOR_START));
+                        ecs_initialized = true;
+                    }
+                }
                 {
                     let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
                     process_entity_updates(&device, &asset_manager, &shader_manager, &mut drawables, updates);
