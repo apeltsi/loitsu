@@ -3,7 +3,8 @@ use std::io::{Write, Read};
 use std::sync::{Arc, Mutex};
 
 use super::AssetError;
-use super::asset::{Asset, image_from_bytes};
+use super::asset::Asset;
+use super::parse::parse;
 
 #[cfg(not(target_arch = "wasm32"))]
 use tokio::task::spawn as spawn_local;
@@ -16,8 +17,8 @@ pub struct Shard {
 
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
 pub struct ShardFile {
-    name: String,
-    data: Vec<u8>,
+    pub name: String,
+    pub data: Vec<u8>,
 }
 
 impl Shard {
@@ -33,6 +34,10 @@ impl Shard {
             name,
             data
         });
+    }
+
+    pub fn get_assets(&self) -> &HashMap<String, ShardFile> {
+        &self.assets
     }
 
     pub fn get_file(&self, name: &str) -> Option<&ShardFile> {
@@ -69,20 +74,8 @@ impl Shard {
         for (name, file) in self.assets.drain() {
             let assets = assets.clone();
             let task = async move {
-                let asset: Arc<Mutex<Asset>> = match name.split(".").last().unwrap() {
-                    "png" => {
-                        Arc::new(Mutex::new(image_from_bytes(file.data, &file.name)))
-                    },
-                    _ => {
-                        #[cfg(not(target_arch = "wasm32"))]
-                        return Err(AssetError::new("Unknown file type"));
-                        #[cfg(target_arch = "wasm32")]
-                        return;
-                    }
-                };
+                let asset = parse(file).unwrap();
                 assets.lock().unwrap().insert(name, asset);
-                #[cfg(not(target_arch = "wasm32"))]
-                Ok(())
             };
             #[cfg(target_arch = "wasm32")]
             task.await;

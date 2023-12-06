@@ -1,8 +1,8 @@
-use std::{rc::Rc, cell::RefCell};
+use std::{rc::Rc, cell::RefCell, sync::{Mutex, Arc}};
 use wgpu::util::DeviceExt;
 use wgpu::RenderPass;
 use super::{Drawable, QUAD_INDICES, QUAD_VERTICES, TransformUniform};
-use crate::{rendering::shader::ShaderManager, asset_management::{asset::Asset, AssetManager}, ecs::Transform};
+use crate::{rendering::shader::ShaderManager, asset_management::{asset::Asset, AssetManager, asset_reference::AssetReference}, ecs::Transform};
 pub struct SpriteDrawable {
     vertex_buffer: Option<wgpu::Buffer>,
     index_buffer: Option<wgpu::Buffer>,
@@ -16,6 +16,8 @@ pub struct SpriteDrawable {
     uuid: uuid::Uuid,
     uniform_dirty: bool,
     sprite_dirty: bool,
+    asset_ref: Option<Arc<Mutex<AssetReference>>>,
+    asset_version: u32
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -40,6 +42,8 @@ impl<'a> SpriteDrawable {
             uuid,
             uniform_dirty: false,
             sprite_dirty: false,
+            asset_ref: None,
+            asset_version: 0,
         }
     }
 }
@@ -57,10 +61,15 @@ impl<'b> Drawable<'b> for SpriteDrawable {
             contents: bytemuck::cast_slice(QUAD_INDICES),
             usage: wgpu::BufferUsages::INDEX,
         }));
-        let asset = asset_manager.get_asset(&self.sprite).expect("Asset not found!");
+        self.asset_ref = Some(asset_manager.get_asset(&self.sprite));
+        let asset_ref = self.asset_ref.clone().unwrap();
+        let asset_ref = asset_ref.lock().unwrap();
+        self.asset_version = asset_ref.get_version();
+        let asset = asset_ref.get_asset();
         let locked_asset = asset.lock().unwrap();
         let sprite_asset = match *locked_asset {
             Asset::Image(ref image_asset) => Some(image_asset),
+            _ => None,
         };
         self.uniform_buffer = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Sprite Uniform Buffer"),
@@ -90,13 +99,35 @@ impl<'b> Drawable<'b> for SpriteDrawable {
             self.uniform_dirty = false;
         }
         if self.sprite_dirty {
-            let asset = crate::asset_management::ASSET_MANAGER.lock().unwrap().get_asset(&self.sprite).unwrap();
+            self.asset_ref = Some(crate::asset_management::ASSET_MANAGER.lock().unwrap().get_asset(&self.sprite));
+            let asset_ref = self.asset_ref.clone().unwrap();
+            let asset_ref = asset_ref.lock().unwrap();
+            self.asset_version = asset_ref.get_version();
+            let asset = asset_ref.get_asset();
             let locked_asset = asset.lock().unwrap();
             let sprite_asset = match *locked_asset {
                 Asset::Image(ref image_asset) => Some(image_asset),
+                _ => None,
             };
             self.create_bind_group(device, sprite_asset);
             self.sprite_dirty = false;
+        }
+        let asset_ref = self.asset_ref.clone().unwrap();
+        if self.asset_version < asset_ref.lock().unwrap().get_version() {
+            // we're outdated
+            let asset_ref = self.asset_ref.clone().unwrap();
+            let asset_ref = asset_ref.lock().unwrap();
+            let asset = asset_ref.get_asset();
+            let locked_asset = asset.lock().unwrap();
+            let sprite_asset = match *locked_asset {
+                Asset::Image(ref image_asset) => Some(image_asset),
+                _ => None,
+            };
+            self.create_bind_group(device, sprite_asset);
+            self.asset_version = asset_ref.get_version();
+        }
+        if self.bind_group.is_none() {
+            return; // Our texture probably hasn't loaded yet
         }
         pass.set_pipeline(self.shader.get_pipeline());
         pass.set_bind_group(0, global_bind_group, &[]);
@@ -132,6 +163,9 @@ impl<'b> Drawable<'b> for SpriteDrawable {
 
 impl SpriteDrawable {
     fn create_bind_group(&mut self, device: &wgpu::Device, sprite_asset: Option<&crate::asset_management::image_asset::ImageAsset>) {
+        if sprite_asset.is_none() {
+            return;
+        }
         self.bind_group = Some(device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &crate::rendering::core::get_sprite_bind_group_layout(device),
             entries: &[
