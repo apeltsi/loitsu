@@ -114,7 +114,6 @@ impl<'b> Drawable<'b> for SpriteDrawable {
         }
         let asset_ref = self.asset_ref.clone().unwrap();
         if self.asset_version < asset_ref.lock().unwrap().get_version() {
-            log!("Updating sprite asset...");
             // we're outdated
             let asset_ref = self.asset_ref.clone().unwrap();
             let asset_ref = asset_ref.lock().unwrap();
@@ -126,15 +125,12 @@ impl<'b> Drawable<'b> for SpriteDrawable {
                                                              // doesn't guarantee that the asset is initialized
                                                              // so we'll do it here, just to be
                                                              // sure
-            log!("Got asset lock.");
             let sprite_asset = match *locked_asset {
                 Asset::Image(ref image_asset) => Some(image_asset),
                 _ => None,
             };
             self.create_bind_group(device, sprite_asset);
-            log!("Updating asset version...");
             self.asset_version = asset_ref.get_version();
-            log!("Done updating sprite asset.");
         }
         if self.bind_group.is_none() {
             return; // Our texture probably hasn't loaded yet
