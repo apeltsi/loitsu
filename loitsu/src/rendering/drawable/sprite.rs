@@ -2,7 +2,7 @@ use std::{rc::Rc, cell::RefCell, sync::{Mutex, Arc}};
 use wgpu::util::DeviceExt;
 use wgpu::RenderPass;
 use super::{Drawable, QUAD_INDICES, QUAD_VERTICES, TransformUniform};
-use crate::{rendering::shader::ShaderManager, asset_management::{asset::Asset, AssetManager, asset_reference::AssetReference}, ecs::Transform};
+use crate::{rendering::shader::ShaderManager, asset_management::{asset::Asset, AssetManager, asset_reference::AssetReference}, ecs::Transform, log};
 pub struct SpriteDrawable {
     vertex_buffer: Option<wgpu::Buffer>,
     index_buffer: Option<wgpu::Buffer>,
@@ -114,17 +114,27 @@ impl<'b> Drawable<'b> for SpriteDrawable {
         }
         let asset_ref = self.asset_ref.clone().unwrap();
         if self.asset_version < asset_ref.lock().unwrap().get_version() {
+            log!("Updating sprite asset...");
             // we're outdated
             let asset_ref = self.asset_ref.clone().unwrap();
             let asset_ref = asset_ref.lock().unwrap();
             let asset = asset_ref.get_asset();
-            let locked_asset = asset.lock().unwrap();
+            #[allow(unused_mut)]
+            let mut locked_asset = asset.lock().unwrap();
+            #[cfg(feature = "direct_asset_management")]
+            locked_asset.initialize(device, queue).unwrap(); // the direct asset management model
+                                                             // doesn't guarantee that the asset is initialized
+                                                             // so we'll do it here, just to be
+                                                             // sure
+            log!("Got asset lock.");
             let sprite_asset = match *locked_asset {
                 Asset::Image(ref image_asset) => Some(image_asset),
                 _ => None,
             };
             self.create_bind_group(device, sprite_asset);
+            log!("Updating asset version...");
             self.asset_version = asset_ref.get_version();
+            log!("Done updating sprite asset.");
         }
         if self.bind_group.is_none() {
             return; // Our texture probably hasn't loaded yet

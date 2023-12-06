@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use super::asset::Asset;
+use super::{asset::Asset, AssetError};
 
 pub struct AssetReference {
     asset: Arc<Mutex<Asset>>,
@@ -30,6 +30,10 @@ impl AssetReference {
     pub fn update(&mut self, asset: Arc<Mutex<Asset>>) {
         self.asset = asset;
         self.runtime_version += 1;
+    }
+
+    pub fn initialize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) -> Result<(), AssetError> {
+        self.asset.lock().unwrap().initialize(device, queue)
     }
 }
 

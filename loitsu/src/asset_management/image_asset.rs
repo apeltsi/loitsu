@@ -34,6 +34,9 @@ impl ImageAsset {
     }
 
     pub fn initialize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) -> Result<(), AssetError> {
+        if self.texture.is_some() {
+            return Ok(());
+        }
         let texture_size = wgpu::Extent3d {
             width: self.dimensions.0,
             height: self.dimensions.1,
