@@ -73,7 +73,7 @@ impl Vec2 {
     }
 
     #[rune::function(protocol = STRING_DISPLAY)]
-    fn string_display(&self, f: &mut rune::runtime::Formatter) -> () {
+    fn string_display(&self, f: &mut rune::runtime::Formatter) {
         write!(f, "({}, {})", self.x, self.y).unwrap();
     }
 }
@@ -140,7 +140,7 @@ impl Color {
 
     #[rune::function(path = Self::hex)]
     fn hex(hex: String) -> Color {
-        let hex = hex.trim_start_matches("#");
+        let hex = hex.trim_start_matches('#');
         let r = u8::from_str_radix(&hex[0..2], 16).unwrap() as f32 / 255.0;
         let g = u8::from_str_radix(&hex[2..4], 16).unwrap() as f32 / 255.0;
         let b = u8::from_str_radix(&hex[4..6], 16).unwrap() as f32 / 255.0;
@@ -346,10 +346,10 @@ impl ToValue for Property {
                 rune::alloc::String::try_from(value.clone()).unwrap().to_value()
             },
             Property::Number(value) => {
-                VmResult::Ok(Value::Float(value.clone() as f64))
+                VmResult::Ok(Value::Float(value as f64))
             },
             Property::Boolean(value) => {
-                VmResult::Ok(Value::Bool(value.clone()))
+                VmResult::Ok(Value::Bool(value))
             },
             Property::Array(value) => {
                 let mut vec = rune::runtime::Vec::new();
@@ -476,16 +476,16 @@ impl ScriptingInstance for RuneInstance {
 
     fn run_component_methods<RuneComponent>(&mut self, entities: &mut [crate::ecs::RuntimeEntity<Self>], method: ComponentFlags) -> Vec<(Rc<RefCell<crate::ecs::Transform>>, Vec<EntityUpdate>)> {
         let mut updates = Vec::new();
-        for mut entity in entities {
+        for entity in entities {
             let mut entity_updates = Vec::new();
             if entity.is_new {
                 if entity.component_flags & ComponentFlags::START == ComponentFlags::START {
-                    entity_updates.extend(self.run_component_methods_on_entity(&mut entity, ComponentFlags::START));
+                    entity_updates.extend(self.run_component_methods_on_entity(entity, ComponentFlags::START));
                 }
                 entity.is_new = false;
             }
             if entity.component_flags & method == method {
-                entity_updates.extend(self.run_component_methods_on_entity(&mut entity, method));
+                entity_updates.extend(self.run_component_methods_on_entity(entity, method));
             }
             for child in &mut entity.children {
                 if child.is_new {
@@ -520,7 +520,7 @@ impl ScriptingInstance for RuneInstance {
             ];
             for method in methods {
                 let result = vm.lookup_function([component_name, flags_to_method(method)]);
-                if let Ok(_) = result {
+                if result.is_ok() {
                     flags |= method;
                 }
             }
@@ -551,7 +551,7 @@ impl RuneInstance {
                 return Vec::new();
             }
         }
-        let mut entity_obj = convert_entity(&entity);
+        let mut entity_obj = convert_entity(entity);
         let (shared, _guard) = unsafe { Shared::from_mut(&mut entity_obj).unwrap() };
         let method = flags_to_method(c_flags);
         for component in &entity.components {

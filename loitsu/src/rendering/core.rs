@@ -243,8 +243,8 @@ fn process_entity_updates(device: &wgpu::Device,
                 EntityUpdate::AddDrawable(drawable) => {
                     match drawable {
                         DrawablePrototype::Sprite {sprite, color, id} => {
-                            let mut drawable = Box::new(SpriteDrawable::new(sprite.as_str(), color, id, &shader_manager));
-                            drawable.init(&device, &asset_manager, entity_updates.0.clone());
+                            let mut drawable = Box::new(SpriteDrawable::new(sprite.as_str(), color, id, shader_manager));
+                            drawable.init(device, asset_manager, entity_updates.0.clone());
                             drawables.push(drawable);
                         }
                     }
@@ -260,9 +260,9 @@ fn process_entity_updates(device: &wgpu::Device,
                 },
                 EntityUpdate::SetDrawableProperty(id, field_name, property) => {
                     // NOTE: Same as above, maybe use a hashmap?
-                    for i in 0..drawables.len() {
-                        if drawables[i].get_uuid().to_string() == id {
-                            drawables[i].set_property(field_name, property);
+                    for drawable in &mut *drawables {
+                        if drawable.get_uuid().to_string() == id {
+                            drawable.set_property(field_name, property);
                             break;
                         }
                     }

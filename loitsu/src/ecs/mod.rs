@@ -109,27 +109,24 @@ impl Transform {
             Transform::Transform2D { changed_frame, has_changed, .. } => {
                 if *changed_frame == frame_num {
                     return true
+                } else if *has_changed {
+                    *changed_frame = frame_num;
+                    *has_changed = false;
+                    return true
                 } else {
-                    if *has_changed {
-                        *changed_frame = frame_num;
-                        *has_changed = false;
-                        return true
-                    } else {
-                        return false
-                    }
+                    return false
                 }
+                
             },
             Transform::RectTransform { changed_frame, has_changed, .. } => {
                 if *changed_frame == frame_num {
                     return true
+                } else if *has_changed {
+                    *changed_frame = frame_num;
+                    *has_changed = false;
+                    return true
                 } else {
-                    if *has_changed {
-                        *changed_frame = frame_num;
-                        *has_changed = false;
-                        return true
-                    } else {
-                        return false
-                    }
+                    return false
                 }
             }
         }
