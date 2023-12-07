@@ -146,6 +146,11 @@ impl AssetManager {
         #[cfg(target_arch = "wasm32")] // currently we only support direct asset management on web
         #[cfg(feature = "direct_asset_management")]
         {
+            // first lets check if we already have a asset ref to the requested asset
+            if let Some(asset) = self.assets.lock().unwrap().assets.get(name) {
+                // the asset is in our local cache, (either being fetched currently or already loaded)
+                return asset.clone();
+            }
             // The asset wasn't in a shard, and we have direct asset management enabled
             // so we'll try to load it from from the local asset server
             log!("Asset not found in shards, trying to load from local asset server");
@@ -154,6 +159,8 @@ impl AssetManager {
             self.assets.lock().unwrap().assets.insert(name.to_owned(), asset_ref.clone());
             let asset_ref_clone = asset_ref.clone();
             let name = name.to_owned();
+            #[cfg(feature = "editor")]
+            crate::web::add_editor_loading_task("Loading assets");
             spawn_local(async move {
                 let result = get_file::get_file(format!("assets/{}", name)).await;
                 match result {
@@ -170,6 +177,8 @@ impl AssetManager {
                         error!("Failed to load asset: {:?}", e.message);
                     }
                 }
+                #[cfg(feature = "editor")]
+                crate::web::remove_editor_loading_task("Loading assets");
             });
             return asset_ref;
         }

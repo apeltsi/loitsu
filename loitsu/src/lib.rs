@@ -43,10 +43,13 @@ pub fn build_scenes(scenes: Vec<(String, String)>, scripts: Vec<scripting::Scrip
 #[cfg(feature = "editor")]
 pub fn load_scene_in_edit_mode(event_handler: editor::EventHandler<scripting::rune_runtime::RuneInstance>, scene: scene_management::Scene, scripts: Vec<scripting::ScriptingSource>) {
     log!("Loading scene in edit mode...");
+    web::add_editor_loading_task("Starting ECS...");
     let mut rune = scripting::rune_runtime::RuneInstance::new_with_sources(scripts).unwrap();
     let mut e = ecs::ECS::new(event_handler);
     e.load_scene(scene, &mut rune);
-    log!("ECS initialized, startind render loop...");
+    web::remove_editor_loading_task("Starting ECS...");
+    web::add_editor_loading_task("Starting render pipeline...");
+    log!("ECS initialized, starting render loop...");
     #[cfg(not(target_arch = "wasm32"))]
     {
         use rendering::desktop;

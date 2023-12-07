@@ -191,10 +191,6 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                             scene, &mut scripting);
                         ecs_initialized = true;
                         log!("ECS initialized");
-                        #[cfg(feature = "editor")]
-                        {
-                            updates.extend(ecs.run_component_methods(&mut scripting, crate::ecs::ComponentFlags::EDITOR_START));
-                        }
                     }
                 } else {
                     let mut asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
@@ -210,6 +206,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 {
                     if !ecs_initialized {
                         updates.extend(ecs.run_component_methods(&mut scripting, crate::ecs::ComponentFlags::EDITOR_START));
+                        crate::web::remove_editor_loading_task("Starting render pipeline...");
                         ecs_initialized = true;
                     }
                 }

@@ -37,6 +37,9 @@ impl ImageAsset {
         if self.texture.is_some() {
             return Ok(());
         }
+        #[cfg(feature = "editor")]
+        #[cfg(target = "wasm32")]
+        crate::web::add_editor_loading_task("Loading assets");
         let texture_size = wgpu::Extent3d {
             width: self.dimensions.0,
             height: self.dimensions.1,
@@ -80,6 +83,10 @@ impl ImageAsset {
                                      .expect("Couldn't create textureview from texture. The texture might not be valid")
                                      .create_view(&wgpu::TextureViewDescriptor::default()));
         }
+
+        #[cfg(feature = "editor")]
+        #[cfg(target = "wasm32")]
+        crate::web::remove_editor_loading_task("Loading assets");
         Ok(())
     }
 }

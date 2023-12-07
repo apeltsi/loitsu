@@ -9,7 +9,6 @@ use walkdir::WalkDir;
 
 #[tokio::main]
 async fn main() {
-    println!("Starting loitsu editor server...");
     let asset_path = std::env::current_dir().unwrap().join("assets");
     let preferences = parse_preferences(asset_path.clone());
 
@@ -38,6 +37,7 @@ async fn main() {
     });
     let assets_route = warp::get().and(warp::path("assets")).and(warp::fs::dir(asset_path.clone()));
     let route = warp::get().and(warp::fs::dir(path.clone()).or(main_scene_route).or(scripts_route).or(assets_route));
+    println!("Editor live at http://localhost:5969");
     warp::serve(route).run(([127, 0, 0, 1], 5969)).await;
 }
 

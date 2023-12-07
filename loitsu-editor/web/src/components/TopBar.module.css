@@ -8,3 +8,25 @@
     padding: 0 20px;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
 }
+
+.tasks {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.spinner {
+    height: 25px;
+    width: 25px;
+    margin-right: 10px;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}

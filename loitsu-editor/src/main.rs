@@ -7,6 +7,10 @@ use loitsu::asset_management::get_file::get_file;
 use wasm_bindgen_futures::spawn_local;
 use loitsu::scripting::ScriptingSource;
 
+use crate::hierarchy::generate_hierarchy;
+
+mod hierarchy;
+
 fn main() {
     // When the server receives a request for LOITSU_MAIN_SCENE
     // it will automatically serve the correct scene from the asset folder
@@ -37,6 +41,8 @@ fn main_event_handler<T>(ecs: &ECS<T>, event: &Event) where T: loitsu::scripting
     match event {
         Event::SceneLoaded(scene) => {
             log!("Scene loaded: {}", scene.name);
+            let hierarchy = generate_hierarchy(ecs);
+            set_hierarchy(serde_json::to_string(&hierarchy).unwrap());
             set_scene_name(scene.name.clone());
         },
         Event::EntityUpdated(name) => {
@@ -48,4 +54,5 @@ fn main_event_handler<T>(ecs: &ECS<T>, event: &Event) where T: loitsu::scripting
 #[wasm_bindgen]
 extern "C" {
     fn set_scene_name(name: String);
+    fn set_hierarchy(hierarchy: String);
 }

@@ -24,10 +24,10 @@ if (window.set_status === undefined) {
     window.add_warning = (message) => {};
     // @ts-ignore
     window.add_error = (message) => {};
-    run();
     const root = document.getElementById('root');
 
     render(() => <App />, root!);
+    run();
 } else {
     window.location.reload();
 }
