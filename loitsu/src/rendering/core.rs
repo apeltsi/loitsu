@@ -256,7 +256,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
         }
     });
 }
-
+#[allow(dead_code)]
 fn find_overlapping_entity<T>(ecs: &ECS<T>, check_position: (f32, f32)) -> Option<Rc<RefCell<RuntimeEntity<T>>>> where T: ScriptingInstance {
     for e in ecs.get_runtime_entities() {
         let entity = e.borrow();

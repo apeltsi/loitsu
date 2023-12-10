@@ -1,3 +1,4 @@
+mod overrides;
 use warp;
 use loitsu::Preferences;
 use warp::http::Response;
@@ -11,6 +12,7 @@ use walkdir::WalkDir;
 async fn main() {
     let asset_path = std::env::current_dir().unwrap().join("assets");
     let preferences = parse_preferences(asset_path.clone());
+    let overrides = overrides::get_asset_overrides(&asset_path.clone());
 
     let exe_path = std::env::current_exe().unwrap();
     let path = exe_path.parent().unwrap().join("editor_assets");
@@ -35,7 +37,17 @@ async fn main() {
         }
         Response::builder().header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate").body(serde_json::to_string(&scripts).unwrap())
     });
-    let assets_route = warp::get().and(warp::path("assets")).and(warp::fs::dir(asset_path.clone()));
+    let assets_route = warp::get().and(warp::path("assets")).and(warp::path::tail()).map(move |tail: warp::path::Tail| {
+        let mut path = asset_path.clone();
+        path.push(tail.as_str());
+        let mut file = File::open(path).unwrap();
+        let mut data = Vec::new();
+        file.read_to_end(&mut data).unwrap();
+        let data = overrides::handle_override(tail.as_str().into(), data, overrides.clone().get(tail.as_str()).unwrap_or(&overrides::AssetOverride {
+            resolution_multiplier: None,
+        }));
+        Response::builder().header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate").body(data)
+    });
     let route = warp::get().and(warp::fs::dir(path.clone()).or(main_scene_route).or(scripts_route).or(assets_route));
     println!("Editor live at http://localhost:5969");
     warp::serve(route).run(([127, 0, 0, 1], 5969)).await;
