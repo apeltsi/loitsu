@@ -8,3 +8,32 @@
 .inspector:hover {
     background-color: var(--panel-bg-highlight-color);
 }
+
+.inspector_component {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.inspector_component_name {
+    font-size: 0.8rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    display: inline-block;
+}
+
+.input {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.input span {
+    margin-right: 0.5rem;
+}
+.input input {
+    flex-grow: 1;
+}

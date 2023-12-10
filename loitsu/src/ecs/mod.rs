@@ -36,6 +36,7 @@ bitflags! {
     }
 }
 
+#[cfg_attr(feature = "scene_generation", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, bitcode::Encode, bitcode::Decode)]
 pub enum Transform {
     Transform2D {

@@ -6,6 +6,7 @@ use bitcode;
 
 use crate::ecs::Transform;
 
+#[cfg_attr(feature = "scene_generation", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
 #[bitcode(recursive)]
 pub enum Property {
@@ -17,6 +18,7 @@ pub enum Property {
     ComponentReference(String), // Reference to another component in the scene (Represents the ID)
 }
 
+#[cfg_attr(feature = "scene_generation", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
 pub struct Scene {
     pub name: String,
@@ -25,6 +27,7 @@ pub struct Scene {
     pub shards: Vec<String>
 }
 
+#[cfg_attr(feature = "scene_generation", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
 #[bitcode(recursive)]
 pub struct Entity {
@@ -36,6 +39,7 @@ pub struct Entity {
     pub transform: Transform,
 }
 
+#[cfg_attr(feature = "scene_generation", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
 pub struct Component {
     pub name: String,
