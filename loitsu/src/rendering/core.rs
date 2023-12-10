@@ -1,9 +1,9 @@
 use winit::{
-    event::{Event, WindowEvent},
+    event::{Event, WindowEvent, MouseButton, ElementState},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
-use crate::{log_render as log, scripting::{ScriptingInstance, EntityUpdate}, scene_management::Scene, rendering::drawable::{sprite::SpriteDrawable, DrawablePrototype}, asset_management::AssetManager, ecs::Transform, log_scripting};
+use crate::{log_render as log, scripting::{ScriptingInstance, EntityUpdate}, scene_management::Scene, rendering::drawable::{sprite::SpriteDrawable, DrawablePrototype}, asset_management::AssetManager, ecs::{Transform, RuntimeEntity}, log_scripting, input::InputState};
 use crate::ecs::ECS;
 use std::{cmp::max, cell::RefCell, rc::Rc};
 use crate::asset_management::ASSET_MANAGER;
@@ -109,6 +109,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     let mut state = State {
         camera: CameraState::new()
     };
+    let mut input_state = InputState::new();
     state.camera.set_scale(1.0);
     state.camera.set_position([0.0, 0.0].into());
     event_loop.run(move |event, _, control_flow| {
@@ -152,6 +153,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 // okay gamers lets resize the screen & camera matrix buffers
                 // from atlas :D
                 let max = max(size.width, size.height);
+                state.camera.aspect = (size.width as f32 / max as f32, size.height as f32 / max as f32);
                 queue.write_buffer(&camera_matrix_buffer, 0, bytemuck::cast_slice(&[CameraMatrix {
                     view: [
                         [(size.height as f32) / max as f32, 0.0, 0.0, 0.0], 
@@ -163,7 +165,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 }]));
                 // On macos the window needs to be redrawn manually after resizing
                 window.request_redraw();
-            }
+            },
             Event::RedrawRequested(_) => {
                 #[allow(unused_mut)]
                 let mut updates = Vec::new();
@@ -206,6 +208,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 {
                     if !ecs_initialized {
                         updates.extend(ecs.run_component_methods(&mut scripting, crate::ecs::ComponentFlags::EDITOR_START));
+                        #[cfg(target_arch = "wasm32")]
                         crate::web::remove_editor_loading_task("Starting render pipeline...");
                         ecs_initialized = true;
                     }
@@ -216,17 +219,58 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 }
                 render_frame(&surface, &device, &queue, &mut drawables, &global_bind_group, ecs_initialized, frame_count);
                 frame_count += 1;
-            }
+            },
             Event::WindowEvent {
                 ref event,
                 window_id,
             } if window_id == window.id() => match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                WindowEvent::CursorMoved { position, ..} => {
+                    input_state.mouse.position = (position.x as f32 / config.width as f32, position.y as f32 / config.height as f32);
+                },
+                WindowEvent::MouseInput { state: element_state, button, .. } => {
+                    match button {
+                        MouseButton::Left => {
+                            input_state.mouse.left_button = *element_state == ElementState::Pressed;
+                            #[cfg(feature = "editor")]
+                            if *element_state == ElementState::Pressed {
+                                let click_pos = input_state.mouse.get_world_position(&state.camera);
+                                if let Some(entity) = find_overlapping_entity(&ecs, click_pos) {
+                                    let entity = entity.borrow();
+                                    ecs.emit(crate::editor::Event::EntitySelected(entity.as_entity()));
+                                }
+                            }
+                        },
+                        MouseButton::Right => {
+                            input_state.mouse.right_button = *element_state == ElementState::Pressed;
+                        },
+                        MouseButton::Middle => {
+                            input_state.mouse.middle_button = *element_state == ElementState::Pressed;
+                        },
+                        _ => {}
+                    }
+                },
                 _ => {}
             },
             _ => {}
         }
     });
+}
+
+fn find_overlapping_entity<T>(ecs: &ECS<T>, check_position: (f32, f32)) -> Option<Rc<RefCell<RuntimeEntity<T>>>> where T: ScriptingInstance {
+    for e in ecs.get_runtime_entities() {
+        let entity = e.borrow();
+        match *(*entity.transform).borrow() {
+            Transform::Transform2D {position, scale, ..} => {
+                if position.0 - scale.0 / 2.0 <= check_position.0 && position.0 + scale.0 / 2.0 >= check_position.0 &&
+                   position.1 - scale.0 / 2.0 <= check_position.1 && position.1 + scale.1 / 2.0 >= check_position.1 {
+                    return Some(e.clone());
+                }
+            },
+            _ => {}
+        };
+    }
+    None
 }
 
 fn process_entity_updates(device: &wgpu::Device, 
@@ -280,16 +324,18 @@ struct State {
     camera: CameraState
 }
 
-struct CameraState {
-    position: cgmath::Vector2<f32>,
-    scale: f32
+pub struct CameraState {
+    pub position: cgmath::Vector2<f32>,
+    pub scale: f32,
+    pub aspect: (f32, f32)
 }
 
 impl CameraState {
     fn new() -> CameraState {
         CameraState {
             position: cgmath::Vector2::<f32> {x: 0.0, y: 0.0},
-            scale: 1.0
+            scale: 1.0,
+            aspect: (1.0, 1.0)
         }
     }
 

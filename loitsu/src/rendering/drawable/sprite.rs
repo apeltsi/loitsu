@@ -3,6 +3,7 @@ use wgpu::util::DeviceExt;
 use wgpu::RenderPass;
 use super::{Drawable, QUAD_INDICES, QUAD_VERTICES, TransformUniform};
 use crate::{rendering::shader::ShaderManager, asset_management::{asset::Asset, AssetManager, asset_reference::AssetReference}, ecs::Transform};
+
 pub struct SpriteDrawable {
     vertex_buffer: Option<wgpu::Buffer>,
     index_buffer: Option<wgpu::Buffer>,

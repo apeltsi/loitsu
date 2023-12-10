@@ -474,28 +474,30 @@ impl ScriptingInstance for RuneInstance {
         Ok(result)
     }
 
-    fn run_component_methods<RuneComponent>(&mut self, entities: &mut [crate::ecs::RuntimeEntity<Self>], method: ComponentFlags) -> Vec<(Rc<RefCell<crate::ecs::Transform>>, Vec<EntityUpdate>)> {
+    fn run_component_methods<RuneComponent>(&mut self, entities: &mut [Rc<RefCell<crate::ecs::RuntimeEntity<Self>>>], method: ComponentFlags) -> Vec<(Rc<RefCell<crate::ecs::Transform>>, Vec<EntityUpdate>)> {
         let mut updates = Vec::new();
         for entity in entities {
             let mut entity_updates = Vec::new();
+            let mut entity = entity.borrow_mut();
             if entity.is_new {
                 if entity.component_flags & ComponentFlags::START == ComponentFlags::START {
-                    entity_updates.extend(self.run_component_methods_on_entity(entity, ComponentFlags::START));
+                    entity_updates.extend(self.run_component_methods_on_entity(&mut entity, ComponentFlags::START));
                 }
                 entity.is_new = false;
             }
             if entity.component_flags & method == method {
-                entity_updates.extend(self.run_component_methods_on_entity(entity, method));
+                entity_updates.extend(self.run_component_methods_on_entity(&mut entity, method));
             }
             for child in &mut entity.children {
+                let mut child = child.borrow_mut();
                 if child.is_new {
                     if child.component_flags & ComponentFlags::START == ComponentFlags::START {
-                        entity_updates.extend(self.run_component_methods_on_entity(child, ComponentFlags::START));
+                        entity_updates.extend(self.run_component_methods_on_entity(&mut child, ComponentFlags::START));
                     }
                     child.is_new = false;
                 }
                 if child.component_flags & method == method {
-                    entity_updates.extend(self.run_component_methods_on_entity(child, method));
+                    entity_updates.extend(self.run_component_methods_on_entity(&mut child, method));
                 }
             }
             updates.push((entity.transform.clone(), entity_updates));

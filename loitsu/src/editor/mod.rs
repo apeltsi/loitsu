@@ -1,4 +1,4 @@
-use crate::{ecs, scripting, scene_management::Scene};
+use crate::{ecs, scripting, scene_management::{Scene, Entity}};
 pub struct EventHandler<T> where T: scripting::ScriptingInstance { 
     pub event_handlers: Vec<Box<dyn Fn(&ecs::ECS<T>, &Event)>>,
 }
@@ -18,4 +18,5 @@ impl<T: scripting::ScriptingInstance> EventHandler<T> {
 pub enum Event {
     SceneLoaded(Scene),
     EntityUpdated(String),
+    EntitySelected(Entity)
 }

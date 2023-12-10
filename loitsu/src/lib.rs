@@ -5,6 +5,7 @@ pub mod scene_management;
 pub mod ecs;
 pub mod asset_management;
 pub mod util;
+pub mod input;
 #[cfg(feature = "editor")]
 pub mod editor;
 use scripting::ScriptingInstance;
@@ -40,6 +41,7 @@ pub fn build_scenes(scenes: Vec<(String, String)>, scripts: Vec<scripting::Scrip
     generated_scenes
 }
 
+#[cfg(target_arch = "wasm32")]
 #[cfg(feature = "editor")]
 pub fn load_scene_in_edit_mode(event_handler: editor::EventHandler<scripting::rune_runtime::RuneInstance>, scene: scene_management::Scene, scripts: Vec<scripting::ScriptingSource>) {
     log!("Loading scene in edit mode...");

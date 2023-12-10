@@ -5,6 +5,7 @@
 }
 .primary {
     position: absolute;
+    pointer-events: none;
     top: 30px;
     left: 0;
     z-index: 1;
@@ -16,18 +17,21 @@
 }
 
 .inspector {
+    pointer-events: auto;
     grid-column: 3;
     grid-row: 1 / 3;
     border-left: 2px solid var(--line-color);
 }
 
 .file-explorer {
+    pointer-events: auto;
     grid-column: 1 / 3;
     grid-row: 2;
     border-top: 2px solid var(--line-color);
 }
 
 .hierarchy {
+    pointer-events: auto;
     grid-column: 1 / 2;
     grid-row: 1;
     border-right: 2px solid var(--line-color);

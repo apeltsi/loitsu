@@ -14,7 +14,7 @@ use bitflags::bitflags;
 pub struct ECS<T> where T: ScriptingInstance {
     pub active_scene: Scene,
     pub static_scene: Option<Scene>,
-    runtime_entities: Vec<RuntimeEntity<T>>,
+    runtime_entities: Vec<Rc<RefCell<RuntimeEntity<T>>>>,
     #[cfg(feature = "editor")]
     event_handler: crate::editor::EventHandler<T>
 }
@@ -139,7 +139,7 @@ pub struct RuntimeEntity<T> where T: ScriptingInstance {
     id: String,
     pub components: Vec<RuntimeComponent<T>>,
     entity_proto: Entity,
-    pub children: Vec<RuntimeEntity<T>>,
+    pub children: Vec<Rc<RefCell<RuntimeEntity<T>>>>,
     pub component_flags: ComponentFlags, // this is the union of all the component flags, so we can quickly check if we need to run a method
     pub transform: Rc<RefCell<Transform>>,
     pub is_new: bool
@@ -221,42 +221,39 @@ impl<T: ScriptingInstance> ECS<T> {
         self.runtime_entities = Vec::new();
     }
 
-    #[cfg(feature = "scene_generation")]
     pub fn as_scene(&self) -> Scene {
         Scene {
             name: self.active_scene.name.clone(),
-            entities: self.runtime_entities.iter().map(|runtime_entity| runtime_entity.as_entity()).collect(),
+            entities: self.runtime_entities.iter().map(|runtime_entity| runtime_entity.borrow().as_entity()).collect(),
             required_assets: Vec::new(),
             shards: Vec::new(),
         }
     }
 
-    pub fn get_runtime_entities(&self) -> &Vec<RuntimeEntity<T>> {
+    pub fn get_runtime_entities(&self) -> &Vec<Rc<RefCell<RuntimeEntity<T>>>> {
         &self.runtime_entities
     }
 }
 
 impl<T: ScriptingInstance> RuntimeEntity<T> {
-    #[cfg(feature = "scene_generation")]
     pub fn as_entity(&self) -> Entity {
         Entity {
             name: self.name.clone(),
             id: self.id.clone(),
             components: self.components.iter().map(|runtime_component| runtime_component.as_component()).collect(),
-            children: self.children.iter().map(|runtime_entity| runtime_entity.as_entity()).collect(),
+            children: self.children.iter().map(|runtime_entity| runtime_entity.borrow().as_entity()).collect(),
             transform: self.transform.borrow().clone(),
         }
     }
 }
 
 impl<T: ScriptingInstance> RuntimeComponent<T> {
-    #[cfg(feature = "scene_generation")]
     pub fn as_component(&self) -> Component {
         self.data.to_component_proto(&self.component_proto).unwrap()
     }
 }
 
-fn init_entities<T>(proto_entities: Vec<Entity>, scripting: &mut T) -> Vec<RuntimeEntity<T>> where T: ScriptingInstance {
+fn init_entities<T>(proto_entities: Vec<Entity>, scripting: &mut T) -> Vec<Rc<RefCell<RuntimeEntity<T>>>> where T: ScriptingInstance {
     // Lets recursively iterate over the entities and create a runtime entity for each one
     let mut runtime_entities = Vec::new();
     for proto_entity in proto_entities {
@@ -281,7 +278,7 @@ fn init_entities<T>(proto_entities: Vec<Entity>, scripting: &mut T) -> Vec<Runti
             };
             runtime_entity.components.push(runtime_component);
         }
-        runtime_entities.push(runtime_entity);
+        runtime_entities.push(Rc::new(RefCell::new(runtime_entity)));
     }
     runtime_entities
 }

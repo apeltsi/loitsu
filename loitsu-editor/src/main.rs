@@ -47,6 +47,9 @@ fn main_event_handler<T>(ecs: &ECS<T>, event: &Event) where T: loitsu::scripting
         },
         Event::EntityUpdated(name) => {
             log!("Entity updated: {}", name);
+        },
+        Event::EntitySelected(entity) => {
+            log!("Selected entity {}", entity.name);
         }
     }
 }
