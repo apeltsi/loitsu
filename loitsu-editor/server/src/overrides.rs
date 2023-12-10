@@ -42,7 +42,7 @@ pub fn get_asset_overrides(path: &PathBuf) -> HashMap<String, AssetOverride> {
 }
 
 // right now this is pretty much a 1 to 1 copy of the loitsu-cli code
-pub fn handle_override(file_path: PathBuf, file_data: Vec<u8>, asset_override: &AssetOverride) -> Vec<u8> {
+pub async fn handle_override(file_path: PathBuf, file_data: Vec<u8>, asset_override: &AssetOverride) -> Vec<u8> {
     let extension = file_path.extension().unwrap().to_str().unwrap();
     match extension {
         "png" | "jpeg" => {
