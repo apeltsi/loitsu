@@ -16,13 +16,18 @@ export default function Hierarchy() {
                 <For each={hierarchy()}>
                 {(item: any) => {
                     return (
-                        <div class={styles.hierarchyItem}>
-                            {item.name}
-                        </div>
+                        <HierarchyItem item={item} />
                     )
                 }}
                 </For>
             </div>
         </div>
     )
+}
+
+function HierarchyItem(props: {item: any}) {
+    // @ts-ignore
+    return  <div class={styles.hierarchyItem} onClick={() => window.request_select_entity(props.item.id)}>
+                {props.item.name}
+            </div>
 }

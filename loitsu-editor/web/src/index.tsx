@@ -3,7 +3,7 @@ import { render } from 'solid-js/web';
 
 import './index.css';
 import App from './App';
-import init, {resize} from '../public/wasm/loitsu-editor.js';
+import init, {resize, request_select_entity} from '../public/wasm/loitsu-editor.js';
 
 window.addEventListener("resize", () => resize());
 
@@ -24,6 +24,8 @@ if (window.set_status === undefined) {
     window.add_warning = (message) => {};
     // @ts-ignore
     window.add_error = (message) => {};
+    // @ts-ignore
+    window.request_select_entity = request_select_entity;
     const root = document.getElementById('root');
 
     render(() => <App />, root!);

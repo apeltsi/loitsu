@@ -167,6 +167,22 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 window.request_redraw();
             },
             Event::RedrawRequested(_) => {
+                #[cfg(feature = "editor")]
+                {
+                    let client_events = ecs.poll_client_events();
+                    for event in client_events {
+                        match event {
+                            crate::editor::ClientEvent::SelectEntity(id) => {
+                                if let Some(entity) = ecs.get_entity(id.as_str()) {
+                                    ecs.emit(crate::editor::Event::EntitySelected((*entity).borrow().as_entity()));
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
+
                 #[allow(unused_mut)]
                 let mut updates = Vec::new();
                 #[cfg(not(feature = "direct_asset_management"))]

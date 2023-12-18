@@ -26,7 +26,7 @@ pub fn build_scenes(scenes: Vec<(String, String)>, scripts: Vec<scripting::Scrip
     #[cfg(not(feature = "editor"))]
     let mut e = ecs::ECS::new();
     #[cfg(feature = "editor")]
-    let mut e = ecs::ECS::new(editor::EventHandler::new());
+    let mut e = ecs::ECS::new(std::sync::Arc::new(std::sync::Mutex::new(editor::EventHandler::new())));
     let mut generated_scenes = Vec::new();
     for scene in scenes {
         let scene = scene_management::Scene::from_json(scene.0, scene.1);
@@ -43,7 +43,7 @@ pub fn build_scenes(scenes: Vec<(String, String)>, scripts: Vec<scripting::Scrip
 
 #[cfg(target_arch = "wasm32")]
 #[cfg(feature = "editor")]
-pub fn load_scene_in_edit_mode(event_handler: editor::EventHandler<scripting::rune_runtime::RuneInstance>, scene: scene_management::Scene, scripts: Vec<scripting::ScriptingSource>) {
+pub fn load_scene_in_edit_mode(event_handler: std::sync::Arc<std::sync::Mutex<editor::EventHandler<scripting::rune_runtime::RuneInstance>>>, scene: scene_management::Scene, scripts: Vec<scripting::ScriptingSource>) {
     log!("Loading scene in edit mode...");
     web::add_editor_loading_task("Starting ECS...");
     let mut rune = scripting::rune_runtime::RuneInstance::new_with_sources(scripts).unwrap();

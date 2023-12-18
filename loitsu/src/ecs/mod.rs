@@ -4,7 +4,8 @@ use std::rc::Rc;
 #[cfg(not(feature = "scene_generation"))]
 use crate::asset_management::ASSET_MANAGER;
 
-
+#[cfg(feature = "editor")]
+use std::sync::{Arc, Mutex};
 #[cfg(feature = "scene_generation")]
 use serde_json::{Value, Map, Number};
 use crate::scene_management::{Scene, Entity, Component};
@@ -16,7 +17,7 @@ pub struct ECS<T> where T: ScriptingInstance {
     pub static_scene: Option<Scene>,
     runtime_entities: Vec<Rc<RefCell<RuntimeEntity<T>>>>,
     #[cfg(feature = "editor")]
-    event_handler: crate::editor::EventHandler<T>
+    event_handler: Arc<Mutex<crate::editor::EventHandler<T>>>
 }
 
 bitflags! {
@@ -174,7 +175,7 @@ impl<T: ScriptingInstance> ECS<T> {
     }
 
     #[cfg(feature = "editor")]
-    pub fn new(event_handler: crate::editor::EventHandler<T>) -> ECS<T> {
+    pub fn new(event_handler: Arc<Mutex<crate::editor::EventHandler<T>>>) -> ECS<T> {
         ECS {
             active_scene: Scene::new("INITIAL_SCENE".to_string()),
             static_scene: None,
@@ -198,9 +199,23 @@ impl<T: ScriptingInstance> ECS<T> {
 
     #[cfg(feature = "editor")]
     pub fn emit(&mut self, event: crate::editor::Event) {
-        for event_handler in &self.event_handler.event_handlers {
+        for event_handler in &self.event_handler.lock().unwrap().event_handlers {
             event_handler(&self, &event);
         }
+    }
+    
+    #[cfg(feature = "editor")]
+    pub fn poll_client_events(&mut self) -> Vec<crate::editor::ClientEvent> {
+        self.event_handler.lock().unwrap().poll_client_events()
+    }
+
+    pub fn get_entity(&self, id: &str) -> Option<Rc<RefCell<RuntimeEntity<T>>>> {
+        for runtime_entity in self.runtime_entities.iter() {
+            if runtime_entity.borrow().get_id() == id {
+                return Some(runtime_entity.clone())
+            }
+        }
+        None
     }
 
     pub fn run_build_step(&mut self, scripting: &mut T) {

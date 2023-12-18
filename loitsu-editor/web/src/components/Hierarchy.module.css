@@ -8,3 +8,16 @@
 .hierarchy:hover {
     background-color: var(--panel-bg-highlight-color);
 }
+
+.hierarchyItem {
+    padding: 0.5em;
+    border-bottom: 1px solid var(--line-color);
+    transition-property: background-color;
+    transition-duration: 0.1s;
+    border-radius: 0.5em;
+    pointer-events: auto;
+}
+
+.hierarchyItem:hover {
+    background-color: var(--input-bg-color-hover);
+}
