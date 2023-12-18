@@ -8,8 +8,10 @@ export default function Inspector() {
     };
     return (
         <div class={styles.inspector + " inspector"}>
-            Inspector
+            <h2>Inspector</h2>
             <Show when={entity()}>
+                {/* @ts-ignore */ }
+                <h3>{entity().name}</h3>
                 {/* @ts-ignore */ }
                 <For each={entity().components}>
                 {(item) => {

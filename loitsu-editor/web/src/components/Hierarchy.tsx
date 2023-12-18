@@ -11,7 +11,7 @@ export default function Hierarchy() {
     };
     return (
         <div class={styles.hierarchy + " hierarchy"}>
-            Hierarchy
+            <h2>Hierarchy</h2>
             <div class={styles.hierarchyList}>
                 <For each={hierarchy()}>
                 {(item: any) => {
