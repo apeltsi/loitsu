@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::Read;
 use warp::Filter;
 use walkdir::WalkDir;
+use std::time::{Duration, SystemTime};
 
 #[tokio::main]
 async fn main() {
@@ -52,20 +53,25 @@ async fn main() {
                 let mut file = File::open(path).await.unwrap();
                 let mut data = Vec::new();
                 file.read_to_end(&mut data).await.unwrap();
-
-                let data = overrides::handle_override(
-                    tail.as_str().into(),
-                    data,
-                    overrides.get(tail.as_str()).unwrap_or(&overrides::AssetOverride {
-                        resolution_multiplier: None,
-                    })
-                    ).await; // Ensure this function is async or can be awaited
-
+                if !overrides.get(tail.as_str()).is_none() {
+                    // lets start a timer
+                    let start = SystemTime::now();
+                    data = overrides::handle_override(
+                        tail.as_str().into(),
+                        data,
+                        overrides.get(tail.as_str()).unwrap()
+                        ).await;
+                    let end = SystemTime::now();
+                    if end.duration_since(start).unwrap() > Duration::from_millis(100) {
+                        println!("Warning: asset override for {} took {}ms", tail.as_str(), end.duration_since(start).unwrap().as_millis());
+                    }
+                }
                 Ok::<_, warp::Rejection>(
                     Response::builder()
                     .header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
                     .body(data)
                     )
+
             }
         });
     let route = warp::get().and(warp::fs::dir(path.clone()).or(main_scene_route).or(scripts_route).or(assets_route));
