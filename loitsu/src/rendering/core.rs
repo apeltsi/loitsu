@@ -1,5 +1,5 @@
 use winit::{
-    event::{Event, WindowEvent, MouseButton, ElementState},
+    event::{Event, WindowEvent, MouseButton, ElementState, MouseScrollDelta},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
@@ -124,13 +124,14 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 window.set_inner_size(window_size);
                 if frame_count == 0 {
                     let max = max(window_size.width as i32, window_size.height as i32);
-                    queue.write_buffer(&camera_matrix_buffer, 0, bytemuck::cast_slice(&[CameraMatrix {
-                        view: [
+                    state.camera.view = [
                             [(size.height as f32) / max as f32, 0.0, 0.0, 0.0], 
                             [0.0, (size.width as f32) / max as f32, 0.0, 0.0],
                             [0.0, 0.0, 1.0, 0.0],
                             [0.0, 0.0, 0.0, 1.0]
-                        ],
+                    ];
+                    queue.write_buffer(&camera_matrix_buffer, 0, bytemuck::cast_slice(&[CameraMatrix {
+                        view: state.camera.view,
                         camera: state.camera.get_transformation_matrix()
                     }]));
                 }
@@ -154,13 +155,14 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 // from atlas :D
                 let max = max(size.width, size.height);
                 state.camera.aspect = (size.width as f32 / max as f32, size.height as f32 / max as f32);
-                queue.write_buffer(&camera_matrix_buffer, 0, bytemuck::cast_slice(&[CameraMatrix {
-                    view: [
+                state.camera.view = [
                         [(size.height as f32) / max as f32, 0.0, 0.0, 0.0], 
                         [0.0, (size.width as f32) / max as f32, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
                         [0.0, 0.0, 0.0, 1.0]
-                    ],
+                ];
+                queue.write_buffer(&camera_matrix_buffer, 0, bytemuck::cast_slice(&[CameraMatrix {
+                    view: state.camera.view,
                     camera: state.camera.get_transformation_matrix()
                 }]));
                 // On macos the window needs to be redrawn manually after resizing
@@ -233,6 +235,13 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
                     process_entity_updates(&device, &asset_manager, &shader_manager, &mut drawables, updates);
                 }
+                if state.camera.dirty {
+                    queue.write_buffer(&camera_matrix_buffer, 0, bytemuck::cast_slice(&[CameraMatrix {
+                        view: state.camera.view,
+                        camera: state.camera.get_transformation_matrix()
+                    }]));
+                    state.camera.dirty = false;
+                }
                 render_frame(&surface, &device, &queue, &mut drawables, &global_bind_group, ecs_initialized, frame_count);
                 frame_count += 1;
             },
@@ -264,6 +273,24 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                             input_state.mouse.middle_button = *element_state == ElementState::Pressed;
                         },
                         _ => {}
+                    }
+                },
+                #[cfg(feature = "editor")]
+                WindowEvent::MouseWheel { delta, .. } => {
+                    match delta {
+                        MouseScrollDelta::LineDelta(x, y) => {
+                            log!("Scroll!! {} {}", x, y);
+                            state.camera.scale += y * 0.001;
+                            state.camera.dirty = true;
+                        },
+                        MouseScrollDelta::PixelDelta(pos) => {
+                            log!("Scroll!!");
+                            state.camera.scale += pos.y as f32 * 0.001;
+                            state.camera.dirty = true;
+                        }
+                    }
+                    if state.camera.scale < 0.1 {
+                        state.camera.scale = 0.1;
                     }
                 },
                 _ => {}
@@ -343,7 +370,9 @@ struct State {
 pub struct CameraState {
     pub position: cgmath::Vector2<f32>,
     pub scale: f32,
-    pub aspect: (f32, f32)
+    pub aspect: (f32, f32),
+    pub dirty: bool,
+    pub view: [[f32; 4]; 4]
 }
 
 impl CameraState {
@@ -351,16 +380,20 @@ impl CameraState {
         CameraState {
             position: cgmath::Vector2::<f32> {x: 0.0, y: 0.0},
             scale: 1.0,
-            aspect: (1.0, 1.0)
+            aspect: (1.0, 1.0),
+            dirty: false,
+            view: [[0.0,0.0,0.0,0.0], [0.0,0.0,0.0,0.0], [0.0,0.0,0.0,0.0], [0.0,0.0,0.0,0.0]]
         }
     }
 
     fn set_position(&mut self, position: cgmath::Vector2<f32>) {
         self.position = position;
+        self.dirty = true;
     }
 
     fn set_scale(&mut self, scale: f32) {
         self.scale = scale;
+        self.dirty = true;
     }
 
     fn get_transformation_matrix(&self) -> [[f32; 4]; 4] {
