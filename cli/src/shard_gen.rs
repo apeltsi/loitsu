@@ -6,11 +6,8 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hasher, Hash};
 use std::fs::File;
 use std::io::Read;
-use crate::asset_builder::AssetOverride;
-use image::io::Reader as ImageReader;
-use std::path::PathBuf;
-use std::io::Cursor;
 use loitsu::Preferences;
+use loitsu_asset_gen::{handle_override, AssetOverride};
 
 #[derive(Debug, Clone)]
 pub struct Shard {
@@ -87,7 +84,7 @@ impl Shard {
         Some(others)
     }
 
-    pub fn encode(&self, overrides: &HashMap<String, AssetOverride>) -> Vec<u8> {
+    pub async fn encode(&self, overrides: &HashMap<String, AssetOverride>) -> Vec<u8> {
         let mut path = std::env::current_dir().unwrap();
         path.push("assets");
         let mut actual_shard = loitsu::asset_management::shard::Shard::new(self.name.clone());
@@ -100,7 +97,7 @@ impl Shard {
             file.read_to_end(&mut data).unwrap();
             // lets check if we have an override
             if let Some(override_data) = overrides.get(asset) {
-                data = handle_override(file_path, data, override_data);
+                data = handle_override(file_path, data, override_data).await;
             }
             actual_shard.add_file(asset.to_string(), data);
         }
@@ -180,35 +177,3 @@ pub fn generate_shards(scenes: Vec<Scene>, scripts: Vec<ScriptingSource>, prefer
     (shards, static_shard)
 }
 
-fn handle_override(file_path: PathBuf, file_data: Vec<u8>, asset_override: &AssetOverride) -> Vec<u8> {
-    let extension = file_path.extension().unwrap().to_str().unwrap();
-    match extension {
-        "png" | "jpeg" => {
-            let data = ImageReader::new(Cursor::new(file_data)).with_guessed_format().unwrap().decode().unwrap();
-            let mut data = data.to_rgba8();
-           
-            // lets apply the overrides
-
-            // first, resolution_mutliplier
-            if let Some(resolution_multiplier) = asset_override.resolution_multiplier {
-                let (width, height) = data.dimensions();
-                let new_width = (width as f32 * resolution_multiplier).round() as u32;
-                let new_height = (height as f32 * resolution_multiplier).round() as u32;
-                data = image::imageops::resize(&data, new_width, new_height, image::imageops::FilterType::Nearest);
-            }
-
-            // finally lets re-encode the image and return the data
-            let mut buffer: Vec<u8> = Vec::new();
-            let format = match extension {
-                "png" => image::ImageOutputFormat::Png,
-                "jpeg" => image::ImageOutputFormat::Jpeg(90),
-                _ => image::ImageOutputFormat::Png
-            };
-            data.write_to(&mut Cursor::new(&mut buffer), format).unwrap();
-            buffer
-        },
-        _ => {
-            file_data
-        }
-    }
-}

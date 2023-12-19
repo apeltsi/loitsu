@@ -5,15 +5,12 @@ use std::str;
 use crate::shard_gen;
 use std::fs::File;
 use std::io::Write;
-use serde_json;
-use serde_json::Value;
-use std::collections::HashMap;
-use std::fs;
 use std::io::Read;
 use crate::info;
 use loitsu::Preferences;
+use loitsu_asset_gen::get_asset_overrides;
 
-pub fn build_assets(out_dir: &PathBuf, force: bool) {
+pub async fn build_assets(out_dir: &PathBuf, force: bool) {
     let asset_path = std::env::current_dir().unwrap().join("assets");
     let shard_dir = out_dir.join("shards");
 
@@ -94,7 +91,7 @@ pub fn build_assets(out_dir: &PathBuf, force: bool) {
     let mut total_size: usize = 0;
     let shard_count = shards.len();
     for shard in shards {
-        let data = shard.encode(&overrides);
+        let data = shard.encode(&overrides).await;
         total_size += data.len();
         let mut path = shard_dir.clone(); 
         path.push(shard.name);
@@ -170,39 +167,4 @@ fn read_files(directory: &str) -> Vec<AssetFile> {
         }
     }
     files
-}
-
-pub struct AssetOverride {
-    pub resolution_multiplier: Option<f32>,
-}
-
-fn get_asset_overrides(path: &PathBuf) -> HashMap<String, AssetOverride> {
-    let mut override_map = HashMap::new();
-    let mut path = path.clone();
-    path.push("overrides.json");
-    // lets check if the file exists
-    if !path.exists() {
-        return override_map;
-    }
-
-    let data = fs::read_to_string(path).unwrap();
-    let v: Value = serde_json::from_str(data.as_str()).unwrap();
-    if let Value::Object(map) = v {
-        for (key, value) in map {
-            if let Value::Object(map) = value {
-                let mut asset_override = AssetOverride {
-                    resolution_multiplier: None,
-                };
-                for (key, value) in map {
-                    if key == "resolution_multiplier" {
-                        if let Value::Number(num) = value {
-                            asset_override.resolution_multiplier = Some(num.as_f64().unwrap() as f32);
-                        }
-                    }
-                }
-                override_map.insert(key, asset_override);
-            }
-        }
-    }
-    override_map
 }

@@ -1,4 +1,3 @@
-mod overrides;
 use warp;
 use loitsu::Preferences;
 use warp::http::Response;
@@ -8,12 +7,13 @@ use std::io::Read;
 use warp::Filter;
 use walkdir::WalkDir;
 use std::time::{Duration, SystemTime};
+use loitsu_asset_gen::{handle_override, get_asset_overrides};
 
 #[tokio::main]
 async fn main() {
     let asset_path = std::env::current_dir().unwrap().join("assets");
     let preferences = parse_preferences(asset_path.clone());
-    let overrides = overrides::get_asset_overrides(&asset_path.clone());
+    let overrides = get_asset_overrides(&asset_path.clone());
 
     let exe_path = std::env::current_exe().unwrap();
     let path = exe_path.parent().unwrap().join("editor_assets");
@@ -59,7 +59,7 @@ async fn main() {
                 if !overrides.get(tail.as_str()).is_none() {
                     // lets start a timer
                     let start = SystemTime::now();
-                    data = overrides::handle_override(
+                    data = handle_override(
                         tail.as_str().into(),
                         data,
                         overrides.get(tail.as_str()).unwrap()

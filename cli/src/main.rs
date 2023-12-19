@@ -110,7 +110,7 @@ async fn build(target: &str, release: bool, run: bool, force: bool) {
         // Lets copy the web player files
         generate_player_files(&out_path, &package_name, &loitsu_version);
         
-        asset_builder::build_assets(&out_path.join("out"), force);
+        asset_builder::build_assets(&out_path.join("out"), force).await;
         if run {
             start_webserver(&out_path).await;
         } else {
@@ -126,7 +126,7 @@ async fn build(target: &str, release: bool, run: bool, force: bool) {
         } else {
             out_path.push("debug");
         }
-        asset_builder::build_assets(&out_path, force);
+        asset_builder::build_assets(&out_path, force).await;
         info!("Building native target...");
         build_with_args(vec![], release, run);
     } else {
