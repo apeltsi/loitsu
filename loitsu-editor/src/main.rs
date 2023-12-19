@@ -1,7 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-use loitsu::{load_scene_in_edit_mode, log};
+
+#[cfg(target_arch = "wasm32")]
+use loitsu::load_scene_in_edit_mode;
+use loitsu::log;
 use loitsu::ecs::ECS;
-use loitsu::scene_management::Entity;
 use loitsu::editor::{EventHandler, Event, ClientEvent};
 use wasm_bindgen::prelude::*;
 use loitsu::asset_management::get_file::get_file;
@@ -15,9 +17,22 @@ mod hierarchy;
 static mut EVENT_HANDLER: Option<Arc<Mutex<EventHandler<loitsu::scripting::rune_runtime::RuneInstance>>>> = None;
 
 fn main() {
+    log!("WASM initialized");
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn override_asset_path(path: String) {
+    loitsu::asset_management::get_file::set_direct_asset_path(path.clone());
+    log!("Overriding asset path to {}", path);
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn start_editor() {
+    log!("Starting editor...");
     // When the server receives a request for LOITSU_MAIN_SCENE
     // it will automatically serve the correct scene from the asset folder
-
     spawn_local(async {
         let scene = get_file("LOITSU_MAIN_SCENE".to_string()).await;
         let scripts = get_file("LOITSU_ALL_SCRIPTS".to_string()).await;

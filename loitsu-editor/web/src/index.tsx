@@ -3,7 +3,7 @@ import { render } from 'solid-js/web';
 
 import './index.css';
 import App from './App';
-import init, {resize, request_select_entity} from '../public/wasm/loitsu-editor.js';
+import init, {start_editor, override_asset_path, resize, request_select_entity} from '../public/wasm/loitsu-editor.js';
 
 window.addEventListener("resize", () => resize());
 
@@ -13,6 +13,12 @@ function set_status(status: string) {
 
 async function run() {
 	await init();
+    if (window.location.search.includes("asset_path=")) {
+        const asset_path = window.location.search.split("asset_path=")[1].split("&")[0];
+        override_asset_path(asset_path);
+    }
+    console.log("Editor loaded.");
+    start_editor();
 }
 // @ts-ignore
 if (window.set_status === undefined) {

@@ -18,6 +18,9 @@ async fn main() {
     let exe_path = std::env::current_exe().unwrap();
     let path = exe_path.parent().unwrap().join("editor_assets");
     let asset_path_clone = asset_path.clone();
+    let cors = warp::cors()
+        .allow_origin("http://localhost:5173")
+        .allow_methods(vec!["GET", "POST", "DELETE"]);
     let main_scene_route = warp::get().and(warp::path("LOITSU_MAIN_SCENE")).map(move || {
         let main_scene_path = preferences.default_scene.clone();
         let mut path = asset_path_clone.clone();
@@ -26,7 +29,7 @@ async fn main() {
         let mut data = String::new();
         file.read_to_string(&mut data).unwrap();
         Response::builder().header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate").body(data)
-    });
+    }).with(cors.clone());
     let asset_path_clone = asset_path.clone();
     let scripts_route = warp::get().and(warp::path("LOITSU_ALL_SCRIPTS")).map(move || {
         let files = read_files(asset_path_clone.clone().to_str().unwrap());
@@ -37,7 +40,7 @@ async fn main() {
             }
         }
         Response::builder().header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate").body(serde_json::to_string(&scripts).unwrap())
-    });
+    }).with(cors.clone());
     let assets_route = warp::get()
         .and(warp::path("assets"))
         .and(warp::path::tail())
@@ -73,7 +76,7 @@ async fn main() {
                     )
 
             }
-        });
+        }).with(cors.clone());
     let route = warp::get().and(warp::fs::dir(path.clone()).or(main_scene_route).or(scripts_route).or(assets_route));
     println!("Editor live at http://localhost:5969");
     warp::serve(route).run(([127, 0, 0, 1], 5969)).await;

@@ -10,6 +10,16 @@ use wasm_bindgen_futures::JsFuture;
 use crate::asset_management::AssetError;
 
 #[cfg(target_arch = "wasm32")]
+static mut DIRECT_ASSET_PATH: &str = "./";
+
+#[cfg(target_arch = "wasm32")]
+pub fn set_direct_asset_path(path: String) {
+    unsafe {
+        DIRECT_ASSET_PATH = path.leak();
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
 impl From<JsValue> for AssetError {
     fn from(value: JsValue) -> Self {
         AssetError::new(&format!("{:?}", value))
@@ -21,7 +31,7 @@ pub async fn get_file(path: String) -> Result<Vec<u8>, AssetError> {
     opts.method("GET");
     opts.mode(RequestMode::Cors);
 
-    let url = format!("./{}", path);
+    let url = format!("{}{}", unsafe {DIRECT_ASSET_PATH}, path);
     let request = Request::new_with_str_and_init(&url, &opts)?;
     
     let window = web_sys::window().unwrap();

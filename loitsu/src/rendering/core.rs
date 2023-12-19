@@ -1,8 +1,10 @@
+#[allow(unused_imports)]
 use winit::{
     event::{Event, WindowEvent, MouseButton, ElementState, MouseScrollDelta},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
+#[allow(unused_imports)]
 use crate::{log_render as log, scripting::{ScriptingInstance, EntityUpdate}, scene_management::Scene, rendering::drawable::{sprite::SpriteDrawable, DrawablePrototype}, asset_management::AssetManager, ecs::{Transform, RuntimeEntity}, log_scripting, input::InputState};
 use crate::ecs::ECS;
 use std::{cmp::max, cell::RefCell, rc::Rc};
@@ -179,7 +181,6 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                                     ecs.emit(crate::editor::Event::EntitySelected((*entity).borrow().as_entity()));
                                 }
                             }
-                            _ => {}
                         }
                     }
                 }

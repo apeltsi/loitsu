@@ -35,7 +35,8 @@ enum Commands {
         release: bool,
         #[arg(short, long, default_value = "false")]
         force: bool
-    }
+    },
+    Edit
 }
 #[tokio::main]
 async fn main() {
@@ -44,7 +45,15 @@ async fn main() {
     match args.command {
         Commands::Build { target, release, force } => build(&target, release, false, force).await,
         Commands::Run { target, release, force } => build(&target, release, true, force).await,
+        Commands::Edit => run_editor()
     }
+}
+
+fn run_editor() {
+    let mut command = std::process::Command::new("loitsu-editor");
+    // now lets run the command and wait for it to finish
+    let mut child = command.spawn().unwrap();
+    child.wait().unwrap();
 }
 
 async fn build(target: &str, release: bool, run: bool, force: bool) {

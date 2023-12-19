@@ -6,6 +6,7 @@ pub mod image_asset;
 pub mod asset_reference;
 pub mod parse;
 
+#[allow(unused_imports)]
 use self::{static_shard::StaticShard, asset::Asset, asset_reference::AssetReference};
 use crate::{log_asset as log, error};
 use lazy_static::lazy_static;
@@ -47,26 +48,29 @@ impl AssetManager {
             static_shard: None,
         };
         let assets = Arc::new(Mutex::new(assets));
-        let assets_clone = assets.clone();
-        let pending_tasks_clone = pending_tasks.clone();
+        
         #[cfg(not(feature = "direct_asset_management"))]
-        spawn_local(async move {
-            let result = get_file::get_file("shards/static.shard".to_string()).await;
+        {
+            let assets_clone = assets.clone();
+            let pending_tasks_clone = pending_tasks.clone();
+            spawn_local(async move {
+                let result = get_file::get_file("shards/static.shard".to_string()).await;
 
-            match result {
-                Ok(file) => {
-                    log!("Successfully loaded static shard");
-                    let static_shard = StaticShard::decode(&file);
-                    let mut assets = assets_clone.lock().unwrap();
-                    assets.static_shard = Some(static_shard);
-                    pending_tasks_clone.fetch_sub(1, Ordering::SeqCst);
-                },
-                Err(e) => {
-                    error!("Failed to load static shard: {:?}", e.message);
-                    // TODO: On web platforms this could show some error to the user
+                match result {
+                    Ok(file) => {
+                        log!("Successfully loaded static shard");
+                        let static_shard = StaticShard::decode(&file);
+                        let mut assets = assets_clone.lock().unwrap();
+                        assets.static_shard = Some(static_shard);
+                        pending_tasks_clone.fetch_sub(1, Ordering::SeqCst);
+                    },
+                    Err(e) => {
+                        error!("Failed to load static shard: {:?}", e.message);
+                        // TODO: On web platforms this could show some error to the user
+                    }
                 }
-            }
-        });
+            });
+        }
         AssetManager {
             pending_tasks,
             assets,
@@ -185,9 +189,12 @@ impl AssetManager {
         // since we guarantee that a asset reference is alway returned
         // we'll have to return a None asset reference for now
         // this reference might be updated later
-        let asset = Arc::new(Mutex::new(AssetReference::new(Arc::new(Mutex::new(Asset::None)))));
-        self.assets.lock().unwrap().assets.insert(name.to_owned(), asset.clone());
-        asset
+        #[allow(unreachable_code)]
+        {
+            let asset = Arc::new(Mutex::new(AssetReference::new(Arc::new(Mutex::new(Asset::None)))));
+            self.assets.lock().unwrap().assets.insert(name.to_owned(), asset.clone());
+            return asset;
+        }
     }
 }
 
