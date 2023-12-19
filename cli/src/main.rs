@@ -36,7 +36,8 @@ enum Commands {
         #[arg(short, long, default_value = "false")]
         force: bool
     },
-    Edit
+    Edit,
+    Clean
 }
 #[tokio::main]
 async fn main() {
@@ -45,7 +46,8 @@ async fn main() {
     match args.command {
         Commands::Build { target, release, force } => build(&target, release, false, force).await,
         Commands::Run { target, release, force } => build(&target, release, true, force).await,
-        Commands::Edit => run_editor()
+        Commands::Edit => run_editor(),
+        Commands::Clean => clean()
     }
 }
 
@@ -54,6 +56,15 @@ fn run_editor() {
     // now lets run the command and wait for it to finish
     let mut child = command.spawn().unwrap();
     child.wait().unwrap();
+}
+
+fn clean() {
+    let mut path = std::env::current_dir().unwrap();
+    path.push(".loitsu");
+    path.push("asset_cache");
+    if path.exists() {
+        fs::remove_dir_all(path.clone()).unwrap();
+    }
 }
 
 async fn build(target: &str, release: bool, run: bool, force: bool) {

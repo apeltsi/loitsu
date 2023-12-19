@@ -1,4 +1,4 @@
-use std::{path::PathBuf, io::Cursor, collections::HashMap};
+use std::{path::PathBuf, io::Cursor, collections::HashMap, io::{Read, Write}, hash::Hasher};
 use image::io::Reader as ImageReader;
 use serde_json::Value;
 
@@ -7,11 +7,54 @@ pub struct AssetOverride {
     pub resolution_multiplier: Option<f32>,
 }
 
+/// Returns a unique hash for the asset, its data and overrides
+pub fn get_asset_unique_hash(file_path: &PathBuf, file_data: &Vec<u8>, asset_override: &AssetOverride) -> String {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    hasher.write(file_path.to_str().unwrap().as_bytes());
+    hasher.write(file_data);
+    if let Some(resolution_multiplier) = asset_override.resolution_multiplier {
+        hasher.write(&resolution_multiplier.to_ne_bytes());
+    }
+    format!("{:X}", hasher.finish())
+}
+
+pub fn get_cached_asset(file_path: &PathBuf, file_data: &Vec<u8>, asset_override: &AssetOverride) -> Option<Vec<u8>> {
+    let hash = get_asset_unique_hash(file_path, file_data, asset_override);
+    let mut path = std::env::current_dir().unwrap();
+    path.push(".loitsu");
+    path.push("asset_cache");
+    path.push(hash);
+    if path.exists() {
+        let mut file = std::fs::File::open(path).unwrap();
+        let mut data = Vec::new();
+        file.read_to_end(&mut data).unwrap();
+        Some(data)
+    } else {
+        None
+    }
+}
+
+fn write_cached_asset(file_path: &PathBuf, file_data: &Vec<u8>, asset_override: &AssetOverride, data: &Vec<u8>) {
+    let hash = get_asset_unique_hash(file_path, file_data, asset_override);
+    let mut path = std::env::current_dir().unwrap();
+    path.push(".loitsu");
+    path.push("asset_cache");
+    path.push(hash);
+    if !path.exists() {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    }
+    let mut file = std::fs::File::create(path).unwrap();
+    file.write_all(data).unwrap();
+}
+
 pub async fn handle_override(file_path: PathBuf, file_data: Vec<u8>, asset_override: &AssetOverride) -> Vec<u8> {
     let extension = file_path.extension().unwrap().to_str().unwrap();
+    if let Some(cached_data) = get_cached_asset(&file_path, &file_data, asset_override) {
+        return cached_data;
+    }
     match extension {
         "png" | "jpeg" => {
-            let data = ImageReader::new(Cursor::new(file_data)).with_guessed_format().unwrap().decode().unwrap();
+            let data = ImageReader::new(Cursor::new(file_data.clone())).with_guessed_format().unwrap().decode().unwrap();
             let mut data = data.to_rgba8();
            
             // lets apply the overrides
@@ -32,6 +75,7 @@ pub async fn handle_override(file_path: PathBuf, file_data: Vec<u8>, asset_overr
                 _ => image::ImageOutputFormat::Png
             };
             data.write_to(&mut Cursor::new(&mut buffer), format).unwrap();
+            write_cached_asset(&file_path, &file_data, asset_override, &buffer);
             buffer
         },
         _ => {

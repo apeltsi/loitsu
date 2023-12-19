@@ -6,7 +6,6 @@ use std::fs::File;
 use std::io::Read;
 use warp::Filter;
 use walkdir::WalkDir;
-use std::time::{Duration, SystemTime};
 use loitsu_asset_gen::{handle_override, get_asset_overrides};
 
 #[tokio::main]
@@ -57,17 +56,11 @@ async fn main() {
                 let mut data = Vec::new();
                 file.read_to_end(&mut data).await.unwrap();
                 if !overrides.get(tail.as_str()).is_none() {
-                    // lets start a timer
-                    let start = SystemTime::now();
                     data = handle_override(
                         tail.as_str().into(),
                         data,
                         overrides.get(tail.as_str()).unwrap()
                         ).await;
-                    let end = SystemTime::now();
-                    if end.duration_since(start).unwrap() > Duration::from_millis(100) {
-                        println!("Warning: asset override for {} took {}ms", tail.as_str(), end.duration_since(start).unwrap().as_millis());
-                    }
                 }
                 Ok::<_, warp::Rejection>(
                     Response::builder()
