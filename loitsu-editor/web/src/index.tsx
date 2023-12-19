@@ -2,13 +2,13 @@
 import { render } from 'solid-js/web';
 
 import './index.css';
-import App from './App';
+import App, { queued_events } from './App';
 import init, {start_editor, override_asset_path, resize, request_select_entity} from '../public/wasm/loitsu-editor.js';
 
 window.addEventListener("resize", () => resize());
 
 function set_status(status: string) {
-    console.log(status);
+    console.log("Status reported: " + status);
 }
 
 async function run() {
@@ -19,6 +19,17 @@ async function run() {
     }
     console.log("Editor loaded.");
     start_editor();
+    const interval = setInterval(() => {
+        if (document.getElementsByTagName("canvas").length === 0) {
+            return;
+        }
+        for (let i = 0; i < queued_events.length; i++) {
+            document.getElementsByTagName("canvas")[0].addEventListener("keydown", (event: KeyboardEvent) => {
+                queued_events[i](event);
+            });
+        }
+        clearInterval(interval);
+    }, 50);
 }
 // @ts-ignore
 if (window.set_status === undefined) {
@@ -32,6 +43,7 @@ if (window.set_status === undefined) {
     window.add_error = (message) => {};
     // @ts-ignore
     window.request_select_entity = request_select_entity;
+
     const root = document.getElementById('root');
 
     render(() => <App />, root!);

@@ -1,5 +1,6 @@
 import styles from './Hierarchy.module.css';
 import { For, createSignal } from 'solid-js';
+import PanelTitle from './PanelTitle';
 
 export default function Hierarchy() {
     let [hierarchy, set_hierarchy] = createSignal([]);
@@ -11,7 +12,7 @@ export default function Hierarchy() {
     };
     return (
         <div class={styles.hierarchy + " hierarchy"}>
-            <h2>Hierarchy</h2>
+            <PanelTitle title={"Hierarchy"}/>
             <div class={styles.hierarchyList}>
                 <For each={hierarchy()}>
                 {(item: any) => {

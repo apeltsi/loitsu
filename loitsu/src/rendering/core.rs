@@ -242,6 +242,10 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         camera: state.camera.get_transformation_matrix()
                     }]));
                     state.camera.dirty = false;
+                    #[cfg(feature = "editor")]
+                    {
+                        ecs.emit(crate::editor::Event::CameraChanged(state.camera.position.x, state.camera.position.y, state.camera.scale));
+                    }
                 }
                 render_frame(&surface, &device, &queue, &mut drawables, &global_bind_group, ecs_initialized, frame_count);
                 frame_count += 1;

@@ -35,6 +35,8 @@ pub enum Event {
     EntityUpdated(String), 
     /// An entity has been selected
     EntitySelected(Entity), 
+    /// The camera has changed (x, y, zoom)
+    CameraChanged(f32, f32, f32)
 }
 
 /// This is a list of events that the client can send to the editor backend

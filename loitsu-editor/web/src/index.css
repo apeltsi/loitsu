@@ -3,16 +3,18 @@
 body {
     --topbar-bg-color: #252525;
     --bg-color: #4E4E4E;
-    --panel-bg-color: #3E3E3E;
-    --panel-bg-highlight-color: #3E3E45;
+    --panel-bg-color: #3E3E3EA0;
+    --panel-bg-highlight-color: #3E3E45A0;
+    --subpanel-bg-color: #2E2E3E;
     --line-color: #333333;
     --text-color: #FFFFFF;
-    --panel-bg-opacity: 0.8;
     --backdrop-blur: 10px;
     --input-bg-color: #202040;
     --input-bg-color-hover: #303050;
     --input-outline-color: #606060;
+    --backdrop-blur: 10px;
     color: var(--text-color);
+    background-color: black;
     margin: 0;
     font-family: 'Roboto', sans-serif;
 }
@@ -36,9 +38,16 @@ input {
     border: none;
     border-radius: 5px;
     padding: 5px;
+    outline: 1px solid transparent;
+    transition-duration: 0.1s;
 }
 
 input:hover {
     background-color: var(--input-bg-color-hover);
     outline: 1px solid var(--input-outline-color);
+}
+
+input:focus {
+    background-color: var(--input-bg-color-hover);
+    outline: 2px solid var(--input-outline-color);
 }

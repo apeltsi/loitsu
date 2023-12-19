@@ -1,6 +1,5 @@
 .hierarchy {
     background-color: var(--panel-bg-color);
-    opacity: var(--panel-bg-opacity);
     transition-property: background-color;
     transition-duration: 0.1s;
 }

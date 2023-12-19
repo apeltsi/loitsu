@@ -1,6 +1,5 @@
 .explorer {
     background-color: var(--panel-bg-color);
-    opacity: var(--panel-bg-opacity);
     overflow-y: scroll;
     overflow-x: hidden;
     display: flex;

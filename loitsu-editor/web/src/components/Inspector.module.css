@@ -1,8 +1,12 @@
 .inspector {
     background-color: var(--panel-bg-color);
-    opacity: var(--panel-bg-opacity);
     transition-property: background-color;
     transition-duration: 0.1s;
+    box-sizing: border-box;
+}
+
+.inspector h3 {
+    margin-left: 0.5rem;
 }
 
 .inspector:hover {
@@ -10,13 +14,17 @@
 }
 
 .inspector_component {
-    margin-top: 0.5rem;
+    margin: 0.5rem;
+    padding: 0.5rem;
     display: flex;
     flex-direction: column;
+    box-sizing: border-box;
+    background-color: var(--subpanel-bg-color);
+    border-radius: 0.5rem;
 }
 
 .inspector_component_name {
-    font-size: 0.8rem;
+    font-size: 1rem;
     font-weight: bold;
     margin-bottom: 0.5rem;
     display: inline-block;
@@ -31,9 +39,15 @@
     padding-right: 0.5rem;
     margin-bottom: 0.5rem;
 }
+
 .input span {
     margin-right: 0.5rem;
 }
+
 .input input {
     flex-grow: 1;
+}
+
+.inspector h3 {
+    margin-top: 0;
 }

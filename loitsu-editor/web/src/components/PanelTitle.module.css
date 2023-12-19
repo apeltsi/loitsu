@@ -1,0 +1,22 @@
+.title {
+    text-transform: uppercase;
+    padding: 0rem 1rem;
+    width: 100%;
+    font-size: 1rem;
+    box-sizing: border-box;
+    overflow: hidden;
+    display: flex;
+    justify-content: start;
+    align-items: center;
+    height: 4rem;
+}
+
+.arrow {
+    width: 2rem;
+    transition: transform 0.3s ease-in-out;
+}
+
+.arrow.rotated {
+    transform: rotate(90deg);
+    margin-right: 1rem;
+}

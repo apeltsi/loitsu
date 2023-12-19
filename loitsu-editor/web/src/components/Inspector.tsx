@@ -1,5 +1,6 @@
 import { For, Match, Show, Switch, createEffect, createSignal } from 'solid-js';
 import styles from './Inspector.module.css';
+import PanelTitle from './PanelTitle';
 export default function Inspector() {
     const [entity, setEntity] = createSignal({} as object);
     // @ts-ignore
@@ -8,7 +9,7 @@ export default function Inspector() {
     };
     return (
         <div class={styles.inspector + " inspector"}>
-            <h2>Inspector</h2>
+            <PanelTitle title={"Inspector"}/>
             <Show when={entity()}>
                 {/* @ts-ignore */ }
                 <h3>{entity().name}</h3>
@@ -32,7 +33,7 @@ interface Component {
 function InspectorComponent(props: { component: Component }) {
     return (
     <div class={styles.inspector_component}>
-        <span class={styles.inspector_component_name}>{props.component.name}</span>
+        <span class={styles.inspector_component_name}>{pretty_name(props.component.name)}</span>
         <For each={Object.keys(props.component.properties)}>
             {(key) => {
                 return <InspectorInput label={key} value={props.component.properties[key]} />
@@ -50,7 +51,7 @@ function InspectorInput(props: { label: string, value: object }) {
     });
     return (
     <div class={styles.input}>
-        <span>{props.label}</span>
+        <span>{pretty_name(props.label)}</span>
         <Switch fallback={<span>Unknown</span>}>
             <Match when={inputType() == "String"}>
                 {/* @ts-ignore */}
@@ -59,4 +60,8 @@ function InspectorInput(props: { label: string, value: object }) {
         </Switch>
     </div>
     )
+}
+
+function pretty_name(name: string) {
+    return name.replace(/_/g, " ").replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase());
 }

@@ -71,6 +71,9 @@ fn main_event_handler<T>(ecs: &ECS<T>, event: &Event) where T: loitsu::scripting
         Event::EntitySelected(entity) => {
             log!("Selected entity {}", entity.name);
             select_entity(serde_json::to_string(&entity).unwrap());
+        },
+        Event::CameraChanged(x, y, zoom) => {
+            camera_moved(*x, *y, *zoom);
         }
     }
 }
@@ -87,4 +90,5 @@ extern "C" {
     fn set_scene_name(name: String);
     fn set_hierarchy(hierarchy: String);
     fn select_entity(entity: String);
+    fn camera_moved(x: f32, y: f32, zoom: f32);
 }
