@@ -12,7 +12,7 @@ impl MouseState {
         let (x, y) = (self.position.0 - 0.5, -self.position.1 + 0.5); // Center the mouse position
         let (x, y) = (x * 2.0, y * 2.0); // Scale the mouse position to the range -1.0 to 1.0
         let (x, y) = (x / camera.aspect.1, y / camera.aspect.0);
-        let (x, y) = (x * camera.scale, y * camera.scale); // Scale the mouse position by the camera zoom
+        let (x, y) = (x / camera.scale, y / camera.scale); // Scale the mouse position by the camera zoom
         let (x, y) = (x + camera.position.x, y + camera.position.y); // Move the mouse position by the camera position
         (x, y)
     }
