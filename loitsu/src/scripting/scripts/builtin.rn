@@ -31,6 +31,14 @@ impl SpriteRenderer {
         self.drawable = entity.register_drawable(drawable);
     }
 
+    pub fn editor_update(self, entity) {
+        if self.drawable != "" {
+            entity.unregister_drawable(self.drawable);
+        }
+        let drawable = Drawable::sprite(self.sprite, Color::white());
+        self.drawable = entity.register_drawable(drawable);
+    }
+
     pub fn editor_destroy(self, entity) {
         entity.unregister_drawable(self.drawable);
     }

@@ -521,6 +521,8 @@ impl ScriptingInstance for RuneInstance {
                 ComponentFlags::EDITOR_START,
                 #[cfg(feature = "editor")]
                 ComponentFlags::EDITOR_DESTROY,
+                #[cfg(feature = "editor")]
+                ComponentFlags::EDITOR_UPDATE,
             ];
             for method in methods {
                 let result = vm.lookup_function([component_name, flags_to_method(method)]);
@@ -647,6 +649,8 @@ fn flags_to_method(flags: ComponentFlags) -> &'static str {
         ComponentFlags::EDITOR_START => "editor_start",
         #[cfg(feature = "editor")]
         ComponentFlags::EDITOR_DESTROY => "editor_destroy",
+        #[cfg(feature = "editor")]
+        ComponentFlags::EDITOR_UPDATE => "editor_update",
         _ => panic!("Invalid component flags"),
     }
 }

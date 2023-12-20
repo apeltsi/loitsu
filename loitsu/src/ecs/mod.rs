@@ -37,6 +37,8 @@ bitflags! {
         const EDITOR_START =    0b01000000;
         #[cfg(feature = "editor")]
         const EDITOR_DESTROY =  0b10000000;
+        #[cfg(feature = "editor")]
+        const EDITOR_UPDATE =    0b00000001_00000000;
     }
 }
 

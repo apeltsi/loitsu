@@ -65,8 +65,6 @@ pub trait ScriptingData<T>
 where
     T: ScriptingInstance,
 {
-    // This function taking in a rune instance is less than ideal but ill try to deal with it in
-    // the future :)
     fn from_component_proto(proto: Component, instance: &mut T) -> Result<Self>
     where
         Self: Sized;
