@@ -1,19 +1,21 @@
-use rune::{Context, Diagnostics, Source, Sources, ContextError, Module, BuildError, Vm, ToValue, Any};
-use rune::runtime::{Value, Struct, VmError, Shared, Args, VmResult, AnyObj};
+use super::EntityUpdate;
+use crate::ecs::{ComponentFlags, RuntimeEntity, Transform};
+use crate::rendering::drawable::{DrawableProperty, DrawablePrototype};
+use crate::scene_management::{Component, Property};
+use crate::scripting::{ScriptingData, ScriptingError, ScriptingSource};
+use crate::{error, log_scripting as log, ScriptingInstance};
+use rune::alloc::fmt::TryWrite;
 use rune::diagnostics::EmitError;
-use crate::rendering::drawable::{DrawablePrototype, DrawableProperty};
-use crate::{ScriptingInstance, log_scripting as log, error};
-use crate::scripting::{ScriptingError, ScriptingSource, ScriptingData};
-use rune::termcolor::{StandardStream, ColorChoice};
-use crate::scene_management::{Property, Component};
+use rune::runtime::{AnyObj, Args, Shared, Struct, Value, VmError, VmResult};
+use rune::termcolor::{ColorChoice, StandardStream};
+use rune::{
+    Any, BuildError, Context, ContextError, Diagnostics, Module, Source, Sources, ToValue, Vm,
+};
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use std::sync::Arc;
-use crate::ecs::{ComponentFlags, Transform, RuntimeEntity};
-use rune::alloc::fmt::TryWrite;
 use uuid::Uuid;
-use super::EntityUpdate;
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
 #[cfg(feature = "scene_generation")]
@@ -24,7 +26,7 @@ pub struct RuneInstance {
 }
 
 pub struct RuneComponent {
-    pub data: Option<Shared<Struct>>
+    pub data: Option<Shared<Struct>>,
 }
 
 #[derive(Debug, Clone, Any)]
@@ -43,29 +45,20 @@ pub struct Vec2 {
     #[rune(get, set, copy)]
     pub x: f32,
     #[rune(get, set, copy)]
-    pub y: f32
+    pub y: f32,
 }
 
 impl Vec2 {
     pub fn new(x: f32, y: f32) -> Self {
-        Self {
-            x,
-            y
-        }
+        Self { x, y }
     }
 
     pub fn from_tuple(pos: (f32, f32)) -> Self {
-        Self {
-            x: pos.0,
-            y: pos.1
-        }
+        Self { x: pos.0, y: pos.1 }
     }
 
     pub fn zero() -> Self {
-        Self {
-            x: 0.0,
-            y: 0.0
-        }
+        Self { x: 0.0, y: 0.0 }
     }
 
     pub fn as_tuple(&self) -> (f32, f32) {
@@ -94,7 +87,7 @@ pub struct Color {
     #[rune(get, set, copy)]
     pub b: f32,
     #[rune(get, set, copy)]
-    pub a: f32
+    pub a: f32,
 }
 
 impl Color {
@@ -104,7 +97,7 @@ impl Color {
             r: 0.0,
             g: 0.0,
             b: 0.0,
-            a: 1.0
+            a: 1.0,
         }
     }
 
@@ -114,28 +107,18 @@ impl Color {
             r: 1.0,
             g: 1.0,
             b: 1.0,
-            a: 1.0
+            a: 1.0,
         }
     }
 
     #[rune::function(path = Self::rgb)]
     fn rgb(r: f32, g: f32, b: f32) -> Color {
-        Color {
-            r,
-            g,
-            b,
-            a: 1.0
-        }
+        Color { r, g, b, a: 1.0 }
     }
 
     #[rune::function(path = Self::rgba)]
     fn rgba(r: f32, g: f32, b: f32, a: f32) -> Color {
-        Color {
-            r,
-            g,
-            b,
-            a
-        }
+        Color { r, g, b, a }
     }
 
     #[rune::function(path = Self::hex)]
@@ -149,14 +132,9 @@ impl Color {
         } else {
             1.0
         };
-        Color {
-            r,
-            g,
-            b,
-            a
-        }
+        Color { r, g, b, a }
     }
-} 
+}
 
 impl Display for Color {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -181,7 +159,7 @@ struct RuneEntity {
     pub transform: Shared<AnyObj>,
     drawables: Vec<(Drawable, Uuid)>,
     remove_drawables: Vec<String>,
-    property_updates: Vec<(String, String, DrawableProperty)>
+    property_updates: Vec<(String, String, DrawableProperty)>,
 }
 
 impl RuneEntity {
@@ -199,24 +177,27 @@ impl RuneEntity {
 
     #[rune::function]
     fn set_drawable_color(&mut self, drawable: &str, property: &str, color: Color) {
-        self.property_updates.push((drawable.to_string(), property.to_string(), DrawableProperty::Color((&color).into())));
+        self.property_updates.push((
+            drawable.to_string(),
+            property.to_string(),
+            DrawableProperty::Color((&color).into()),
+        ));
     }
 
     #[rune::function]
     fn set_drawable_sprite(&mut self, drawable: &str, property: &str, sprite: &str) {
-        self.property_updates.push((drawable.to_string(), property.to_string(), DrawableProperty::Sprite(sprite.to_string())));
+        self.property_updates.push((
+            drawable.to_string(),
+            property.to_string(),
+            DrawableProperty::Sprite(sprite.to_string()),
+        ));
     }
 }
 
 #[derive(Debug, Clone, Any)]
 enum Drawable {
     #[rune(constructor)]
-    Sprite (
-        #[rune(get, set)]
-        String,
-        #[rune(get, set)]
-        Color
-    )
+    Sprite(#[rune(get, set)] String, #[rune(get, set)] Color),
 }
 
 impl Drawable {
@@ -229,13 +210,11 @@ impl Drawable {
 impl From<&(Drawable, Uuid)> for DrawablePrototype {
     fn from(drawable: &(Drawable, Uuid)) -> Self {
         match &drawable.0 {
-            Drawable::Sprite(sprite, color) => {
-                DrawablePrototype::Sprite {
-                    sprite: sprite.to_string(),
-                    color: [color.r, color.g, color.b, color.a],
-                    id: drawable.1
-                }
-            }
+            Drawable::Sprite(sprite, color) => DrawablePrototype::Sprite {
+                sprite: sprite.to_string(),
+                color: [color.r, color.g, color.b, color.a],
+                id: drawable.1,
+            },
         }
     }
 }
@@ -243,20 +222,21 @@ impl From<&(Drawable, Uuid)> for DrawablePrototype {
 impl From<Transform> for RuneTransform {
     fn from(transform: Transform) -> Self {
         match transform {
-            Transform::Transform2D { position, rotation, scale, .. } => {
-                RuneTransform {
-                    position: Shared::new(AnyObj::new(Vec2::from_tuple(position)).unwrap()).unwrap(),
-                    rotation,
-                    scale: Shared::new(AnyObj::new(Vec2::from_tuple(scale)).unwrap()).unwrap()
-                }
+            Transform::Transform2D {
+                position,
+                rotation,
+                scale,
+                ..
+            } => RuneTransform {
+                position: Shared::new(AnyObj::new(Vec2::from_tuple(position)).unwrap()).unwrap(),
+                rotation,
+                scale: Shared::new(AnyObj::new(Vec2::from_tuple(scale)).unwrap()).unwrap(),
             },
-            Transform::RectTransform { position, .. } => {
-                RuneTransform {
-                    position: Shared::new(AnyObj::new(Vec2::from_tuple(position)).unwrap()).unwrap(),
-                    rotation: 0.0,
-                    scale: Shared::new(AnyObj::new(Vec2::new(1.0, 1.0)).unwrap()).unwrap()
-                }
-            }
+            Transform::RectTransform { position, .. } => RuneTransform {
+                position: Shared::new(AnyObj::new(Vec2::from_tuple(position)).unwrap()).unwrap(),
+                rotation: 0.0,
+                scale: Shared::new(AnyObj::new(Vec2::new(1.0, 1.0)).unwrap()).unwrap(),
+            },
         }
     }
 }
@@ -273,7 +253,7 @@ impl From<RuneTransform> for Transform {
             scale: as_vec2(transform.scale).as_tuple(),
             r#static: false,
             has_changed: false,
-            changed_frame: 0
+            changed_frame: 0,
         }
     }
 }
@@ -281,7 +261,12 @@ impl From<RuneTransform> for Transform {
 impl ScriptingData<RuneInstance> for RuneComponent {
     fn from_component_proto(proto: Component, instance: &mut RuneInstance) -> Result<Self> {
         // lets start by initializing a new struct in the runtime
-        let data = instance.virtual_machine.as_mut().unwrap().call([proto.name.as_str(), "new"], ()).expect("Error when initializing component. Did you forget to include a 'new' method?");
+        let data = instance
+            .virtual_machine
+            .as_mut()
+            .unwrap()
+            .call([proto.name.as_str(), "new"], ())
+            .expect("Error when initializing component. Did you forget to include a 'new' method?");
         let component_data = match data {
             Value::Struct(data) => {
                 {
@@ -289,18 +274,18 @@ impl ScriptingData<RuneInstance> for RuneComponent {
                     let component_data_obj = component_data.data_mut();
                     // lets assign all of our properties
                     for (key, value) in proto.properties {
-                        component_data_obj.insert_value(rune::alloc::String::try_from(key)?, value).unwrap();
+                        component_data_obj
+                            .insert_value(rune::alloc::String::try_from(key)?, value)
+                            .unwrap();
                     }
                 }
                 Some(data)
-            },
-            _ => {
-                None
             }
+            _ => None,
         };
 
         Ok(RuneComponent {
-            data: component_data
+            data: component_data,
         })
     }
 
@@ -310,7 +295,9 @@ impl ScriptingData<RuneInstance> for RuneComponent {
             let component_data = data.clone().into_mut().unwrap();
             let component_data_obj = component_data.data();
             for (key, value) in component_data_obj.iter() {
-                proto.properties.insert(key.to_string(), value.clone().into());
+                proto
+                    .properties
+                    .insert(key.to_string(), value.clone().into());
             }
         }
         Ok(proto)
@@ -320,21 +307,11 @@ impl ScriptingData<RuneInstance> for RuneComponent {
 impl From<Value> for Property {
     fn from(value: Value) -> Self {
         match value {
-            Value::String(value) => {
-                Property::String(value.into_ref().unwrap().to_string())
-            },
-            Value::Float(value) => {
-                Property::Number(value as f32)
-            },
-            Value::Integer(value) => {
-                Property::Number(value as f32)
-            },
-            Value::Bool(value) => {
-                Property::Boolean(value)
-            },
-            _ => {
-                Property::String("".to_string())
-            }
+            Value::String(value) => Property::String(value.into_ref().unwrap().to_string()),
+            Value::Float(value) => Property::Number(value as f32),
+            Value::Integer(value) => Property::Number(value as f32),
+            Value::Bool(value) => Property::Boolean(value),
+            _ => Property::String("".to_string()),
         }
     }
 }
@@ -342,28 +319,24 @@ impl From<Value> for Property {
 impl ToValue for Property {
     fn to_value(self) -> VmResult<Value> {
         match self {
-            Property::String(value) => {
-                rune::alloc::String::try_from(value.clone()).unwrap().to_value()
-            },
-            Property::Number(value) => {
-                VmResult::Ok(Value::Float(value as f64))
-            },
-            Property::Boolean(value) => {
-                VmResult::Ok(Value::Bool(value))
-            },
+            Property::String(value) => rune::alloc::String::try_from(value.clone())
+                .unwrap()
+                .to_value(),
+            Property::Number(value) => VmResult::Ok(Value::Float(value as f64)),
+            Property::Boolean(value) => VmResult::Ok(Value::Bool(value)),
             Property::Array(value) => {
                 let mut vec = rune::runtime::Vec::new();
                 for item in value {
                     let _ = vec.push_value(item.to_value()).into_result();
                 }
                 VmResult::Ok(Value::Vec(Shared::new(vec).unwrap()))
-            },
-            Property::EntityReference(value) => {
-                rune::alloc::String::try_from(value.clone()).unwrap().to_value()
-            },
-            Property::ComponentReference(value) => {
-                rune::alloc::String::try_from(value.clone()).unwrap().to_value()
-            },
+            }
+            Property::EntityReference(value) => rune::alloc::String::try_from(value.clone())
+                .unwrap()
+                .to_value(),
+            Property::ComponentReference(value) => rune::alloc::String::try_from(value.clone())
+                .unwrap()
+                .to_value(),
         }
     }
 }
@@ -407,9 +380,16 @@ impl ScriptingInstance for RuneInstance {
         context.install(&core_module)?;
         let runtime = context.runtime()?;
         let mut rune_sources = Sources::new();
-        rune_sources.insert(Source::new("loitsu_builtin", include_str!("scripts/builtin.rn"))?).unwrap();
+        rune_sources
+            .insert(Source::new(
+                "loitsu_builtin",
+                include_str!("scripts/builtin.rn"),
+            )?)
+            .unwrap();
         for source in sources {
-            rune_sources.insert(Source::new(source.name, source.source)?).unwrap();
+            rune_sources
+                .insert(Source::new(source.name, source.source)?)
+                .unwrap();
         }
         let mut diagnostics = Diagnostics::without_warnings();
         let result = rune::prepare(&mut rune_sources)
@@ -437,14 +417,19 @@ impl ScriptingInstance for RuneInstance {
             virtual_machine: None,
         })
     }
-    
+
     fn initialize(&mut self, sources: Vec<ScriptingSource>) -> Result<()> {
         let mut context = Context::new();
         let core_module = core_module()?;
         context.install(&core_module)?;
         let runtime = context.runtime()?;
         let mut rune_sources = Sources::new();
-        rune_sources.insert(Source::new("loitsu_builtin", include_str!("scripts/builtin.rn"))?).unwrap();
+        rune_sources
+            .insert(Source::new(
+                "loitsu_builtin",
+                include_str!("scripts/builtin.rn"),
+            )?)
+            .unwrap();
         for source in sources {
             let _ = rune_sources.insert(Source::new(source.name, source.source)?);
         }
@@ -469,19 +454,34 @@ impl ScriptingInstance for RuneInstance {
         Ok(())
     }
 
-    fn call<T>(&mut self, path: [&str; 2], args: T) -> Result<Value> where T: Args {
-        let result = self.virtual_machine.as_mut().unwrap().execute(path, args)?.complete().into_result()?;
+    fn call<T>(&mut self, path: [&str; 2], args: T) -> Result<Value>
+    where
+        T: Args,
+    {
+        let result = self
+            .virtual_machine
+            .as_mut()
+            .unwrap()
+            .execute(path, args)?
+            .complete()
+            .into_result()?;
         Ok(result)
     }
 
-    fn run_component_methods<RuneComponent>(&mut self, entities: &mut [Rc<RefCell<crate::ecs::RuntimeEntity<Self>>>], method: ComponentFlags) -> Vec<(Rc<RefCell<crate::ecs::Transform>>, Vec<EntityUpdate>)> {
+    fn run_component_methods<RuneComponent>(
+        &mut self,
+        entities: &mut [Rc<RefCell<crate::ecs::RuntimeEntity<Self>>>],
+        method: ComponentFlags,
+    ) -> Vec<(Rc<RefCell<crate::ecs::Transform>>, Vec<EntityUpdate>)> {
         let mut updates = Vec::new();
         for entity in entities {
             let mut entity_updates = Vec::new();
             let mut entity = entity.borrow_mut();
             if entity.is_new {
                 if entity.component_flags & ComponentFlags::START == ComponentFlags::START {
-                    entity_updates.extend(self.run_component_methods_on_entity(&mut entity, ComponentFlags::START));
+                    entity_updates.extend(
+                        self.run_component_methods_on_entity(&mut entity, ComponentFlags::START),
+                    );
                 }
                 entity.is_new = false;
             }
@@ -492,7 +492,9 @@ impl ScriptingInstance for RuneInstance {
                 let mut child = child.borrow_mut();
                 if child.is_new {
                     if child.component_flags & ComponentFlags::START == ComponentFlags::START {
-                        entity_updates.extend(self.run_component_methods_on_entity(&mut child, ComponentFlags::START));
+                        entity_updates.extend(
+                            self.run_component_methods_on_entity(&mut child, ComponentFlags::START),
+                        );
                     }
                     child.is_new = false;
                 }
@@ -535,10 +537,12 @@ fn convert_entity(entity: &RuntimeEntity<RuneInstance>) -> RuneEntity {
     RuneEntity {
         name: entity.get_name().to_string(),
         transform: Shared::new(
-            AnyObj::new(
-                Into::<RuneTransform>::into(entity.transform.borrow().clone()))
-            .unwrap()
-            ).unwrap(),
+            AnyObj::new(Into::<RuneTransform>::into(
+                entity.transform.borrow().clone(),
+            ))
+            .unwrap(),
+        )
+        .unwrap(),
         drawables: Vec::new(),
         remove_drawables: Vec::new(),
         property_updates: Vec::new(),
@@ -546,7 +550,11 @@ fn convert_entity(entity: &RuntimeEntity<RuneInstance>) -> RuneEntity {
 }
 
 impl RuneInstance {
-    fn run_component_methods_on_entity(&mut self, entity: &mut crate::ecs::RuntimeEntity<Self>, c_flags: ComponentFlags) -> Vec<EntityUpdate> {
+    fn run_component_methods_on_entity(
+        &mut self,
+        entity: &mut crate::ecs::RuntimeEntity<Self>,
+        c_flags: ComponentFlags,
+    ) -> Vec<EntityUpdate> {
         #[cfg(feature = "disable_common_ecs_methods")]
         {
             if c_flags == ComponentFlags::START || c_flags == ComponentFlags::DESTROY {
@@ -564,17 +572,25 @@ impl RuneInstance {
                 Some(data) => {
                     let r = self.virtual_machine.as_mut().unwrap().call(
                         [component.component_proto.name.as_str(), method],
-                        (data.clone(), shared.clone()));
+                        (data.clone(), shared.clone()),
+                    );
                     if let Err(error) = r {
-                        crate::logging::error(&format!("Error running method {} on component {}: {}", method, component.component_proto.name, error));
+                        crate::logging::error(&format!(
+                            "Error running method {} on component {}: {}",
+                            method, component.component_proto.name, error
+                        ));
                     }
-                },
+                }
                 None => {
                     let r = self.virtual_machine.as_mut().unwrap().call(
                         [component.component_proto.name.as_str(), method],
-                        (rune::runtime::Value::EmptyTuple, shared.clone()));
+                        (rune::runtime::Value::EmptyTuple, shared.clone()),
+                    );
                     if let Err(error) = r {
-                        crate::logging::error(&format!("Error running method {} on component {}: {}", method, component.component_proto.name, error));
+                        crate::logging::error(&format!(
+                            "Error running method {} on component {}: {}",
+                            method, component.component_proto.name, error
+                        ));
                     }
                 }
             }
@@ -584,10 +600,16 @@ impl RuneInstance {
         let mut new_transform: Transform = rune_transform.into();
         if *entity.transform.borrow() != new_transform {
             match new_transform {
-                Transform::Transform2D { ref mut has_changed, ..} => {
+                Transform::Transform2D {
+                    ref mut has_changed,
+                    ..
+                } => {
                     *has_changed = true;
-                },
-                Transform::RectTransform { ref mut has_changed, .. } => {
+                }
+                Transform::RectTransform {
+                    ref mut has_changed,
+                    ..
+                } => {
                     *has_changed = true;
                 }
             }
@@ -595,13 +617,19 @@ impl RuneInstance {
         }
         let mut updates = Vec::new();
         for drawable in &entity_obj.drawables {
-            updates.push(EntityUpdate::AddDrawable(Into::<DrawablePrototype>::into(drawable)));
+            updates.push(EntityUpdate::AddDrawable(Into::<DrawablePrototype>::into(
+                drawable,
+            )));
         }
         for drawable in &entity_obj.remove_drawables {
             updates.push(EntityUpdate::RemoveDrawable(drawable.clone()));
         }
         for property_update in &entity_obj.property_updates {
-            updates.push(EntityUpdate::SetDrawableProperty(property_update.0.clone(), property_update.1.clone(), property_update.2.clone()));
+            updates.push(EntityUpdate::SetDrawableProperty(
+                property_update.0.clone(),
+                property_update.1.clone(),
+                property_update.2.clone(),
+            ));
         }
         updates
     }
@@ -651,14 +679,17 @@ fn core_module() -> Result<Module> {
     m.function_meta(Color::black)?;
     m.function_meta(Color::white)?;
     m.function_meta(Drawable::sprite)?;
-    
-    m.function("print", | log: &str | log!("[RUNE] {}", log)).build()?;
-    m.function("error", | log: &str | error!("[RUNE] {}", log)).build()?;
+
+    m.function("print", |log: &str| log!("[RUNE] {}", log))
+        .build()?;
+    m.function("error", |log: &str| error!("[RUNE] {}", log))
+        .build()?;
     let start = Arc::new(instant::Instant::now());
     m.function("get_time", move || {
         let duration = start.elapsed();
         duration.as_secs_f64()
-    }).build()?;
+    })
+    .build()?;
     // Math Constants
     m.constant("PI", std::f64::consts::PI).build()?;
     m.constant("E", std::f64::consts::E).build()?;
@@ -674,20 +705,23 @@ fn core_module() -> Result<Module> {
         m.constant("PLATFORM", "DESKTOP").build()?;
         m.constant("IS_WEB", false).build()?;
     }
-    m.constant("LOITSU_VERSION", env!("CARGO_PKG_VERSION")).build()?;
+    m.constant("LOITSU_VERSION", env!("CARGO_PKG_VERSION"))
+        .build()?;
 
     #[cfg(feature = "scene_generation")]
     {
-        m.function("require_asset", | asset: &str | {
-            unsafe { REQUIRED_ASSETS.push(asset.to_string()); }
+        m.function("require_asset", |asset: &str| {
+            unsafe {
+                REQUIRED_ASSETS.push(asset.to_string());
+            }
             Ok::<(), ()>(())
-        }).build()?;
+        })
+        .build()?;
     }
     #[cfg(not(feature = "scene_generation"))]
     {
-        m.function("require_asset", | _asset: &str | {
-            Ok::<(), ()>(())
-        }).build()?;
+        m.function("require_asset", |_asset: &str| Ok::<(), ()>(()))
+            .build()?;
     }
     Ok(m)
 }

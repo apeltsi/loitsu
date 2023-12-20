@@ -1,32 +1,36 @@
-pub mod scripting;
-pub mod rendering;
-pub mod logging;
-pub mod scene_management;
-pub mod ecs;
 pub mod asset_management;
-pub mod util;
-pub mod input;
+pub mod ecs;
 #[cfg(feature = "editor")]
 pub mod editor;
+pub mod input;
+pub mod logging;
+pub mod rendering;
+pub mod scene_management;
+pub mod scripting;
+pub mod util;
 use scripting::ScriptingInstance;
 
 #[cfg_attr(feature = "json_preference_parse", derive(serde::Deserialize))]
 #[derive(Clone, bitcode::Decode, bitcode::Encode)]
 pub struct Preferences {
-    pub default_scene: String
+    pub default_scene: String,
 }
 
 #[cfg(target_arch = "wasm32")]
 mod web;
 
 #[cfg(feature = "scene_generation")]
-pub fn build_scenes(scenes: Vec<(String, String)>, scripts: Vec<scripting::ScriptingSource>) -> Vec<scene_management::Scene> {
-    let mut rune = scripting::rune_runtime::
-        RuneInstance::new_with_sources(scripts).unwrap();
+pub fn build_scenes(
+    scenes: Vec<(String, String)>,
+    scripts: Vec<scripting::ScriptingSource>,
+) -> Vec<scene_management::Scene> {
+    let mut rune = scripting::rune_runtime::RuneInstance::new_with_sources(scripts).unwrap();
     #[cfg(not(feature = "editor"))]
     let mut e = ecs::ECS::new();
     #[cfg(feature = "editor")]
-    let mut e = ecs::ECS::new(std::sync::Arc::new(std::sync::Mutex::new(editor::EventHandler::new())));
+    let mut e = ecs::ECS::new(std::sync::Arc::new(std::sync::Mutex::new(
+        editor::EventHandler::new(),
+    )));
     let mut generated_scenes = Vec::new();
     for scene in scenes {
         let scene = scene_management::Scene::from_json(scene.0, scene.1);
@@ -43,7 +47,13 @@ pub fn build_scenes(scenes: Vec<(String, String)>, scripts: Vec<scripting::Scrip
 
 #[cfg(target_arch = "wasm32")]
 #[cfg(feature = "editor")]
-pub fn load_scene_in_edit_mode(event_handler: std::sync::Arc<std::sync::Mutex<editor::EventHandler<scripting::rune_runtime::RuneInstance>>>, scene: scene_management::Scene, scripts: Vec<scripting::ScriptingSource>) {
+pub fn load_scene_in_edit_mode(
+    event_handler: std::sync::Arc<
+        std::sync::Mutex<editor::EventHandler<scripting::rune_runtime::RuneInstance>>,
+    >,
+    scene: scene_management::Scene,
+    scripts: Vec<scripting::ScriptingSource>,
+) {
     log!("Loading scene in edit mode...");
     web::add_editor_loading_task("Starting ECS...");
     let mut rune = scripting::rune_runtime::RuneInstance::new_with_sources(scripts).unwrap();
@@ -93,6 +103,4 @@ pub fn init_engine() {
 }
 
 #[cfg(test)]
-mod tests {
-
-}
+mod tests {}

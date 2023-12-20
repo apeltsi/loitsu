@@ -5,7 +5,7 @@ pub struct ImageAsset {
     rgba: image::RgbaImage,
     texture: Option<wgpu::Texture>,
     texture_view: Option<wgpu::TextureView>,
-    dimensions: (u32, u32)
+    dimensions: (u32, u32),
 }
 
 impl ImageAsset {
@@ -25,7 +25,7 @@ impl ImageAsset {
             rgba: image,
             dimensions,
             texture: None,
-            texture_view: None 
+            texture_view: None,
         }
     }
 
@@ -33,7 +33,11 @@ impl ImageAsset {
         &self.name
     }
 
-    pub fn initialize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) -> Result<(), AssetError> {
+    pub fn initialize(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) -> Result<(), AssetError> {
         if self.texture.is_some() {
             return Ok(());
         }
@@ -45,18 +49,16 @@ impl ImageAsset {
             height: self.dimensions.1,
             depth_or_array_layers: 1,
         };
-        let texture = device.create_texture(
-            &wgpu::TextureDescriptor {
-                size: texture_size,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                label: Some(self.name.as_str()),
-                view_formats: &[],
-            }
-        );
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            size: texture_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            label: Some(self.name.as_str()),
+            view_formats: &[],
+        });
         queue.write_texture(
             // Tells wgpu where to copy the pixel data
             wgpu::ImageCopyTexture {
@@ -79,9 +81,14 @@ impl ImageAsset {
             self.texture = Some(texture);
         }
         {
-            self.texture_view = Some(self.texture.as_ref()
-                                     .expect("Couldn't create textureview from texture. The texture might not be valid")
-                                     .create_view(&wgpu::TextureViewDescriptor::default()));
+            self.texture_view = Some(
+                self.texture
+                    .as_ref()
+                    .expect(
+                        "Couldn't create textureview from texture. The texture might not be valid",
+                    )
+                    .create_view(&wgpu::TextureViewDescriptor::default()),
+            );
         }
 
         #[cfg(feature = "editor")]
@@ -93,7 +100,7 @@ impl ImageAsset {
 
 // i know this looks bad just lemme cook
 // (really feel like this will be a problem in the future)
-#[cfg(target_arch = "wasm32")] 
+#[cfg(target_arch = "wasm32")]
 unsafe impl Sync for ImageAsset {}
 #[cfg(target_arch = "wasm32")]
 unsafe impl Send for ImageAsset {}

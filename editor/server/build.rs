@@ -1,6 +1,6 @@
 use std::env;
-use std::path::PathBuf;
 use std::path::Path;
+use std::path::PathBuf;
 
 fn main() {
     println!("cargo:rerun-if-changed=../web/dist/*");
@@ -18,7 +18,6 @@ fn main() {
     target_path_buf.push("editor_assets");
     copy_dir(&path_buf, &target_path_buf).unwrap();
 }
-
 
 fn copy_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
     if !dst.exists() {
@@ -38,5 +37,3 @@ fn copy_dir(src: &Path, dst: &Path) -> std::io::Result<()> {
     }
     Ok(())
 }
-
-

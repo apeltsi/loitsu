@@ -1,20 +1,22 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use crate::hierarchy::generate_hierarchy;
+use loitsu::asset_management::get_file::get_file;
+use loitsu::ecs::ECS;
+use loitsu::editor::{ClientEvent, Event, EventHandler};
 #[cfg(target_arch = "wasm32")]
 use loitsu::load_scene_in_edit_mode;
 use loitsu::log;
-use loitsu::ecs::ECS;
-use loitsu::editor::{EventHandler, Event, ClientEvent};
-use wasm_bindgen::prelude::*;
-use loitsu::asset_management::get_file::get_file;
-use wasm_bindgen_futures::spawn_local;
 use loitsu::scripting::ScriptingSource;
 use std::sync::{Arc, Mutex};
-use crate::hierarchy::generate_hierarchy;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 
 mod hierarchy;
 
-static mut EVENT_HANDLER: Option<Arc<Mutex<EventHandler<loitsu::scripting::rune_runtime::RuneInstance>>>> = None;
+static mut EVENT_HANDLER: Option<
+    Arc<Mutex<EventHandler<loitsu::scripting::rune_runtime::RuneInstance>>>,
+> = None;
 
 fn main() {
     log!("WASM initialized");
@@ -46,32 +48,38 @@ pub fn start_editor() {
         let mut event_handler = EventHandler::new();
         event_handler.register_event_handler(Box::new(main_event_handler));
         let event_handler = Arc::new(Mutex::new(event_handler));
-        unsafe { EVENT_HANDLER = Some(event_handler.clone()); }
-        let scripts = scripts.iter().map(|script| {
-            ScriptingSource {
-                name: "Unknown Source".to_string(), 
-                source: script.clone()
-            }
-        }).collect::<Vec<ScriptingSource>>();
+        unsafe {
+            EVENT_HANDLER = Some(event_handler.clone());
+        }
+        let scripts = scripts
+            .iter()
+            .map(|script| ScriptingSource {
+                name: "Unknown Source".to_string(),
+                source: script.clone(),
+            })
+            .collect::<Vec<ScriptingSource>>();
         load_scene_in_edit_mode(event_handler, scene, scripts);
     });
 }
 
-fn main_event_handler<T>(ecs: &ECS<T>, event: &Event) where T: loitsu::scripting::ScriptingInstance {
+fn main_event_handler<T>(ecs: &ECS<T>, event: &Event)
+where
+    T: loitsu::scripting::ScriptingInstance,
+{
     match event {
         Event::SceneLoaded(scene) => {
             log!("Scene loaded: {}", scene.name);
             let hierarchy = generate_hierarchy(ecs);
             set_hierarchy(serde_json::to_string(&hierarchy).unwrap());
             set_scene_name(scene.name.clone());
-        },
+        }
         Event::EntityUpdated(name) => {
             log!("Entity updated: {}", name);
-        },
+        }
         Event::EntitySelected(entity) => {
             log!("Selected entity {}", entity.name);
             select_entity(serde_json::to_string(&entity).unwrap());
-        },
+        }
         Event::CameraChanged(x, y, zoom) => {
             camera_moved(*x, *y, *zoom);
         }

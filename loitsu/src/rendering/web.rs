@@ -1,11 +1,14 @@
+use crate::ecs::ECS;
+use crate::log;
+use crate::scripting::ScriptingInstance;
+use crate::web::update_loading_status;
 use winit::event_loop::EventLoop;
 use winit::platform::web::WindowExtWebSys;
-use crate::log;
-use crate::web::update_loading_status;
-use crate::scripting::ScriptingInstance;
-use crate::ecs::ECS;
 
-pub fn init_view<T>(scripting: T, ecs: ECS<T>) where T: ScriptingInstance + 'static {
+pub fn init_view<T>(scripting: T, ecs: ECS<T>)
+where
+    T: ScriptingInstance + 'static,
+{
     log!("Initializing web...");
     update_loading_status(1);
 
@@ -23,6 +26,8 @@ pub fn init_view<T>(scripting: T, ecs: ECS<T>) where T: ScriptingInstance + 'sta
             body.append_child(&web_sys::Element::from(window.canvas()))
                 .ok()
         })
-    .expect("couldn't append canvas to document body");
-    wasm_bindgen_futures::spawn_local(crate::rendering::core::run(event_loop, window, scripting, ecs));
+        .expect("couldn't append canvas to document body");
+    wasm_bindgen_futures::spawn_local(crate::rendering::core::run(
+        event_loop, window, scripting, ecs,
+    ));
 }

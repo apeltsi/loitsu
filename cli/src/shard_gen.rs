@@ -1,20 +1,20 @@
 use loitsu::asset_management::static_shard::StaticShard;
-use loitsu::scripting::ScriptingSource;
 use loitsu::scene_management::Scene;
-use std::collections::HashMap;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hasher, Hash};
-use std::fs::File;
-use std::io::Read;
+use loitsu::scripting::ScriptingSource;
 use loitsu::Preferences;
 use loitsu_asset_gen::{handle_override, AssetOverride};
+use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
+use std::fs::File;
+use std::hash::{Hash, Hasher};
+use std::io::Read;
 
 #[derive(Debug, Clone)]
 pub struct Shard {
     pub assets: Vec<String>,
     pub is_root: bool,
     pub dependents: Vec<String>,
-    pub name: String
+    pub name: String,
 }
 
 impl PartialEq for Shard {
@@ -39,7 +39,7 @@ impl Shard {
             assets,
             is_root,
             dependents,
-            name: "".to_string()
+            name: "".to_string(),
         }
     }
 
@@ -58,7 +58,7 @@ impl Shard {
         // a new shard with the duplicates
         let mut is_different = false;
         let mut others = others.clone();
-    
+
         let index_of_self = others.iter().position(|x| x == self).unwrap();
 
         for i in 0..others.len() {
@@ -72,7 +72,16 @@ impl Shard {
                 others[index_of_self].remove_items(duplicates.clone());
                 others[i].remove_items(duplicates.clone());
                 // lets create a new shard with the duplicates
-                let new_shard = Shard::new(duplicates, false, others[index_of_self].dependents.clone().into_iter().chain(other.dependents.clone()).collect());
+                let new_shard = Shard::new(
+                    duplicates,
+                    false,
+                    others[index_of_self]
+                        .dependents
+                        .clone()
+                        .into_iter()
+                        .chain(other.dependents.clone())
+                        .collect(),
+                );
                 // lets add the new shard to the list of shards
                 others.push(new_shard);
                 is_different = true;
@@ -92,7 +101,8 @@ impl Shard {
             // lets read the raw file
             let mut file_path = path.clone();
             file_path.push(asset.clone());
-            let mut file = File::open(file_path.clone()).expect(format!("Unable to open {}", asset).as_str());
+            let mut file =
+                File::open(file_path.clone()).expect(format!("Unable to open {}", asset).as_str());
             let mut data = Vec::new();
             file.read_to_end(&mut data).unwrap();
             // lets check if we have an override
@@ -124,7 +134,11 @@ impl Shard {
     }
 }
 
-pub fn generate_shards(scenes: Vec<Scene>, scripts: Vec<ScriptingSource>, preferences: &Preferences) -> (Vec<Shard>, StaticShard) {
+pub fn generate_shards(
+    scenes: Vec<Scene>,
+    scripts: Vec<ScriptingSource>,
+    preferences: &Preferences,
+) -> (Vec<Shard>, StaticShard) {
     let mut initial_shards = Vec::new();
     for scene in scenes.clone() {
         initial_shards.push(Shard::new(scene.required_assets, true, vec![scene.name]));
@@ -141,7 +155,7 @@ pub fn generate_shards(scenes: Vec<Scene>, scripts: Vec<ScriptingSource>, prefer
                 Some(new_shards) => {
                     shards = new_shards;
                     did_change = true;
-                },
+                }
                 None => {}
             }
         }
@@ -149,7 +163,7 @@ pub fn generate_shards(scenes: Vec<Scene>, scripts: Vec<ScriptingSource>, prefer
 
     // remove any empty shards
     shards = shards.into_iter().filter(|x| x.assets.len() > 0).collect();
-    
+
     // and finally lets generate our names
     for i in 0..shards.len() {
         shards[i].generate_name();
@@ -176,4 +190,3 @@ pub fn generate_shards(scenes: Vec<Scene>, scripts: Vec<ScriptingSource>, prefer
 
     (shards, static_shard)
 }
-

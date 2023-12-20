@@ -1,14 +1,14 @@
+pub mod asset;
+pub mod asset_reference;
+pub mod get_file;
+pub mod image_asset;
+pub mod parse;
 pub mod shard;
 pub mod static_shard;
-pub mod get_file;
-pub mod asset;
-pub mod image_asset;
-pub mod asset_reference;
-pub mod parse;
 
 #[allow(unused_imports)]
-use self::{static_shard::StaticShard, asset::Asset, asset_reference::AssetReference};
-use crate::{log_asset as log, error};
+use self::{asset::Asset, asset_reference::AssetReference, static_shard::StaticShard};
+use crate::{error, log_asset as log};
 use lazy_static::lazy_static;
 
 #[cfg(target_arch = "wasm32")]
@@ -17,16 +17,22 @@ use wasm_bindgen_futures::spawn_local;
 #[cfg(not(target_arch = "wasm32"))]
 use tokio::task::spawn as spawn_local;
 
-use std::{sync::{Arc, Mutex, atomic::{AtomicUsize, Ordering}}, collections::HashMap};
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
+};
 
-
-lazy_static!{
-    pub static ref ASSET_MANAGER: Arc<Mutex<AssetManager>> = Arc::new(Mutex::new(AssetManager::new()));
+lazy_static! {
+    pub static ref ASSET_MANAGER: Arc<Mutex<AssetManager>> =
+        Arc::new(Mutex::new(AssetManager::new()));
 }
 
 pub struct AssetManager {
     pub pending_tasks: Arc<AtomicUsize>,
-    pub assets: Arc<Mutex<Assets>>
+    pub assets: Arc<Mutex<Assets>>,
 }
 
 pub struct Assets {
@@ -48,7 +54,7 @@ impl AssetManager {
             static_shard: None,
         };
         let assets = Arc::new(Mutex::new(assets));
-        
+
         #[cfg(not(feature = "direct_asset_management"))]
         {
             let assets_clone = assets.clone();
@@ -63,7 +69,7 @@ impl AssetManager {
                         let mut assets = assets_clone.lock().unwrap();
                         assets.static_shard = Some(static_shard);
                         pending_tasks_clone.fetch_sub(1, Ordering::SeqCst);
-                    },
+                    }
                     Err(e) => {
                         error!("Failed to load static shard: {:?}", e.message);
                         // TODO: On web platforms this could show some error to the user
@@ -103,25 +109,30 @@ impl AssetManager {
                             let mut shard = shard::Shard::decode(&file);
                             let consumed_shard = shard.consume().await.unwrap();
                             let mut assets = assets.lock().unwrap();
-                            
+
                             for (name, asset) in &consumed_shard.assets {
-                                let asset_ref = Arc::new(Mutex::new(AssetReference::new(asset.clone())));
-                                if let Some(old) = assets.assets.insert(name.to_string(), asset_ref.clone()) {
-                                    asset_ref.lock().unwrap().increment_version(old.lock().unwrap().get_version());
+                                let asset_ref =
+                                    Arc::new(Mutex::new(AssetReference::new(asset.clone())));
+                                if let Some(old) =
+                                    assets.assets.insert(name.to_string(), asset_ref.clone())
+                                {
+                                    asset_ref
+                                        .lock()
+                                        .unwrap()
+                                        .increment_version(old.lock().unwrap().get_version());
                                 }
                             }
                             assets.shards.push(consumed_shard);
 
                             pending_tasks.fetch_sub(1, Ordering::SeqCst);
                             log!("Successfully loaded shard: '{}'", shard.get_name());
-                        },
+                        }
                         Err(e) => {
                             error!("Failed to load shard: {:?}", e.message);
                         }
                     }
                 });
             }
-
         });
     }
 
@@ -139,7 +150,7 @@ impl AssetManager {
         }
     }
 
-    pub fn get_asset(&self, name: &str) -> Arc<Mutex<AssetReference>>  {
+    pub fn get_asset(&self, name: &str) -> Arc<Mutex<AssetReference>> {
         #[cfg(not(feature = "direct_asset_management"))]
         {
             let assets = self.assets.lock().unwrap();
@@ -159,8 +170,14 @@ impl AssetManager {
             // so we'll try to load it from from the local asset server
             log!("Asset not found in shards, trying to load from local asset server");
 
-            let asset_ref = Arc::new(Mutex::new(AssetReference::new(Arc::new(Mutex::new(Asset::None)))));
-            self.assets.lock().unwrap().assets.insert(name.to_owned(), asset_ref.clone());
+            let asset_ref = Arc::new(Mutex::new(AssetReference::new(Arc::new(Mutex::new(
+                Asset::None,
+            )))));
+            self.assets
+                .lock()
+                .unwrap()
+                .assets
+                .insert(name.to_owned(), asset_ref.clone());
             let asset_ref_clone = asset_ref.clone();
             let name = name.to_owned();
             #[cfg(feature = "editor")]
@@ -170,13 +187,10 @@ impl AssetManager {
                 match result {
                     Ok(file) => {
                         // lets parse the asset
-                        let shard_file = shard::ShardFile {
-                            name,
-                            data: file,
-                        };
+                        let shard_file = shard::ShardFile { name, data: file };
                         let asset = parse::parse(shard_file).unwrap();
                         asset_ref_clone.lock().unwrap().update(asset);
-                    },
+                    }
                     Err(e) => {
                         error!("Failed to load asset: {:?}", e.message);
                     }
@@ -191,8 +205,14 @@ impl AssetManager {
         // this reference might be updated later
         #[allow(unreachable_code)]
         {
-            let asset = Arc::new(Mutex::new(AssetReference::new(Arc::new(Mutex::new(Asset::None)))));
-            self.assets.lock().unwrap().assets.insert(name.to_owned(), asset.clone());
+            let asset = Arc::new(Mutex::new(AssetReference::new(Arc::new(Mutex::new(
+                Asset::None,
+            )))));
+            self.assets
+                .lock()
+                .unwrap()
+                .assets
+                .insert(name.to_owned(), asset.clone());
             return asset;
         }
     }
@@ -223,4 +243,3 @@ impl From<tokio::task::JoinError> for AssetError {
         AssetError::new(&format!("{:?}", value))
     }
 }
-

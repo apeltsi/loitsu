@@ -115,6 +115,7 @@
     backdrop-filter: blur(var(--backdrop-blur));
     border-radius: 0.5rem;
     padding: 0.25rem;
+    font-family: 'Roboto Mono', monospace;
 }
 
 @keyframes popFadeIn {

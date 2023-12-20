@@ -4,20 +4,23 @@ use std::rc::Rc;
 #[cfg(not(feature = "scene_generation"))]
 use crate::asset_management::ASSET_MANAGER;
 
+use crate::scene_management::{Component, Entity, Scene};
+use crate::scripting::{EntityUpdate, ScriptingData, ScriptingInstance};
+use bitflags::bitflags;
+#[cfg(feature = "scene_generation")]
+use serde_json::{Map, Number, Value};
 #[cfg(feature = "editor")]
 use std::sync::{Arc, Mutex};
-#[cfg(feature = "scene_generation")]
-use serde_json::{Value, Map, Number};
-use crate::scene_management::{Scene, Entity, Component};
-use crate::scripting::{ScriptingData, ScriptingInstance, EntityUpdate};
-use bitflags::bitflags;
 
-pub struct ECS<T> where T: ScriptingInstance {
+pub struct ECS<T>
+where
+    T: ScriptingInstance,
+{
     pub active_scene: Scene,
     pub static_scene: Option<Scene>,
     runtime_entities: Vec<Rc<RefCell<RuntimeEntity<T>>>>,
     #[cfg(feature = "editor")]
-    event_handler: Arc<Mutex<crate::editor::EventHandler<T>>>
+    event_handler: Arc<Mutex<crate::editor::EventHandler<T>>>,
 }
 
 bitflags! {
@@ -37,7 +40,10 @@ bitflags! {
     }
 }
 
-#[cfg_attr(feature = "scene_generation", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "scene_generation",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[derive(Debug, Clone, bitcode::Encode, bitcode::Decode)]
 pub enum Transform {
     Transform2D {
@@ -46,26 +52,42 @@ pub enum Transform {
         scale: (f32, f32),
         r#static: bool,
         changed_frame: u64,
-        has_changed: bool
+        has_changed: bool,
     },
     RectTransform {
         // TODO: Implement this :D
         position: (f32, f32),
         changed_frame: u64,
-        has_changed: bool
-    }
+        has_changed: bool,
+    },
 }
 
 impl PartialEq for Transform {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Transform::Transform2D { position: (x1, y1), rotation: r1, scale: (sx1, sy1), .. }, Transform::Transform2D { position: (x2, y2), rotation: r2, scale: (sx2, sy2), .. }) => {
-                x1 == x2 && y1 == y2 && r1 == r2 && sx1 == sx2 && sy1 == sy2
-            },
-            (Transform::RectTransform { position: (x1, y1), .. }, Transform::RectTransform { position: (x2, y2), .. }) => {
-                x1 == x2 && y1 == y2
-            },
-            _ => false
+            (
+                Transform::Transform2D {
+                    position: (x1, y1),
+                    rotation: r1,
+                    scale: (sx1, sy1),
+                    ..
+                },
+                Transform::Transform2D {
+                    position: (x2, y2),
+                    rotation: r2,
+                    scale: (sx2, sy2),
+                    ..
+                },
+            ) => x1 == x2 && y1 == y2 && r1 == r2 && sx1 == sx2 && sy1 == sy2,
+            (
+                Transform::RectTransform {
+                    position: (x1, y1), ..
+                },
+                Transform::RectTransform {
+                    position: (x2, y2), ..
+                },
+            ) => x1 == x2 && y1 == y2,
+            _ => false,
         }
     }
 }
@@ -74,23 +96,44 @@ impl Transform {
     #[cfg(feature = "scene_generation")]
     pub fn to_json(self) -> Value {
         match self {
-            Transform::Transform2D { position, rotation, scale, r#static, .. } => {
+            Transform::Transform2D {
+                position,
+                rotation,
+                scale,
+                r#static,
+                ..
+            } => {
                 let mut map = Map::new();
-                map.insert("position".to_string(), 
-                           Value::Array(vec![Value::Number(Number::from_f64(position.0 as f64).unwrap()), 
-                                             Value::Number(Number::from_f64(position.1 as f64).unwrap())]));
-                map.insert("rotation".to_string(), Value::Number(Number::from_f64(rotation as f64).unwrap()));
-                map.insert("scale".to_string(), 
-                           Value::Array(vec![Value::Number(Number::from_f64(scale.0 as f64).unwrap()), 
-                                             Value::Number(Number::from_f64(scale.1 as f64).unwrap())]));
+                map.insert(
+                    "position".to_string(),
+                    Value::Array(vec![
+                        Value::Number(Number::from_f64(position.0 as f64).unwrap()),
+                        Value::Number(Number::from_f64(position.1 as f64).unwrap()),
+                    ]),
+                );
+                map.insert(
+                    "rotation".to_string(),
+                    Value::Number(Number::from_f64(rotation as f64).unwrap()),
+                );
+                map.insert(
+                    "scale".to_string(),
+                    Value::Array(vec![
+                        Value::Number(Number::from_f64(scale.0 as f64).unwrap()),
+                        Value::Number(Number::from_f64(scale.1 as f64).unwrap()),
+                    ]),
+                );
                 map.insert("static".to_string(), Value::Bool(r#static));
                 Value::Object(map)
-            },
+            }
             Transform::RectTransform { position, .. } => {
                 let mut map = Map::new();
-                map.insert("position".to_string(), 
-                           Value::Array(vec![Value::Number(Number::from_f64(position.0 as f64).unwrap()), 
-                                             Value::Number(Number::from_f64(position.1 as f64).unwrap())]));
+                map.insert(
+                    "position".to_string(),
+                    Value::Array(vec![
+                        Value::Number(Number::from_f64(position.0 as f64).unwrap()),
+                        Value::Number(Number::from_f64(position.1 as f64).unwrap()),
+                    ]),
+                );
                 Value::Object(map)
             }
         }
@@ -98,37 +141,57 @@ impl Transform {
     #[cfg(feature = "scene_generation")]
     pub fn from_json(json: &Map<String, Value>) -> Transform {
         let position = json["position"].as_array().unwrap();
-        let position = (position[0].as_f64().unwrap() as f32, position[1].as_f64().unwrap() as f32);
+        let position = (
+            position[0].as_f64().unwrap() as f32,
+            position[1].as_f64().unwrap() as f32,
+        );
         let rotation = json["rotation"].as_f64().unwrap() as f32;
         let scale = json["scale"].as_array().unwrap();
-        let scale = (scale[0].as_f64().unwrap() as f32, scale[1].as_f64().unwrap() as f32);
+        let scale = (
+            scale[0].as_f64().unwrap() as f32,
+            scale[1].as_f64().unwrap() as f32,
+        );
         let r#static = json["static"].as_bool().unwrap();
-        Transform::Transform2D { position, rotation, scale, r#static, changed_frame: 0, has_changed: true }
+        Transform::Transform2D {
+            position,
+            rotation,
+            scale,
+            r#static,
+            changed_frame: 0,
+            has_changed: true,
+        }
     }
 
     pub fn check_changed(&mut self, frame_num: u64) -> bool {
         match self {
-            Transform::Transform2D { changed_frame, has_changed, .. } => {
+            Transform::Transform2D {
+                changed_frame,
+                has_changed,
+                ..
+            } => {
                 if *changed_frame == frame_num {
-                    return true
+                    return true;
                 } else if *has_changed {
                     *changed_frame = frame_num;
                     *has_changed = false;
-                    return true
+                    return true;
                 } else {
-                    return false
+                    return false;
                 }
-                
-            },
-            Transform::RectTransform { changed_frame, has_changed, .. } => {
+            }
+            Transform::RectTransform {
+                changed_frame,
+                has_changed,
+                ..
+            } => {
                 if *changed_frame == frame_num {
-                    return true
+                    return true;
                 } else if *has_changed {
                     *changed_frame = frame_num;
                     *has_changed = false;
-                    return true
+                    return true;
                 } else {
-                    return false
+                    return false;
                 }
             }
         }
@@ -136,7 +199,10 @@ impl Transform {
 }
 
 #[allow(dead_code)]
-pub struct RuntimeEntity<T> where T: ScriptingInstance {
+pub struct RuntimeEntity<T>
+where
+    T: ScriptingInstance,
+{
     name: String,
     id: String,
     pub components: Vec<RuntimeComponent<T>>,
@@ -144,10 +210,13 @@ pub struct RuntimeEntity<T> where T: ScriptingInstance {
     pub children: Vec<Rc<RefCell<RuntimeEntity<T>>>>,
     pub component_flags: ComponentFlags, // this is the union of all the component flags, so we can quickly check if we need to run a method
     pub transform: Rc<RefCell<Transform>>,
-    pub is_new: bool
+    pub is_new: bool,
 }
 
-impl<T> RuntimeEntity<T> where T: ScriptingInstance {
+impl<T> RuntimeEntity<T>
+where
+    T: ScriptingInstance,
+{
     pub fn get_name(&self) -> &str {
         &self.name
     }
@@ -158,7 +227,10 @@ impl<T> RuntimeEntity<T> where T: ScriptingInstance {
 }
 
 #[allow(dead_code)]
-pub struct RuntimeComponent<T> where T: ScriptingInstance {
+pub struct RuntimeComponent<T>
+where
+    T: ScriptingInstance,
+{
     pub data: T::Data,
     pub component_proto: Component,
     pub flags: ComponentFlags,
@@ -180,7 +252,7 @@ impl<T: ScriptingInstance> ECS<T> {
             active_scene: Scene::new("INITIAL_SCENE".to_string()),
             static_scene: None,
             runtime_entities: Vec::new(),
-            event_handler
+            event_handler,
         }
     }
 
@@ -194,7 +266,10 @@ impl<T: ScriptingInstance> ECS<T> {
         // next up we'll have to figure out how to load our assets
         // lets start by requesting the appropriate shards
         #[cfg(not(feature = "scene_generation"))]
-        ASSET_MANAGER.lock().unwrap().request_shards(scene.shards.clone());
+        ASSET_MANAGER
+            .lock()
+            .unwrap()
+            .request_shards(scene.shards.clone());
     }
 
     #[cfg(feature = "editor")]
@@ -203,7 +278,7 @@ impl<T: ScriptingInstance> ECS<T> {
             event_handler(&self, &event);
         }
     }
-    
+
     #[cfg(feature = "editor")]
     pub fn poll_client_events(&mut self) -> Vec<crate::editor::ClientEvent> {
         self.event_handler.lock().unwrap().poll_client_events()
@@ -212,7 +287,7 @@ impl<T: ScriptingInstance> ECS<T> {
     pub fn get_entity(&self, id: &str) -> Option<Rc<RefCell<RuntimeEntity<T>>>> {
         for runtime_entity in self.runtime_entities.iter() {
             if runtime_entity.borrow().get_id() == id {
-                return Some(runtime_entity.clone())
+                return Some(runtime_entity.clone());
             }
         }
         None
@@ -222,11 +297,18 @@ impl<T: ScriptingInstance> ECS<T> {
         self.run_component_methods(scripting, ComponentFlags::BUILD);
     }
 
-    pub fn run_frame(&mut self, scripting: &mut T) -> Vec<(Rc<RefCell<Transform>>, Vec<EntityUpdate>)> {
+    pub fn run_frame(
+        &mut self,
+        scripting: &mut T,
+    ) -> Vec<(Rc<RefCell<Transform>>, Vec<EntityUpdate>)> {
         self.run_component_methods(scripting, ComponentFlags::FRAME)
     }
 
-    pub fn run_component_methods(&mut self, scripting: &mut T, method: ComponentFlags) -> Vec<(Rc<RefCell<Transform>>, Vec<EntityUpdate>)>  {
+    pub fn run_component_methods(
+        &mut self,
+        scripting: &mut T,
+        method: ComponentFlags,
+    ) -> Vec<(Rc<RefCell<Transform>>, Vec<EntityUpdate>)> {
         // Lets iterate over the entities and run the build step on each component
         scripting.run_component_methods::<T>(self.runtime_entities.as_mut_slice(), method)
     }
@@ -240,7 +322,11 @@ impl<T: ScriptingInstance> ECS<T> {
     pub fn as_scene(&self) -> Scene {
         Scene {
             name: self.active_scene.name.clone(),
-            entities: self.runtime_entities.iter().map(|runtime_entity| runtime_entity.borrow().as_entity()).collect(),
+            entities: self
+                .runtime_entities
+                .iter()
+                .map(|runtime_entity| runtime_entity.borrow().as_entity())
+                .collect(),
             required_assets: Vec::new(),
             shards: Vec::new(),
         }
@@ -256,8 +342,16 @@ impl<T: ScriptingInstance> RuntimeEntity<T> {
         Entity {
             name: self.name.clone(),
             id: self.id.clone(),
-            components: self.components.iter().map(|runtime_component| runtime_component.as_component()).collect(),
-            children: self.children.iter().map(|runtime_entity| runtime_entity.borrow().as_entity()).collect(),
+            components: self
+                .components
+                .iter()
+                .map(|runtime_component| runtime_component.as_component())
+                .collect(),
+            children: self
+                .children
+                .iter()
+                .map(|runtime_entity| runtime_entity.borrow().as_entity())
+                .collect(),
             transform: self.transform.borrow().clone(),
         }
     }
@@ -269,7 +363,13 @@ impl<T: ScriptingInstance> RuntimeComponent<T> {
     }
 }
 
-fn init_entities<T>(proto_entities: Vec<Entity>, scripting: &mut T) -> Vec<Rc<RefCell<RuntimeEntity<T>>>> where T: ScriptingInstance {
+fn init_entities<T>(
+    proto_entities: Vec<Entity>,
+    scripting: &mut T,
+) -> Vec<Rc<RefCell<RuntimeEntity<T>>>>
+where
+    T: ScriptingInstance,
+{
     // Lets recursively iterate over the entities and create a runtime entity for each one
     let mut runtime_entities = Vec::new();
     for proto_entity in proto_entities {
@@ -281,14 +381,15 @@ fn init_entities<T>(proto_entities: Vec<Entity>, scripting: &mut T) -> Vec<Rc<Re
             children: init_entities(proto_entity.children.clone(), scripting),
             component_flags: ComponentFlags::EMPTY,
             transform: Rc::new(RefCell::new(proto_entity.transform.clone())),
-            is_new: true
+            is_new: true,
         };
-        
+
         for proto_component in runtime_entity.entity_proto.components.clone() {
             let flags = scripting.get_component_flags(proto_component.name.as_str());
             runtime_entity.component_flags |= flags;
             let runtime_component = RuntimeComponent {
-                data: ScriptingData::from_component_proto(proto_component.clone(), scripting).unwrap(),
+                data: ScriptingData::from_component_proto(proto_component.clone(), scripting)
+                    .unwrap(),
                 component_proto: proto_component,
                 flags,
             };

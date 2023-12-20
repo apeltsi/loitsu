@@ -32,8 +32,11 @@ impl AssetReference {
         self.runtime_version += 1;
     }
 
-    pub fn initialize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) -> Result<(), AssetError> {
+    pub fn initialize(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) -> Result<(), AssetError> {
         self.asset.lock().unwrap().initialize(device, queue)
     }
 }
-

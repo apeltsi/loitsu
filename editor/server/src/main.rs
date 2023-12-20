@@ -1,12 +1,12 @@
-use warp;
 use loitsu::Preferences;
-use warp::http::Response;
-use std::path::PathBuf;
+use loitsu_asset_gen::{get_asset_overrides, handle_override};
 use std::fs::File;
 use std::io::Read;
-use warp::Filter;
+use std::path::PathBuf;
 use walkdir::WalkDir;
-use loitsu_asset_gen::{handle_override, get_asset_overrides};
+use warp;
+use warp::http::Response;
+use warp::Filter;
 
 #[tokio::main]
 async fn main() {
@@ -20,26 +20,42 @@ async fn main() {
     let cors = warp::cors()
         .allow_origin("http://localhost:5173")
         .allow_methods(vec!["GET", "POST", "DELETE"]);
-    let main_scene_route = warp::get().and(warp::path("LOITSU_MAIN_SCENE")).map(move || {
-        let main_scene_path = preferences.default_scene.clone();
-        let mut path = asset_path_clone.clone();
-        path.push(format!("{}.scene.json", main_scene_path));
-        let mut file = File::open(path).unwrap();
-        let mut data = String::new();
-        file.read_to_string(&mut data).unwrap();
-        Response::builder().header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate").body(data)
-    }).with(cors.clone());
+    let main_scene_route = warp::get()
+        .and(warp::path("LOITSU_MAIN_SCENE"))
+        .map(move || {
+            let main_scene_path = preferences.default_scene.clone();
+            let mut path = asset_path_clone.clone();
+            path.push(format!("{}.scene.json", main_scene_path));
+            let mut file = File::open(path).unwrap();
+            let mut data = String::new();
+            file.read_to_string(&mut data).unwrap();
+            Response::builder()
+                .header(
+                    "Cache-Control",
+                    "no-store, no-cache, must-revalidate, proxy-revalidate",
+                )
+                .body(data)
+        })
+        .with(cors.clone());
     let asset_path_clone = asset_path.clone();
-    let scripts_route = warp::get().and(warp::path("LOITSU_ALL_SCRIPTS")).map(move || {
-        let files = read_files(asset_path_clone.clone().to_str().unwrap());
-        let mut scripts = Vec::new();
-        for file in files {
-            if file.name.ends_with(".rn") {
-                scripts.push(String::from_utf8(file.data.clone()).unwrap());
+    let scripts_route = warp::get()
+        .and(warp::path("LOITSU_ALL_SCRIPTS"))
+        .map(move || {
+            let files = read_files(asset_path_clone.clone().to_str().unwrap());
+            let mut scripts = Vec::new();
+            for file in files {
+                if file.name.ends_with(".rn") {
+                    scripts.push(String::from_utf8(file.data.clone()).unwrap());
+                }
             }
-        }
-        Response::builder().header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate").body(serde_json::to_string(&scripts).unwrap())
-    }).with(cors.clone());
+            Response::builder()
+                .header(
+                    "Cache-Control",
+                    "no-store, no-cache, must-revalidate, proxy-revalidate",
+                )
+                .body(serde_json::to_string(&scripts).unwrap())
+        })
+        .with(cors.clone());
     let assets_route = warp::get()
         .and(warp::path("assets"))
         .and(warp::path::tail())
@@ -59,25 +75,33 @@ async fn main() {
                     data = handle_override(
                         tail.as_str().into(),
                         data,
-                        overrides.get(tail.as_str()).unwrap()
-                        ).await;
+                        overrides.get(tail.as_str()).unwrap(),
+                    )
+                    .await;
                 }
                 Ok::<_, warp::Rejection>(
                     Response::builder()
-                    .header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
-                    .body(data)
-                    )
-
+                        .header(
+                            "Cache-Control",
+                            "no-store, no-cache, must-revalidate, proxy-revalidate",
+                        )
+                        .body(data),
+                )
             }
-        }).with(cors.clone());
-    let route = warp::get().and(warp::fs::dir(path.clone()).or(main_scene_route).or(scripts_route).or(assets_route));
+        })
+        .with(cors.clone());
+    let route = warp::get().and(
+        warp::fs::dir(path.clone())
+            .or(main_scene_route)
+            .or(scripts_route)
+            .or(assets_route),
+    );
     println!("Editor live at http://localhost:5969");
     warp::serve(route).run(([127, 0, 0, 1], 5969)).await;
 }
 
-
 fn parse_preferences(asset_path: PathBuf) -> Preferences {
-     {
+    {
         let mut path = asset_path.clone();
         path.push("preferences.json");
         if path.exists() {
@@ -99,7 +123,8 @@ fn read_files(directory: &str) -> Vec<AssetFile> {
     // lets recursively walk the directory and read all the files, a bit heavy memory-wise but this
     // is a build step so it should be fine :D
     for entry in WalkDir::new(path) {
-        let entry = entry.expect("Couldn't read assets directory! Are you in the correct directory?");
+        let entry =
+            entry.expect("Couldn't read assets directory! Are you in the correct directory?");
         let path = entry.path();
         if path.is_file() {
             let name = path.file_name().unwrap().to_str().unwrap().to_string();

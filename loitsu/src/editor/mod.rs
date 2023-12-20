@@ -1,7 +1,14 @@
-use crate::{ecs, scripting, scene_management::{Scene, Entity}};
-pub struct EventHandler<T> where T: scripting::ScriptingInstance { 
+use crate::{
+    ecs,
+    scene_management::{Entity, Scene},
+    scripting,
+};
+pub struct EventHandler<T>
+where
+    T: scripting::ScriptingInstance,
+{
     pub event_handlers: Vec<Box<dyn Fn(&ecs::ECS<T>, &Event)>>,
-    client_events: Vec<ClientEvent>
+    client_events: Vec<ClientEvent>,
 }
 
 impl<T: scripting::ScriptingInstance> EventHandler<T> {
@@ -30,13 +37,13 @@ impl<T: scripting::ScriptingInstance> EventHandler<T> {
 /// This is a list of events that the editor backend can send to the client
 pub enum Event {
     /// A scene has been loaded
-    SceneLoaded(Scene), 
+    SceneLoaded(Scene),
     /// An entity has been updated
-    EntityUpdated(String), 
+    EntityUpdated(String),
     /// An entity has been selected
-    EntitySelected(Entity), 
+    EntitySelected(Entity),
     /// The camera has changed (x, y, zoom)
-    CameraChanged(f32, f32, f32)
+    CameraChanged(f32, f32, f32),
 }
 
 /// This is a list of events that the client can send to the editor backend

@@ -1,6 +1,12 @@
-use std::{path::PathBuf, io::Cursor, collections::HashMap, io::{Read, Write}, hash::Hasher};
 use image::io::Reader as ImageReader;
 use serde_json::Value;
+use std::{
+    collections::HashMap,
+    hash::Hasher,
+    io::Cursor,
+    io::{Read, Write},
+    path::PathBuf,
+};
 
 #[derive(Clone, Debug)]
 pub struct AssetOverride {
@@ -8,7 +14,11 @@ pub struct AssetOverride {
 }
 
 /// Returns a unique hash for the asset, its data and overrides
-pub fn get_asset_unique_hash(file_path: &PathBuf, file_data: &Vec<u8>, asset_override: &AssetOverride) -> String {
+pub fn get_asset_unique_hash(
+    file_path: &PathBuf,
+    file_data: &Vec<u8>,
+    asset_override: &AssetOverride,
+) -> String {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     hasher.write(file_path.to_str().unwrap().as_bytes());
     hasher.write(file_data);
@@ -18,7 +28,11 @@ pub fn get_asset_unique_hash(file_path: &PathBuf, file_data: &Vec<u8>, asset_ove
     format!("{:X}", hasher.finish())
 }
 
-pub fn get_cached_asset(file_path: &PathBuf, file_data: &Vec<u8>, asset_override: &AssetOverride) -> Option<Vec<u8>> {
+pub fn get_cached_asset(
+    file_path: &PathBuf,
+    file_data: &Vec<u8>,
+    asset_override: &AssetOverride,
+) -> Option<Vec<u8>> {
     let hash = get_asset_unique_hash(file_path, file_data, asset_override);
     let mut path = std::env::current_dir().unwrap();
     path.push(".loitsu");
@@ -34,7 +48,12 @@ pub fn get_cached_asset(file_path: &PathBuf, file_data: &Vec<u8>, asset_override
     }
 }
 
-fn write_cached_asset(file_path: &PathBuf, file_data: &Vec<u8>, asset_override: &AssetOverride, data: &Vec<u8>) {
+fn write_cached_asset(
+    file_path: &PathBuf,
+    file_data: &Vec<u8>,
+    asset_override: &AssetOverride,
+    data: &Vec<u8>,
+) {
     let hash = get_asset_unique_hash(file_path, file_data, asset_override);
     let mut path = std::env::current_dir().unwrap();
     path.push(".loitsu");
@@ -47,16 +66,24 @@ fn write_cached_asset(file_path: &PathBuf, file_data: &Vec<u8>, asset_override: 
     file.write_all(data).unwrap();
 }
 
-pub async fn handle_override(file_path: PathBuf, file_data: Vec<u8>, asset_override: &AssetOverride) -> Vec<u8> {
+pub async fn handle_override(
+    file_path: PathBuf,
+    file_data: Vec<u8>,
+    asset_override: &AssetOverride,
+) -> Vec<u8> {
     let extension = file_path.extension().unwrap().to_str().unwrap();
     if let Some(cached_data) = get_cached_asset(&file_path, &file_data, asset_override) {
         return cached_data;
     }
     match extension {
         "png" | "jpeg" => {
-            let data = ImageReader::new(Cursor::new(file_data.clone())).with_guessed_format().unwrap().decode().unwrap();
+            let data = ImageReader::new(Cursor::new(file_data.clone()))
+                .with_guessed_format()
+                .unwrap()
+                .decode()
+                .unwrap();
             let mut data = data.to_rgba8();
-           
+
             // lets apply the overrides
 
             // first, resolution_mutliplier
@@ -64,7 +91,12 @@ pub async fn handle_override(file_path: PathBuf, file_data: Vec<u8>, asset_overr
                 let (width, height) = data.dimensions();
                 let new_width = (width as f32 * resolution_multiplier).round() as u32;
                 let new_height = (height as f32 * resolution_multiplier).round() as u32;
-                data = image::imageops::resize(&data, new_width, new_height, image::imageops::FilterType::Nearest);
+                data = image::imageops::resize(
+                    &data,
+                    new_width,
+                    new_height,
+                    image::imageops::FilterType::Nearest,
+                );
             }
 
             // finally lets re-encode the image and return the data
@@ -72,15 +104,14 @@ pub async fn handle_override(file_path: PathBuf, file_data: Vec<u8>, asset_overr
             let format = match extension {
                 "png" => image::ImageOutputFormat::Png,
                 "jpeg" => image::ImageOutputFormat::Jpeg(90),
-                _ => image::ImageOutputFormat::Png
+                _ => image::ImageOutputFormat::Png,
             };
-            data.write_to(&mut Cursor::new(&mut buffer), format).unwrap();
+            data.write_to(&mut Cursor::new(&mut buffer), format)
+                .unwrap();
             write_cached_asset(&file_path, &file_data, asset_override, &buffer);
             buffer
-        },
-        _ => {
-            file_data
         }
+        _ => file_data,
     }
 }
 
@@ -104,7 +135,8 @@ pub fn get_asset_overrides(path: &PathBuf) -> HashMap<String, AssetOverride> {
                 for (key, value) in map {
                     if key == "resolution_multiplier" {
                         if let Value::Number(num) = value {
-                            asset_override.resolution_multiplier = Some(num.as_f64().unwrap() as f32);
+                            asset_override.resolution_multiplier =
+                                Some(num.as_f64().unwrap() as f32);
                         }
                     }
                 }

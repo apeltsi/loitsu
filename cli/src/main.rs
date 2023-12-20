@@ -1,16 +1,16 @@
+use cargo_toml::{Dependency, Manifest};
 use clap::{Parser, Subcommand};
+use colored::*;
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-use warp::Filter;
-use cargo_toml::{Manifest, Dependency};
 use std::path::PathBuf;
-use colored::*;
+use warp::Filter;
 mod asset_builder;
 mod shard_gen;
 
-#[derive(Debug, Parser)] 
+#[derive(Debug, Parser)]
 #[command(name = "loitsu")]
 #[command(about = "Tools useful for development with the Loitsu engine", long_about = None)]
 struct Cli {
@@ -26,7 +26,7 @@ enum Commands {
         #[arg(short, long, default_value = "false")]
         release: bool,
         #[arg(short, long, default_value = "false")]
-        force: bool
+        force: bool,
     },
     Run {
         #[arg(short, long, default_value = "")]
@@ -34,20 +34,28 @@ enum Commands {
         #[arg(short, long, default_value = "false")]
         release: bool,
         #[arg(short, long, default_value = "false")]
-        force: bool
+        force: bool,
     },
     Edit,
-    Clean
+    Clean,
 }
 #[tokio::main]
 async fn main() {
     let args = Cli::parse();
 
     match args.command {
-        Commands::Build { target, release, force } => build(&target, release, false, force).await,
-        Commands::Run { target, release, force } => build(&target, release, true, force).await,
+        Commands::Build {
+            target,
+            release,
+            force,
+        } => build(&target, release, false, force).await,
+        Commands::Run {
+            target,
+            release,
+            force,
+        } => build(&target, release, true, force).await,
         Commands::Edit => run_editor(),
-        Commands::Clean => clean()
+        Commands::Clean => clean(),
     }
 }
 
@@ -71,7 +79,11 @@ async fn build(target: &str, release: bool, run: bool, force: bool) {
     if target == "web" {
         info!("Building for web");
         // Now we can build the target
-        build_with_args(vec!["--target=wasm32-unknown-unknown".to_string()], release, false);
+        build_with_args(
+            vec!["--target=wasm32-unknown-unknown".to_string()],
+            release,
+            false,
+        );
         let mut out_path = std::env::current_dir().unwrap();
         out_path.push("target");
         out_path.push("wasm32-unknown-unknown");
@@ -103,7 +115,7 @@ async fn build(target: &str, release: bool, run: bool, force: bool) {
                             match package_version {
                                 cargo_toml::Inheritable::Set(version) => {
                                     format!("{}dev", version)
-                                },
+                                }
                                 cargo_toml::Inheritable::Inherited { .. } => {
                                     "Unknown (CUSTOM/DEV)".to_string()
                                 }
@@ -120,7 +132,7 @@ async fn build(target: &str, release: bool, run: bool, force: bool) {
         info!("Creating player...");
         // Lets copy the web player files
         generate_player_files(&out_path, &package_name, &loitsu_version);
-        
+
         asset_builder::build_assets(&out_path.join("out"), force).await;
         if run {
             start_webserver(&out_path).await;
@@ -147,10 +159,13 @@ async fn build(target: &str, release: bool, run: bool, force: bool) {
 
 fn generate_player_files(path: &PathBuf, app_name: &str, loitsu_version: &str) {
     // First lets load the player html file located in /player
-    let build_path = path.join("out"); 
+    let build_path = path.join("out");
     let raw_player_html = include_str!("../player/index.html");
     let build_date = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    let player_html = raw_player_html.replace("{APP_NAME}", &app_name).replace("{LOITSU_VERSION}", &loitsu_version).replace("{BUILD_DATE}", &build_date);
+    let player_html = raw_player_html
+        .replace("{APP_NAME}", &app_name)
+        .replace("{LOITSU_VERSION}", &loitsu_version)
+        .replace("{BUILD_DATE}", &build_date);
 
     // Now lets write the html file to the output directory
     let out_str = build_path.to_str().unwrap();
@@ -192,7 +207,11 @@ async fn start_webserver(path: &PathBuf) {
     let directory = out_path.to_str().unwrap();
     // Add middleware to set Cache-Control header
     let add_no_cache_header = warp::any().map(|| {
-        warp::reply::with_header(warp::reply(), "Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
+        warp::reply::with_header(
+            warp::reply(),
+            "Cache-Control",
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
+        )
     });
 
     let route = warp::get()
@@ -210,7 +229,12 @@ fn wasm_bindgen(path: &PathBuf, bin_name: &str) {
     let out_path = directory.join("out");
     let mut command = std::process::Command::new("wasm-bindgen");
     command.arg(format!("{}.wasm", bin_path.to_str().unwrap()));
-    command.args(vec!["--target", "web", "--out-dir", out_path.to_str().unwrap()]);
+    command.args(vec![
+        "--target",
+        "web",
+        "--out-dir",
+        out_path.to_str().unwrap(),
+    ]);
     let mut child = command.spawn().expect("failed to build");
     // lets wait for the build to complete
     child.wait().unwrap();
@@ -226,9 +250,9 @@ macro_rules! info {
 }
 
 pub fn info(msg: &str) {
-    println!("{} {}", "[INFO]".bright_blue(),msg);
+    println!("{} {}", "[INFO]".bright_blue(), msg);
 }
 
 pub fn done(msg: &str) {
-    println!("{} {}", "[DONE]".bright_green(),msg);
+    println!("{} {}", "[DONE]".bright_green(), msg);
 }

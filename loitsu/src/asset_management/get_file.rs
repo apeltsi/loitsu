@@ -3,9 +3,9 @@
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
-use web_sys::{Request, RequestInit, RequestMode, Response};
-#[cfg(target_arch = "wasm32")]
 use wasm_bindgen_futures::JsFuture;
+#[cfg(target_arch = "wasm32")]
+use web_sys::{Request, RequestInit, RequestMode, Response};
 
 use crate::asset_management::AssetError;
 
@@ -31,9 +31,9 @@ pub async fn get_file(path: String) -> Result<Vec<u8>, AssetError> {
     opts.method("GET");
     opts.mode(RequestMode::Cors);
 
-    let url = format!("{}{}", unsafe {DIRECT_ASSET_PATH}, path);
+    let url = format!("{}{}", unsafe { DIRECT_ASSET_PATH }, path);
     let request = Request::new_with_str_and_init(&url, &opts)?;
-    
+
     let window = web_sys::window().unwrap();
 
     let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;

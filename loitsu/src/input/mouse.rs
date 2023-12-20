@@ -4,7 +4,7 @@ pub struct MouseState {
     pub position: (f32, f32),
     pub left_button: bool,
     pub right_button: bool,
-    pub middle_button: bool
+    pub middle_button: bool,
 }
 
 impl MouseState {
