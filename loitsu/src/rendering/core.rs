@@ -256,7 +256,15 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
             } if window_id == window.id() => match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 WindowEvent::CursorMoved { position, ..} => {
+                    input_state.mouse.last_position = Some(input_state.mouse.position);
                     input_state.mouse.position = (position.x as f32 / config.width as f32, position.y as f32 / config.height as f32);
+                    if input_state.mouse.right_button {
+                        let delta = input_state.mouse.get_delta();
+                        let world_scale_delta = input_state.mouse.as_world_scale(&state.camera, (-delta.0, delta.1));
+                        state.camera.position.x += world_scale_delta.0;
+                        state.camera.position.y += world_scale_delta.1;
+                        state.camera.dirty = true;
+                    }
                 },
                 WindowEvent::MouseInput { state: element_state, button, .. } => {
                     match button {
@@ -304,6 +312,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
         }
     });
 }
+
 #[allow(dead_code)]
 fn find_overlapping_entity<T>(ecs: &ECS<T>, check_position: (f32, f32)) -> Option<Rc<RefCell<RuntimeEntity<T>>>> where T: ScriptingInstance {
     for e in ecs.get_runtime_entities() {
@@ -403,8 +412,8 @@ impl CameraState {
 
     fn get_transformation_matrix(&self) -> [[f32; 4]; 4] {
         [
-            [self.scale, 0.0, 0.0, -self.position.x], // position is inverted because we want to move the world, not the camera
-            [0.0, self.scale, 0.0, -self.position.y],
+            [self.scale, 0.0, 0.0, -self.position.x * self.scale], // position is inverted because we want to move the world, not the camera
+            [0.0, self.scale, 0.0, -self.position.y * self.scale],
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
         ]

@@ -12,6 +12,8 @@ impl InputState {
                 left_button: false,
                 right_button: false,
                 middle_button: false,
+                drag_start: None,
+                last_position: None,
             },
         }
     }

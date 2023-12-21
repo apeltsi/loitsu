@@ -108,6 +108,11 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    top: 30px;
+    left: 0;
+    width: 100vw;
+    position: absolute;
+    height: calc(100vh - 30px);
 }
 
 .camera-state {
