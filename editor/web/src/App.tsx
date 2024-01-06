@@ -7,12 +7,16 @@ import TopBar from './components/TopBar';
 function App() {
     const [camera, setCamera] = createSignal("(0,0) x1");
     const [popOut, setPopOut] = createSignal(false);
+    const [loading, setLoading] = createSignal(true);
+    setTimeout(() => {
+        setLoading(false);
+    }, 1000);
     // @ts-ignore
     window.camera_moved = (x, y, zoom) => {
         x = Math.round(x * 100) / 100;
         y = Math.round(y * 100) / 100;
         zoom = Math.round(zoom * 100) / 100;
-        setCamera(`(${x},${y}) x${zoom}`);
+        setCamera(`(${x.toFixed(2)},${y.toFixed(2)}) x${zoom}`);
     };
     // pop out should activate on alt+enter
     
@@ -23,6 +27,7 @@ function App() {
     });
     return (
     <>
+        <div class={"splash" + (loading() ? "" : " done")}></div>
         <TopBar/>
         <div class={popOut() ? "" : "panel-shadow"}>
             <div class={"primary" + (popOut() ? " popout" : "")}>

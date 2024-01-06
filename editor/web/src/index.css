@@ -13,10 +13,23 @@ body {
     --input-bg-color-hover: #303050;
     --input-outline-color: #606060;
     --backdrop-blur: 10px;
+    cursor: url("./assets/cursor/cursor.png"), url("./assets/cursor/cursor.svg"), auto;
+    --text-cursor: url("./assets/cursor/text-cursor.png") 12 12, url("./assets/cursor/text-cursor.svg") 12 12,
+    auto;
+    --timeline-cursor: url("./assets/cursor/timeline.png") 12 12, url("./assets/cursor/timeline.svg") 12 12,
+    auto;
+    --pointer-cursor: url("./assets/cursor/pointer-cursor.png") 8 0,
+    url("./assets/cursor/pointer-cursor.svg") 8 0, auto;
+    --dot-cursor: url("./assets/cursor/dot-cursor.png") 12 12, url("./assets/cursor/dot-cursor.svg") 12 12,
+    auto;
     color: var(--text-color);
     background-color: black;
     margin: 0;
     font-family: 'Roboto', sans-serif;
+}
+
+span, h1, h2, h3, h4, h5, h6, p {
+    cursor: var(--text-cursor);
 }
 
 canvas {
@@ -40,6 +53,7 @@ input {
     padding: 5px;
     outline: 1px solid transparent;
     transition-duration: 0.1s;
+    cursor: var(--text-cursor);
 }
 
 input:hover {

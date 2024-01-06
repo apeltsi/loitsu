@@ -258,6 +258,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 WindowEvent::CursorMoved { position, ..} => {
                     input_state.mouse.last_position = Some(input_state.mouse.position);
                     input_state.mouse.position = (position.x as f32 / config.width as f32, position.y as f32 / config.height as f32);
+                    #[cfg(feature = "editor")]
                     if input_state.mouse.right_button {
                         let delta = input_state.mouse.get_delta();
                         let world_scale_delta = input_state.mouse.as_world_scale(&state.camera, (-delta.0, delta.1));
