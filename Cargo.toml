@@ -1,0 +1,9 @@
+[workspace]
+
+members = [
+    "loitsu",
+    "editor",
+    "editor/server",
+    "cli",
+]
+resolver = "2"
