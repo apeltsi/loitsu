@@ -94,6 +94,19 @@ pub fn request_select_entity(id: String) {
 }
 
 #[wasm_bindgen]
+pub fn set_component_property(id: String, component: String, field: String, value: String) {
+    let event_handler = unsafe { EVENT_HANDLER.as_ref().unwrap().clone() };
+    let mut event_handler = event_handler.lock().unwrap();
+    event_handler.emit_client(ClientEvent::SetComponentProperty {
+        entity: id,
+        // FIXME: This currently assumes that all properties are strings
+        property: loitsu::scene_management::Property::String(value),
+        component,
+        field,
+    });
+}
+
+#[wasm_bindgen]
 extern "C" {
     fn set_scene_name(name: String);
     fn set_hierarchy(hierarchy: String);

@@ -38,7 +38,7 @@ pub async fn get_file(path: String) -> Result<Vec<u8>, AssetError> {
 
     let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
 
-    let response: Response = resp_value.dyn_into().unwrap();
+    let response: Response = resp_value.dyn_into()?;
 
     // now lets turn the response into a byte vector
     let buffer = JsFuture::from(response.array_buffer()?).await?;

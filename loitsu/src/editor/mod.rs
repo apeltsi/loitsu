@@ -1,6 +1,6 @@
 use crate::{
     ecs,
-    scene_management::{Entity, Scene},
+    scene_management::{Entity, Property, Scene},
     scripting,
 };
 pub struct EventHandler<T>
@@ -50,4 +50,10 @@ pub enum Event {
 pub enum ClientEvent {
     /// A request to select an entity with the given uuid
     SelectEntity(String),
+    SetComponentProperty {
+        entity: String,
+        component: String,
+        field: String,
+        property: Property,
+    },
 }

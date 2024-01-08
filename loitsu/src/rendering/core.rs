@@ -6,7 +6,8 @@ use winit::{
 };
 #[allow(unused_imports)]
 use crate::{log_render as log, scripting::{ScriptingInstance, EntityUpdate}, scene_management::Scene, rendering::drawable::{sprite::SpriteDrawable, DrawablePrototype}, asset_management::AssetManager, ecs::{Transform, RuntimeEntity}, log_scripting, input::InputState};
-use crate::ecs::ECS;
+#[allow(unused_imports)]
+use crate::ecs::{ECS, ComponentFlags};
 use std::{cmp::max, cell::RefCell, rc::Rc};
 use crate::asset_management::ASSET_MANAGER;
 
@@ -140,6 +141,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 unsafe {WEB_RESIZED = false;}
             }
         }
+
         match event {
             Event::MainEventsCleared => {
                 window.request_redraw();
@@ -171,6 +173,8 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 window.request_redraw();
             },
             Event::RedrawRequested(_) => {
+                #[allow(unused_mut)]
+                let mut updates = Vec::new();
                 #[cfg(feature = "editor")]
                 {
                     let client_events = ecs.poll_client_events();
@@ -180,14 +184,21 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                                 if let Some(entity) = ecs.get_entity(id.as_str()) {
                                     ecs.emit(crate::editor::Event::EntitySelected((*entity).borrow().as_entity()));
                                 }
-                            }
+                            },
+                            crate::editor::ClientEvent::SetComponentProperty { entity, component, field, property } => {
+                                if let Some(entity) = ecs.get_entity(entity.as_str()) {
+                                    {
+                                        let mut entity = (*entity).borrow_mut();
+                                        let component = entity.get_component_mut(component.as_str()).unwrap();
+                                        component.set_property(field.as_str(), property);
+                                    }
+                                    updates.extend(ecs.run_component_methods(&mut scripting, ComponentFlags::EDITOR_UPDATE));
+                                }
+                            },
                         }
                     }
                 }
 
-
-                #[allow(unused_mut)]
-                let mut updates = Vec::new();
                 #[cfg(not(feature = "direct_asset_management"))]
                 if !ecs_initialized {
                     let scene: Option<Scene> = {
@@ -292,13 +303,11 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 #[cfg(feature = "editor")]
                 WindowEvent::MouseWheel { delta, .. } => {
                     match delta {
-                        MouseScrollDelta::LineDelta(x, y) => {
-                            log!("Scroll!! {} {}", x, y);
+                        MouseScrollDelta::LineDelta(_x, y) => {
                             state.camera.scale += y * 0.001;
                             state.camera.dirty = true;
                         },
                         MouseScrollDelta::PixelDelta(pos) => {
-                            log!("Scroll!!");
                             state.camera.scale += pos.y as f32 * 0.001;
                             state.camera.dirty = true;
                         }

@@ -2,7 +2,10 @@
 use serde_json::{Map, Value};
 
 use bitcode;
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display},
+};
 
 use crate::ecs::Transform;
 
@@ -19,6 +22,50 @@ pub enum Property {
     Array(Vec<Property>),
     EntityReference(String), // Reference to another entity in the scene (Represents the ID)
     ComponentReference(String), // Reference to another component in the scene (Represents the ID)
+}
+
+impl Debug for Property {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Property::String(s) => write!(f, "{}", s),
+            Property::Number(n) => write!(f, "{}", n),
+            Property::Boolean(b) => write!(f, "{}", b),
+            Property::Array(a) => {
+                write!(f, "[")?;
+                for (i, item) in a.iter().enumerate() {
+                    write!(f, "{:?}", item)?;
+                    if i != a.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "]")
+            }
+            Property::EntityReference(id) => write!(f, "EntityReference({})", id),
+            Property::ComponentReference(id) => write!(f, "ComponentReference({})", id),
+        }
+    }
+}
+
+impl Display for Property {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Property::String(s) => write!(f, "{}", s),
+            Property::Number(n) => write!(f, "{}", n),
+            Property::Boolean(b) => write!(f, "{}", b),
+            Property::Array(a) => {
+                write!(f, "[")?;
+                for (i, item) in a.iter().enumerate() {
+                    write!(f, "{}", item)?;
+                    if i != a.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "]")
+            }
+            Property::EntityReference(id) => write!(f, "EntityReference({})", id),
+            Property::ComponentReference(id) => write!(f, "ComponentReference({})", id),
+        }
+    }
 }
 
 #[cfg_attr(

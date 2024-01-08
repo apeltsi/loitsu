@@ -1,5 +1,6 @@
 pub mod rune_runtime;
 use crate::ecs::ComponentFlags;
+use crate::scene_management::Property;
 use crate::{
     ecs::Transform,
     rendering::drawable::{DrawableProperty, DrawablePrototype},
@@ -69,4 +70,5 @@ where
     where
         Self: Sized;
     fn to_component_proto(&self, proto: &Component) -> Result<Component>;
+    fn set_property(&mut self, name: &str, value: Property) -> Result<()>;
 }

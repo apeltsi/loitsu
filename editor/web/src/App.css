@@ -130,7 +130,7 @@
     width: 100vw;
     height: calc(100vh - 30px);
     z-index: 100;
-    background-color: var(--line-color);
+    background-color: #232036;
     background-image: url('/splash-bg.svg');
     background-size: contain;
     background-position: center;

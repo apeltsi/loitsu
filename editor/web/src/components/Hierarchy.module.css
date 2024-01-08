@@ -9,7 +9,14 @@
 }
 
 .hierarchyItem {
+    display: block;
+    background-color: transparent;
+    text-align: left;
+    font-weight: 600;
     padding: 0.5em;
+    width: 100%;
+    color: var(--text-color);
+    border: none;
     border-bottom: 1px solid var(--line-color);
     transition-property: background-color;
     transition-duration: 0.1s;

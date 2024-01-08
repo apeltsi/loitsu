@@ -302,6 +302,17 @@ impl ScriptingData<RuneInstance> for RuneComponent {
         }
         Ok(proto)
     }
+
+    fn set_property(&mut self, property: &str, value: Property) -> Result<()> {
+        if let Some(data) = &mut self.data {
+            let mut component_data = data.clone().into_mut().unwrap();
+            let component_data_obj = component_data.data_mut();
+            component_data_obj
+                .insert_value(rune::alloc::String::try_from(property)?, value)
+                .unwrap();
+        }
+        Ok(())
+    }
 }
 
 impl From<Value> for Property {

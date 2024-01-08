@@ -28,7 +28,7 @@ export default function Hierarchy() {
 
 function HierarchyItem(props: {item: any}) {
     // @ts-ignore
-    return  <div class={styles.hierarchyItem} onClick={() => window.request_select_entity(props.item.id)}>
+    return  <button class={styles.hierarchyItem} onClick={() => window.request_select_entity(props.item.id)}>
                 {props.item.name}
-            </div>
+            </button>
 }

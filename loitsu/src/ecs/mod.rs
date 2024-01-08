@@ -4,7 +4,7 @@ use std::rc::Rc;
 #[cfg(not(feature = "scene_generation"))]
 use crate::asset_management::ASSET_MANAGER;
 
-use crate::scene_management::{Component, Entity, Scene};
+use crate::scene_management::{Component, Entity, Property, Scene};
 use crate::scripting::{EntityUpdate, ScriptingData, ScriptingInstance};
 use bitflags::bitflags;
 #[cfg(feature = "scene_generation")]
@@ -226,6 +226,15 @@ where
     pub fn get_id(&self) -> &str {
         &self.id
     }
+
+    pub fn get_component_mut(&mut self, id: &str) -> Option<&mut RuntimeComponent<T>> {
+        for component in self.components.iter_mut() {
+            if component.component_proto.id == id {
+                return Some(component);
+            }
+        }
+        None
+    }
 }
 
 #[allow(dead_code)]
@@ -362,6 +371,10 @@ impl<T: ScriptingInstance> RuntimeEntity<T> {
 impl<T: ScriptingInstance> RuntimeComponent<T> {
     pub fn as_component(&self) -> Component {
         self.data.to_component_proto(&self.component_proto).unwrap()
+    }
+
+    pub fn set_property(&mut self, field: &str, property: Property) {
+        let _ = self.data.set_property(field, property);
     }
 }
 

@@ -32,18 +32,28 @@ span, h1, h2, h3, h4, h5, h6, p {
     cursor: var(--text-cursor);
 }
 
+button {
+    cursor: var(--pointer-cursor);
+}
+
 canvas {
     position: absolute;
     top: 0;
     left: 0;
     z-index: 0;
 }
+
+canvas.grabbing {
+    cursor: var(--dot-cursor);
+}
+
 .root {
     position: absolute;
     top: 0;
     left: 0;
     z-index: 1;
 }
+
 input {
     font-family: 'Roboto Mono', monospace;
     background-color: var(--input-bg-color);

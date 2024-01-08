@@ -3,7 +3,7 @@ import { render } from 'solid-js/web';
 
 import './index.css';
 import App, { queued_events } from './App';
-import init, {start_editor, override_asset_path, resize, request_select_entity} from '../public/wasm/loitsu-editor.js';
+import init, {start_editor, override_asset_path, resize, request_select_entity, set_component_property} from '../public/wasm/loitsu-editor.js';
 
 window.addEventListener("resize", () => resize());
 
@@ -28,6 +28,16 @@ async function run() {
                 queued_events[i](event);
             });
         }
+        document.getElementsByTagName("canvas")[0].addEventListener("mousedown", (event: MouseEvent) => {
+            if (event.button === 2) {
+                document.getElementsByTagName("canvas")[0].classList.add("grabbing");
+            }
+        });
+        document.getElementsByTagName("canvas")[0].addEventListener("mouseup", (event: MouseEvent) => {
+            if (event.button === 2) {
+                document.getElementsByTagName("canvas")[0].classList.remove("grabbing");
+            }
+        });
         clearInterval(interval);
     }, 50);
 }
@@ -43,6 +53,8 @@ if (window.set_status === undefined) {
     window.add_error = (message) => {};
     // @ts-ignore
     window.request_select_entity = request_select_entity;
+    // @ts-ignore
+    window.set_component_property = set_component_property;
 
     const root = document.getElementById('root');
 

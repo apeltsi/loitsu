@@ -186,6 +186,12 @@ impl AssetManager {
                 let result = get_file::get_file(format!("assets/{}", name)).await;
                 match result {
                     Ok(file) => {
+                        if file.len() == 0 {
+                            error!("Failed to load asset: Asset was empty");
+                            #[cfg(feature = "editor")]
+                            crate::web::remove_editor_loading_task("Loading assets");
+                            return;
+                        }
                         // lets parse the asset
                         let shard_file = shard::ShardFile { name, data: file };
                         let asset = parse::parse(shard_file).unwrap();

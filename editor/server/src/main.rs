@@ -68,6 +68,9 @@ async fn main() {
                 let mut path = asset_path;
                 path.push(tail.as_str());
 
+                if !path.exists() {
+                    return Ok::<_, warp::Rejection>(Response::builder().status(404).body(vec![]));
+                }
                 let mut file = File::open(path).await.unwrap();
                 let mut data = Vec::new();
                 file.read_to_end(&mut data).await.unwrap();

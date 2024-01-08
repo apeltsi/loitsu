@@ -28,6 +28,27 @@
     font-weight: bold;
     margin-bottom: 0.5rem;
     display: inline-block;
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.inspector_component_true_name {
+    opacity: 0.25;
+    margin-bottom: 0.5rem;
+    font-family: 'Roboto Mono', monospace;
+}
+
+.inspector_component_names {
+    display: flex;
+    flex-direction: row;
+    align-items: start;
+    justify-content: space-between;
+}
+
+.inspector_component:hover .inspector_component_true_name {
+    opacity: 0.75;
 }
 
 .input {
