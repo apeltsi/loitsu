@@ -40,6 +40,7 @@ function InspectorComponent(props: { entity_id: string, component: Component }) 
         </div>
         <For each={Object.keys(props.component.properties)}>
             {(key) => {
+                if (key.startsWith("_")) return;
                 return <InspectorInput label={key} value={props.component.properties[key]} on_change={(value) => {
                     // @ts-ignore
                     window.set_component_property(props.entity_id, props.component.id, key, value);

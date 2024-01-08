@@ -6,41 +6,41 @@ pub fn v2(x, y) {
 
 struct SpriteRenderer {
     sprite,
-    drawable
+    _drawable
 }
 
 impl SpriteRenderer {
 	pub fn new() {
 		SpriteRenderer {
             sprite: "",
-            drawable: ""
+            _drawable: ""
         }
 	}
 
     pub fn set_color(self, entity, color) {
-        self.drawable = entity.set_drawable_color("color", color);
+        self._drawable = entity.set_drawable_color("color", color);
     }
 
     pub fn start(self, entity) {
         let drawable = Drawable::sprite(self.sprite, Color::white());
-        self.drawable = entity.register_drawable(drawable);
+        self._drawable = entity.register_drawable(drawable);
     }
 
     pub fn editor_start(self, entity) {
         let drawable = Drawable::sprite(self.sprite, Color::white());
-        self.drawable = entity.register_drawable(drawable);
+        self._drawable = entity.register_drawable(drawable);
     }
 
     pub fn editor_update(self, entity) {
-        if self.drawable != "" {
-            entity.unregister_drawable(self.drawable);
+        if self._drawable != "" {
+            entity.unregister_drawable(self._drawable);
         }
         let drawable = Drawable::sprite(self.sprite, Color::white());
-        self.drawable = entity.register_drawable(drawable);
+        self._drawable = entity.register_drawable(drawable);
     }
 
     pub fn editor_destroy(self, entity) {
-        entity.unregister_drawable(self.drawable);
+        entity.unregister_drawable(self._drawable);
     }
 
     pub fn build(self, entity) {
@@ -48,6 +48,6 @@ impl SpriteRenderer {
     }
 
     pub fn destroy(self, entity) {
-        entity.unregister_drawable(self.drawable);
+        entity.unregister_drawable(self._drawable);
     }
 }
