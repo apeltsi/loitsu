@@ -1,12 +1,13 @@
 use super::EntityUpdate;
 use crate::ecs::{ComponentFlags, RuntimeEntity, Transform};
+use crate::input::{str_to_key, InputState};
 use crate::rendering::drawable::{DrawableProperty, DrawablePrototype};
 use crate::scene_management::{Component, Property};
 use crate::scripting::{ScriptingData, ScriptingError, ScriptingSource};
 use crate::{error, log_scripting as log, ScriptingInstance};
 use rune::alloc::fmt::TryWrite;
 use rune::diagnostics::EmitError;
-use rune::runtime::{AnyObj, Args, Shared, Struct, Value, VmError, VmResult};
+use rune::runtime::{AnyObj, Args, Protocol, Shared, Struct, Value, VmError, VmResult};
 use rune::termcolor::{ColorChoice, StandardStream};
 use rune::{
     Any, BuildError, Context, ContextError, Diagnostics, Module, Source, Sources, ToValue, Vm,
@@ -14,7 +15,7 @@ use rune::{
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
@@ -33,18 +34,80 @@ pub struct RuneComponent {
 struct RuneTransform {
     #[rune(get, set)]
     position: Shared<AnyObj>,
-    #[rune(get, set)]
+    #[rune(get, set, add_assign, sub_assign, mul_assign, div_assign)]
     rotation: f32,
     #[rune(get, set)]
     scale: Shared<AnyObj>,
 }
 
+impl RuneTransform {
+    fn add_position(&mut self, other: &Vec2) {
+        let mut position = as_vec2(self.position.clone());
+        position.x += other.x;
+        position.y += other.y;
+        self.position = Shared::new(AnyObj::new(position).unwrap()).unwrap();
+    }
+    fn sub_position(&mut self, other: &Vec2) {
+        let mut position = as_vec2(self.position.clone());
+        position.x -= other.x;
+        position.y -= other.y;
+        self.position = Shared::new(AnyObj::new(position).unwrap()).unwrap();
+    }
+    fn mul_position(&mut self, other: Shared<AnyObj>) {
+        let position = as_vec2(self.position.clone());
+        let position = mul_vec2(position, Value::from(other));
+        self.position = Shared::new(AnyObj::new(position).unwrap()).unwrap();
+    }
+    fn div_position(&mut self, other: &Vec2) {
+        let mut position = as_vec2(self.position.clone());
+        position.x /= other.x;
+        position.y /= other.y;
+        self.position = Shared::new(AnyObj::new(position).unwrap()).unwrap();
+    }
+    fn add_scale(&mut self, other: &Vec2) {
+        let mut scale = as_vec2(self.scale.clone());
+        scale.x += other.x;
+        scale.y += other.y;
+        self.scale = Shared::new(AnyObj::new(scale).unwrap()).unwrap();
+    }
+    fn sub_scale(&mut self, other: &Vec2) {
+        let mut scale = as_vec2(self.scale.clone());
+        scale.x -= other.x;
+        scale.y -= other.y;
+        self.scale = Shared::new(AnyObj::new(scale).unwrap()).unwrap();
+    }
+    fn mul_scale(&mut self, other: Shared<AnyObj>) {
+        let scale = as_vec2(self.scale.clone());
+        let scale = mul_vec2(scale, Value::from(other));
+        self.scale = Shared::new(AnyObj::new(scale).unwrap()).unwrap();
+    }
+    fn div_scale(&mut self, other: &Vec2) {
+        let mut scale = as_vec2(self.scale.clone());
+        scale.x /= other.x;
+        scale.y /= other.y;
+        self.scale = Shared::new(AnyObj::new(scale).unwrap()).unwrap();
+    }
+}
+
+fn mul_vec2(a: Vec2, b: Value) -> Vec2 {
+    match b {
+        Value::Struct(b) => {
+            let b = b.borrow_ref().unwrap();
+            let x = b.get("x").unwrap().as_float().unwrap();
+            let y = b.get("y").unwrap().as_float().unwrap();
+            Vec2::new(a.x * x as f32, a.y * y as f32)
+        }
+        Value::Float(b) => Vec2::new(a.x * b as f32, a.y * b as f32),
+        _ => panic!("Invalid type for Vec2 multiplication"),
+    }
+}
+
 #[derive(Debug, Clone, Any, PartialEq)]
 #[rune(constructor)]
 pub struct Vec2 {
-    #[rune(get, set, copy)]
+    #[rune(get, set, copy, add_assign, sub_assign, mul_assign, div_assign)]
     pub x: f32,
-    #[rune(get, set, copy)]
+    #[rune(get, set, copy, add_assign, sub_assign, mul_assign, div_assign)]
     pub y: f32,
 }
 
@@ -56,9 +119,16 @@ impl Vec2 {
     pub fn from_tuple(pos: (f32, f32)) -> Self {
         Self { x: pos.0, y: pos.1 }
     }
-
-    pub fn zero() -> Self {
-        Self { x: 0.0, y: 0.0 }
+    #[rune::function(path = Self::normalize)]
+    pub fn normalize(&self) -> Self {
+        let length = (self.x * self.x + self.y * self.y).sqrt();
+        if length == 0.0 {
+            return Self { x: 0.0, y: 0.0 };
+        }
+        Self {
+            x: self.x / length,
+            y: self.y / length,
+        }
     }
 
     pub fn as_tuple(&self) -> (f32, f32) {
@@ -68,6 +138,35 @@ impl Vec2 {
     #[rune::function(protocol = STRING_DISPLAY)]
     fn string_display(&self, f: &mut rune::runtime::Formatter) {
         write!(f, "({}, {})", self.x, self.y).unwrap();
+    }
+
+    #[rune::function(protocol = ADD)]
+    fn add(&self, other: &Vec2) -> Self {
+        Self {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+
+    #[rune::function(protocol = SUB)]
+    fn sub(&self, other: &Vec2) -> Self {
+        Self {
+            x: self.x - other.x,
+            y: self.y - other.y,
+        }
+    }
+
+    #[rune::function(protocol = MUL)]
+    fn mul(&self, other: Value) -> Self {
+        mul_vec2(self.clone(), other)
+    }
+
+    #[rune::function(protocol = DIV)]
+    fn div(&self, other: &Vec2) -> Self {
+        Self {
+            x: self.x / other.x,
+            y: self.y / other.y,
+        }
     }
 }
 
@@ -387,7 +486,7 @@ impl ScriptingInstance for RuneInstance {
 
     fn new_with_sources(sources: Vec<ScriptingSource>) -> Result<Self> {
         let mut context = Context::new();
-        let core_module = core_module()?;
+        let core_module = core_module(None)?;
         context.install(&core_module)?;
         let runtime = context.runtime()?;
         let mut rune_sources = Sources::new();
@@ -429,9 +528,13 @@ impl ScriptingInstance for RuneInstance {
         })
     }
 
-    fn initialize(&mut self, sources: Vec<ScriptingSource>) -> Result<()> {
+    fn initialize(
+        &mut self,
+        sources: Vec<ScriptingSource>,
+        input_state: Arc<Mutex<InputState>>,
+    ) -> Result<()> {
         let mut context = Context::new();
-        let core_module = core_module()?;
+        let core_module = core_module(Some(input_state))?;
         context.install(&core_module)?;
         let runtime = context.runtime()?;
         let mut rune_sources = Sources::new();
@@ -676,7 +779,7 @@ pub unsafe fn clear_required_assets() {
     REQUIRED_ASSETS.clear();
 }
 
-fn core_module() -> Result<Module> {
+fn core_module(input_state: Option<Arc<Mutex<InputState>>>) -> Result<Module> {
     let mut m = Module::new();
 
     // Types
@@ -686,6 +789,11 @@ fn core_module() -> Result<Module> {
     m.ty::<Color>()?;
     m.ty::<Drawable>()?;
     m.function_meta(Vec2::string_display)?;
+    m.function_meta(Vec2::normalize)?;
+    m.function_meta(Vec2::add)?;
+    m.function_meta(Vec2::sub)?;
+    m.function_meta(Vec2::mul)?;
+    m.function_meta(Vec2::div)?;
     m.function_meta(RuneEntity::register_drawable)?;
     m.function_meta(RuneEntity::unregister_drawable)?;
     m.function_meta(Color::hex)?;
@@ -695,6 +803,31 @@ fn core_module() -> Result<Module> {
     m.function_meta(Color::white)?;
     m.function_meta(Drawable::sprite)?;
 
+    m.field_function(
+        Protocol::ADD_ASSIGN,
+        "position",
+        RuneTransform::add_position,
+    )?;
+    m.field_function(
+        Protocol::SUB_ASSIGN,
+        "position",
+        RuneTransform::sub_position,
+    )?;
+    m.field_function(
+        Protocol::MUL_ASSIGN,
+        "position",
+        RuneTransform::mul_position,
+    )?;
+    m.field_function(
+        Protocol::DIV_ASSIGN,
+        "position",
+        RuneTransform::div_position,
+    )?;
+    m.field_function(Protocol::ADD_ASSIGN, "scale", RuneTransform::add_scale)?;
+    m.field_function(Protocol::SUB_ASSIGN, "scale", RuneTransform::sub_scale)?;
+    m.field_function(Protocol::MUL_ASSIGN, "scale", RuneTransform::mul_scale)?;
+    m.field_function(Protocol::DIV_ASSIGN, "scale", RuneTransform::div_scale)?;
+
     m.function("print", |log: &str| log!("[RUNE] {}", log))
         .build()?;
     m.function("error", |log: &str| error!("[RUNE] {}", log))
@@ -703,6 +836,19 @@ fn core_module() -> Result<Module> {
     m.function("get_time", move || {
         let duration = start.elapsed();
         duration.as_secs_f64()
+    })
+    .build()?;
+    let input_state = input_state.clone();
+    m.function("get_key", move |key: &str| {
+        if let Some(input_state) = &input_state {
+            let input_state = input_state.lock().unwrap();
+            if let Some(virtual_key) = str_to_key(key) {
+                return input_state.get_key(virtual_key);
+            }
+            false
+        } else {
+            false
+        }
     })
     .build()?;
     // Math Constants

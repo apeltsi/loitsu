@@ -1,5 +1,6 @@
 pub mod rune_runtime;
 use crate::ecs::ComponentFlags;
+use crate::input::InputState;
 use crate::scene_management::Property;
 use crate::{
     ecs::Transform,
@@ -7,6 +8,7 @@ use crate::{
     scene_management::Component,
 };
 use bitcode;
+use std::sync::{Arc, Mutex};
 use std::{cell::RefCell, fmt, rc::Rc};
 
 pub type Result<T> = std::result::Result<T, ScriptingError>;
@@ -50,7 +52,11 @@ pub trait ScriptingInstance: Sized {
     fn new_uninitialized() -> Result<Self>
     where
         Self: Sized;
-    fn initialize(&mut self, sources: Vec<ScriptingSource>) -> Result<()>;
+    fn initialize(
+        &mut self,
+        sources: Vec<ScriptingSource>,
+        input_state: Arc<Mutex<InputState>>,
+    ) -> Result<()>;
     fn call<T>(&mut self, path: [&str; 2], args: T) -> Result<rune::runtime::Value>
     where
         T: rune::runtime::Args;
