@@ -8,6 +8,7 @@ pub struct InputState {
     pub mouse: mouse::MouseState,
     pub down_keys: Vec<VirtualKeyCode>,
     pub new_keys: Vec<VirtualKeyCode>,
+    pub up_keys: Vec<VirtualKeyCode>,
 }
 
 impl InputState {
@@ -23,11 +24,20 @@ impl InputState {
             },
             down_keys: Vec::new(),
             new_keys: Vec::new(),
+            up_keys: Vec::new(),
         }
     }
 
     pub fn get_key(&self, key: VirtualKeyCode) -> bool {
         self.down_keys.contains(&key)
+    }
+
+    pub fn get_key_down(&self, key: VirtualKeyCode) -> bool {
+        self.new_keys.contains(&key)
+    }
+
+    pub fn get_key_up(&self, key: VirtualKeyCode) -> bool {
+        self.up_keys.contains(&key)
     }
 }
 

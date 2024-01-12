@@ -53,15 +53,15 @@ impl RuneTransform {
         position.y -= other.y;
         self.position = Shared::new(AnyObj::new(position).unwrap()).unwrap();
     }
-    fn mul_position(&mut self, other: Shared<AnyObj>) {
+    fn mul_position(&mut self, other: Value) {
         let position = as_vec2(self.position.clone());
-        let position = mul_vec2(position, Value::from(other));
+        let position = mul_vec2(position, other);
         self.position = Shared::new(AnyObj::new(position).unwrap()).unwrap();
     }
-    fn div_position(&mut self, other: &Vec2) {
+    fn div_position(&mut self, other: f64) {
         let mut position = as_vec2(self.position.clone());
-        position.x /= other.x;
-        position.y /= other.y;
+        position.x /= other as f32;
+        position.y /= other as f32;
         self.position = Shared::new(AnyObj::new(position).unwrap()).unwrap();
     }
     fn add_scale(&mut self, other: &Vec2) {
@@ -76,15 +76,15 @@ impl RuneTransform {
         scale.y -= other.y;
         self.scale = Shared::new(AnyObj::new(scale).unwrap()).unwrap();
     }
-    fn mul_scale(&mut self, other: Shared<AnyObj>) {
+    fn mul_scale(&mut self, other: Value) {
         let scale = as_vec2(self.scale.clone());
-        let scale = mul_vec2(scale, Value::from(other));
+        let scale = mul_vec2(scale, other);
         self.scale = Shared::new(AnyObj::new(scale).unwrap()).unwrap();
     }
-    fn div_scale(&mut self, other: &Vec2) {
+    fn div_scale(&mut self, other: f64) {
         let mut scale = as_vec2(self.scale.clone());
-        scale.x /= other.x;
-        scale.y /= other.y;
+        scale.x /= other as f32;
+        scale.y /= other as f32;
         self.scale = Shared::new(AnyObj::new(scale).unwrap()).unwrap();
     }
 }
@@ -838,12 +838,38 @@ fn core_module(input_state: Option<Arc<Mutex<InputState>>>) -> Result<Module> {
         duration.as_secs_f64()
     })
     .build()?;
-    let input_state = input_state.clone();
+    let input_state_clone = input_state.clone();
     m.function("get_key", move |key: &str| {
-        if let Some(input_state) = &input_state {
+        if let Some(input_state) = &input_state_clone {
             let input_state = input_state.lock().unwrap();
             if let Some(virtual_key) = str_to_key(key) {
                 return input_state.get_key(virtual_key);
+            }
+            false
+        } else {
+            false
+        }
+    })
+    .build()?;
+    let input_state_clone = input_state.clone();
+    m.function("get_key_down", move |key: &str| {
+        if let Some(input_state) = &input_state_clone {
+            let input_state = input_state.lock().unwrap();
+            if let Some(virtual_key) = str_to_key(key) {
+                return input_state.get_key_down(virtual_key);
+            }
+            false
+        } else {
+            false
+        }
+    })
+    .build()?;
+    let input_state_clone = input_state.clone();
+    m.function("get_key_up", move |key: &str| {
+        if let Some(input_state) = &input_state_clone {
+            let input_state = input_state.lock().unwrap();
+            if let Some(virtual_key) = str_to_key(key) {
+                return input_state.get_key_up(virtual_key);
             }
             false
         } else {

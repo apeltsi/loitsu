@@ -250,6 +250,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 {
                     let mut input_state = input_state.lock().unwrap();
                     input_state.new_keys.clear();
+                    input_state.up_keys.clear();
                 }
                 if state.camera.dirty {
                     queue.write_buffer(&camera_matrix_buffer, 0, bytemuck::cast_slice(&[CameraMatrix {
@@ -328,6 +329,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         // check if we should add or remove the key
                         if input.state == ElementState::Released {
                             input_state.down_keys.retain(|&x| x != key);
+                            input_state.up_keys.push(key);
                         } else {
                             input_state.down_keys.push(key);
                             input_state.new_keys.push(key);
