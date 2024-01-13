@@ -8,7 +8,7 @@ use winit::{
 use crate::{log_render as log, scripting::{ScriptingInstance, EntityUpdate}, scene_management::Scene, rendering::drawable::{sprite::SpriteDrawable, DrawablePrototype}, asset_management::AssetManager, ecs::{Transform, RuntimeEntity}, log_scripting, input::InputState};
 #[allow(unused_imports)]
 use crate::ecs::{ECS, ComponentFlags};
-use std::{cmp::max, cell::RefCell, rc::Rc};
+use std::{cmp::max, cell::RefCell, rc::Rc, sync::{Mutex, Arc}};
 use crate::asset_management::ASSET_MANAGER;
 
 #[cfg(target_arch = "wasm32")]
@@ -112,7 +112,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     let mut state = State {
         camera: CameraState::new()
     };
-    let mut input_state = InputState::new();
+    let input_state = Arc::new(Mutex::new(InputState::new()));
     state.camera.set_scale(1.0);
     state.camera.set_position([0.0, 0.0].into());
     event_loop.run(move |event, _, control_flow| {
@@ -205,7 +205,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
                         let x = if let Some(static_shard) = &asset_manager.assets.lock().unwrap().static_shard {
                             // init scripts
-                            scripting.initialize(static_shard.get_scripts().clone()).unwrap();
+                            scripting.initialize(static_shard.get_scripts().clone(), input_state.clone()).unwrap();
                             log_scripting!("Scripting initialized");
                             let default_scene_name = static_shard.get_preferences().default_scene.as_str();
                             let scene = static_shard.get_scene(default_scene_name);
@@ -247,6 +247,11 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
                     process_entity_updates(&device, &asset_manager, &shader_manager, &mut drawables, updates);
                 }
+                {
+                    let mut input_state = input_state.lock().unwrap();
+                    input_state.new_keys.clear();
+                    input_state.up_keys.clear();
+                }
                 if state.camera.dirty {
                     queue.write_buffer(&camera_matrix_buffer, 0, bytemuck::cast_slice(&[CameraMatrix {
                         view: state.camera.view,
@@ -267,6 +272,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
             } if window_id == window.id() => match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                 WindowEvent::CursorMoved { position, ..} => {
+                    let mut input_state = input_state.lock().unwrap();
                     input_state.mouse.last_position = Some(input_state.mouse.position);
                     input_state.mouse.position = (position.x as f32 / config.width as f32, position.y as f32 / config.height as f32);
                     #[cfg(feature = "editor")]
@@ -279,6 +285,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     }
                 },
                 WindowEvent::MouseInput { state: element_state, button, .. } => {
+                    let mut input_state = input_state.lock().unwrap();
                     match button {
                         MouseButton::Left => {
                             input_state.mouse.left_button = *element_state == ElementState::Pressed;
@@ -314,6 +321,19 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     }
                     if state.camera.scale < 0.1 {
                         state.camera.scale = 0.1;
+                    }
+                },
+                WindowEvent::KeyboardInput { input, .. } => {
+                    if let Some(key) = input.virtual_keycode {
+                        let mut input_state = input_state.lock().unwrap();
+                        // check if we should add or remove the key
+                        if input.state == ElementState::Released {
+                            input_state.down_keys.retain(|&x| x != key);
+                            input_state.up_keys.push(key);
+                        } else {
+                            input_state.down_keys.push(key);
+                            input_state.new_keys.push(key);
+                        }
                     }
                 },
                 _ => {}

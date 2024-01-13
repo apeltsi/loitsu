@@ -125,7 +125,6 @@ impl AssetManager {
                             assets.shards.push(consumed_shard);
 
                             pending_tasks.fetch_sub(1, Ordering::SeqCst);
-                            log!("Successfully loaded shard: '{}'", shard.get_name());
                         }
                         Err(e) => {
                             error!("Failed to load shard: {:?}", e.message);
