@@ -83,6 +83,9 @@ where
         Event::CameraChanged(x, y, zoom) => {
             camera_moved(*x, *y, *zoom);
         }
+        Event::SelectedEntityPosition(x, y, width, height) => {
+            set_selected_bounds_pos(*x, *y, *width, *height);
+        }
     }
 }
 
@@ -100,6 +103,7 @@ pub fn set_component_property(id: String, component: String, field: String, valu
     event_handler.emit_client(ClientEvent::SetComponentProperty {
         entity: id,
         // FIXME: This currently assumes that all properties are strings
+        // (In runes case) the engine should use the type data from the initial values
         property: loitsu::scene_management::Property::String(value),
         component,
         field,
@@ -112,4 +116,5 @@ extern "C" {
     fn set_hierarchy(hierarchy: String);
     fn select_entity(entity: String);
     fn camera_moved(x: f32, y: f32, zoom: f32);
+    fn set_selected_bounds_pos(x: f32, y: f32, width: f32, height: f32);
 }

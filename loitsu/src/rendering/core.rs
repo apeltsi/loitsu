@@ -9,7 +9,7 @@ use crate::{log_render as log, scripting::{ScriptingInstance, EntityUpdate}, sce
 #[allow(unused_imports)]
 use crate::ecs::{ECS, ComponentFlags};
 use std::{cmp::max, cell::RefCell, rc::Rc, sync::{Mutex, Arc}};
-use crate::asset_management::ASSET_MANAGER;
+use crate::{asset_management::ASSET_MANAGER, scene_management::Entity, util::scaling};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -115,6 +115,8 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     let input_state = Arc::new(Mutex::new(InputState::new()));
     state.camera.set_scale(1.0);
     state.camera.set_position([0.0, 0.0].into());
+    #[cfg(feature = "editor")]
+    let mut selected_entity: Option<Rc<RefCell<RuntimeEntity<T>>>> = None;
     event_loop.run(move |event, _, control_flow| {
         let _ = (&instance, &adapter);
         *control_flow = ControlFlow::Poll;
@@ -182,7 +184,12 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         match event {
                             crate::editor::ClientEvent::SelectEntity(id) => {
                                 if let Some(entity) = ecs.get_entity(id.as_str()) {
-                                    ecs.emit(crate::editor::Event::EntitySelected((*entity).borrow().as_entity()));
+                                    selected_entity = Some(entity.clone());
+                                    let entity = (*entity).borrow();
+                                    let as_entity = entity.as_entity();
+                                    let entity_bounds = get_entity_screen_space_bounds(&state.camera, &as_entity).unwrap();
+                                    ecs.emit(crate::editor::Event::EntitySelected(as_entity));
+                                    ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
                                 }
                             },
                             crate::editor::ClientEvent::SetComponentProperty { entity, component, field, property } => {
@@ -278,10 +285,15 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     #[cfg(feature = "editor")]
                     if input_state.mouse.right_button {
                         let delta = input_state.mouse.get_delta();
-                        let world_scale_delta = input_state.mouse.as_world_scale(&state.camera, (-delta.0, delta.1));
+                        let world_scale_delta = crate::util::scaling::as_world_scale(&state.camera, (-delta.0, delta.1));
                         state.camera.position.x += world_scale_delta.0;
                         state.camera.position.y += world_scale_delta.1;
                         state.camera.dirty = true;
+                        if let Some(entity) = &selected_entity {
+                            let as_entity = entity.borrow().as_entity();
+                            let entity_bounds = get_entity_screen_space_bounds(&state.camera, &as_entity).unwrap();
+                            ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
+                        }
                     }
                 },
                 WindowEvent::MouseInput { state: element_state, button, .. } => {
@@ -293,8 +305,12 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                             if *element_state == ElementState::Pressed {
                                 let click_pos = input_state.mouse.get_world_position(&state.camera);
                                 if let Some(entity) = find_overlapping_entity(&ecs, click_pos) {
+                                    selected_entity = Some(entity.clone());
                                     let entity = entity.borrow();
-                                    ecs.emit(crate::editor::Event::EntitySelected(entity.as_entity()));
+                                    let as_entity = entity.as_entity();
+                                    let entity_bounds = get_entity_screen_space_bounds(&state.camera, &as_entity).unwrap();
+                                    ecs.emit(crate::editor::Event::EntitySelected(as_entity));
+                                    ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
                                 }
                             }
                         },
@@ -322,6 +338,11 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     if state.camera.scale < 0.1 {
                         state.camera.scale = 0.1;
                     }
+                    if let Some(entity) = &selected_entity {
+                        let as_entity = entity.borrow().as_entity();
+                        let entity_bounds = get_entity_screen_space_bounds(&state.camera, &as_entity).unwrap();
+                        ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
+                    }
                 },
                 WindowEvent::KeyboardInput { input, .. } => {
                     if let Some(key) = input.virtual_keycode {
@@ -341,6 +362,19 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
             _ => {}
         }
     });
+}
+
+#[allow(dead_code)]
+fn get_entity_screen_space_bounds(camera: &CameraState, entity: &Entity) -> Option<(f32, f32, f32, f32)> {
+    match entity.transform {
+        Transform::Transform2D {position, scale, ..} => {
+            let screen_pos = scaling::as_screen_pos(camera, position);
+            let screen_scale = scaling::as_screen_scale(camera, scale);
+            return Some((screen_pos.0, screen_pos.1, screen_scale.0, screen_scale.1));
+        },
+        _ => {}
+    };
+    None
 }
 
 #[allow(dead_code)]

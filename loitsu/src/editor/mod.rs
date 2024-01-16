@@ -44,6 +44,8 @@ pub enum Event {
     EntitySelected(Entity),
     /// The camera has changed (x, y, zoom)
     CameraChanged(f32, f32, f32),
+    /// The selected entitys position on screen has changed. (x, y, width, height) where 1 is the width or height of the screen
+    SelectedEntityPosition(f32, f32, f32, f32),
 }
 
 /// This is a list of events that the client can send to the editor backend

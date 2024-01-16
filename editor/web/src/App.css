@@ -156,3 +156,17 @@
         filter: opacity(1);
     }
 }
+
+.select_bounds {
+    position: absolute;
+    border: 2px solid var(--accent);
+    pointer-events: none;
+    z-index: 1000;
+    border-radius: 0.5rem;
+    box-shadow: 0 0 10px 10px var(--accent);
+    transition-duration: 0.2s;
+    transition-property: opacity;
+    animation: select 0.2s ease-out;
+    transform: translate(-2px, -2px);
+    z-index: -1;
+}

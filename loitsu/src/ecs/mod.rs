@@ -11,6 +11,7 @@ use bitflags::bitflags;
 use serde_json::{Map, Number, Value};
 #[cfg(feature = "editor")]
 use std::sync::{Arc, Mutex};
+use uuid::Uuid;
 
 pub struct ECS<T>
 where
@@ -206,7 +207,7 @@ where
     T: ScriptingInstance,
 {
     name: String,
-    id: String,
+    id: Uuid,
     pub components: Vec<RuntimeComponent<T>>,
     entity_proto: Entity,
     pub children: Vec<Rc<RefCell<RuntimeEntity<T>>>>,
@@ -223,8 +224,12 @@ where
         &self.name
     }
 
-    pub fn get_id(&self) -> &str {
-        &self.id
+    pub fn get_id(&self) -> String {
+        self.id.to_string()
+    }
+
+    pub fn get_uuid(&self) -> Uuid {
+        self.id
     }
 
     pub fn get_component_mut(&mut self, id: &str) -> Option<&mut RuntimeComponent<T>> {
@@ -352,7 +357,7 @@ impl<T: ScriptingInstance> RuntimeEntity<T> {
     pub fn as_entity(&self) -> Entity {
         Entity {
             name: self.name.clone(),
-            id: self.id.clone(),
+            id: self.id.to_string(),
             components: self
                 .components
                 .iter()
@@ -390,7 +395,7 @@ where
     for proto_entity in proto_entities {
         let mut runtime_entity = RuntimeEntity {
             name: proto_entity.name.clone(),
-            id: proto_entity.id.clone(),
+            id: Uuid::parse_str(proto_entity.id.as_str()).unwrap(),
             components: Vec::new(),
             entity_proto: proto_entity.clone(),
             children: init_entities(proto_entity.children.clone(), scripting),

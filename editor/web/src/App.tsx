@@ -8,6 +8,12 @@ function App() {
     const [camera, setCamera] = createSignal("(0,0) x1");
     const [popOut, setPopOut] = createSignal(false);
     const [loading, setLoading] = createSignal(true);
+    const [selectBounds, setSelectBounds] = createSignal(["0", "0", "0", "0"]);
+    // @ts-ignore
+    window.set_selected_bounds_pos = (x, y, width, height) => {
+        setSelectBounds([(x - width / 2) * 100 + "vw", "calc(" + (y - height / 2) * 100 + "vh - 30px)", width * 100 + "vw", height * 100 + "vh"]);
+    };
+
     setTimeout(() => {
         setLoading(false);
     }, 1000);
@@ -37,6 +43,7 @@ function App() {
                 <div class="overlays">
                     <span class="camera-state">{camera()}</span>
                 </div>
+                <div class="select_bounds" style={{left: selectBounds()[0], top: selectBounds()[1], width: selectBounds()[2], height: selectBounds()[3]}}/>
             </div>
         </div>
     </>
