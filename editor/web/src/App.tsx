@@ -1,22 +1,42 @@
-import { createSignal } from 'solid-js';
+import { createSignal, onCleanup } from 'solid-js';
 import './App.css';
 import FileExplorer from './components/FileExplorer';
 import Hierarchy from './components/Hierarchy';
 import Inspector from './components/Inspector';
 import TopBar from './components/TopBar';
+import { Show } from 'solid-js/web';
+import { add_select_listener, remove_select_listener } from '.';
+
 function App() {
     const [camera, setCamera] = createSignal("(0,0) x1");
     const [popOut, setPopOut] = createSignal(false);
     const [loading, setLoading] = createSignal(true);
     const [selectBounds, setSelectBounds] = createSignal(["0", "0", "0", "0"]);
+    let selected_entity = "";
+    const [showSelection, setShowSelection] = createSignal(false);
     // @ts-ignore
     window.set_selected_bounds_pos = (x, y, width, height) => {
         setSelectBounds([(x - width / 2) * 100 + "vw", "calc(" + (y - height / 2) * 100 + "vh - 30px)", width * 100 + "vw", height * 100 + "vh"]);
     };
 
+    const select_listener = (entity: any) => {
+        if (entity.id !== selected_entity) {
+            setShowSelection(false);
+            selected_entity = entity.id;
+            requestAnimationFrame(() => {
+                setShowSelection(true);
+            });
+        }
+    };
+    add_select_listener(select_listener);
+    onCleanup(() => {
+        remove_select_listener(select_listener);
+    });
+
     setTimeout(() => {
         setLoading(false);
     }, 1000);
+
     // @ts-ignore
     window.camera_moved = (x, y, zoom) => {
         x = Math.round(x * 100) / 100;
@@ -43,7 +63,9 @@ function App() {
                 <div class="overlays">
                     <span class="camera-state">{camera()}</span>
                 </div>
-                <div class="select_bounds" style={{left: selectBounds()[0], top: selectBounds()[1], width: selectBounds()[2], height: selectBounds()[3]}}/>
+                <Show when={showSelection()}>
+                    <div class="select_bounds" style={{left: selectBounds()[0], top: selectBounds()[1], width: selectBounds()[2], height: selectBounds()[3]}}/>
+                </Show>
             </div>
         </div>
     </>

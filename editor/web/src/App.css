@@ -159,14 +159,23 @@
 
 .select_bounds {
     position: absolute;
-    border: 2px solid var(--accent);
+    border: 2px solid var(--accent-hover);
     pointer-events: none;
     z-index: 1000;
-    border-radius: 0.5rem;
+    border-radius: 0.2rem;
     box-shadow: 0 0 10px 10px var(--accent);
-    transition-duration: 0.2s;
-    transition-property: opacity;
-    animation: select 0.2s ease-out;
+    animation: select 0.1s ease-out;
     transform: translate(-2px, -2px);
     z-index: -1;
+}
+
+@keyframes select {
+    from {
+        opacity: 0.25;
+        transform: translate(-2px, -2px) scale(1.1);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-2px, -2px) scale(1);
+    }
 }

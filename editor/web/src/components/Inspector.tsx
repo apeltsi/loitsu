@@ -1,12 +1,17 @@
-import { For, Match, Show, Switch, createEffect, createSignal } from 'solid-js';
+import { For, Match, Show, Switch, createEffect, createSignal, onCleanup } from 'solid-js';
 import styles from './Inspector.module.css';
 import PanelTitle from './PanelTitle';
+import { add_select_listener, remove_select_listener } from '..';
+
 export default function Inspector() {
     const [entity, setEntity] = createSignal({} as object);
-    // @ts-ignore
-    window.select_entity = (entity: string) => {
-        setEntity(JSON.parse(entity));
+    const select_listener = (entity: any) => {
+        setEntity(entity);
     };
+    add_select_listener(select_listener);
+    onCleanup(() => {
+        remove_select_listener(select_listener);
+    });
     return (
         <div class={styles.inspector + " inspector"}>
             <PanelTitle title={"Inspector"}/>
