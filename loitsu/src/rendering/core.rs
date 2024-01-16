@@ -285,7 +285,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     #[cfg(feature = "editor")]
                     if input_state.mouse.right_button {
                         let delta = input_state.mouse.get_delta();
-                        let world_scale_delta = crate::util::scaling::as_world_scale(&state.camera, (-delta.0, delta.1));
+                        let world_scale_delta = crate::util::scaling::as_world_scale(&state.camera, (-delta.0 / 2.0, delta.1));
                         state.camera.position.x += world_scale_delta.0;
                         state.camera.position.y += world_scale_delta.1;
                         state.camera.dirty = true;

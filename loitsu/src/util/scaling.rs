@@ -49,7 +49,7 @@ mod tests {
         let camera = CameraState {
             position: (0.0, 0.0).into(),
             scale: 2.0,
-            aspect: (1.0, 1.0),
+            aspect: (1.0, 2.0),
             dirty: false,
             view: [[0.0; 4]; 4],
         };
@@ -73,7 +73,7 @@ mod tests {
         let camera = CameraState {
             position: (0.0, 0.0).into(),
             scale: 1.0,
-            aspect: (1.0, 1.0),
+            aspect: (1.0, 2.0),
             dirty: false,
             view: [
                 [1.0, 0.0, 0.0, 0.0],
