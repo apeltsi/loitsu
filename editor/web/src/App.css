@@ -163,7 +163,7 @@
     pointer-events: none;
     z-index: 1000;
     border-radius: 0.2rem;
-    box-shadow: 0 0 10px 10px var(--accent);
+    box-shadow: 0 0 10px 5px var(--accent);
     animation: select 0.1s ease-out;
     transform: translate(-2px, -2px);
     z-index: -1;

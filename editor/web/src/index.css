@@ -13,8 +13,8 @@ body {
     --input-bg-color-hover: #303050;
     --input-outline-color: #606060;
     --backdrop-blur: 10px;
-    --accent: #30A0FF;
-    --accent-hover: #50C0FF;
+    --accent: #5544C2;
+    --accent-hover: #8646E0;
     cursor: url("./assets/cursor/cursor.png"), url("./assets/cursor/cursor.svg"), auto;
     --text-cursor: url("./assets/cursor/text-cursor.png") 12 12, url("./assets/cursor/text-cursor.svg") 12 12,
     auto;
