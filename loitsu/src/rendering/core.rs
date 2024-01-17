@@ -304,6 +304,9 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                             #[cfg(feature = "editor")]
                             if *element_state == ElementState::Pressed {
                                 let click_pos = input_state.mouse.get_world_position(&state.camera);
+                                // not sure why we have to divide by the aspect ratio here, but it works so I'm not gonna question it
+                                let click_pos = (click_pos.0 / state.camera.aspect.1, click_pos.1 / state.camera.aspect.0);
+
                                 if let Some(entity) = find_overlapping_entity(&ecs, click_pos) {
                                     selected_entity = Some(entity.clone());
                                     let entity = entity.borrow();
