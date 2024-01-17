@@ -11,7 +11,7 @@ pub struct MouseState {
 
 impl MouseState {
     pub fn get_world_position(&self, camera: &CameraState) -> (f32, f32) {
-        scaling::as_world_pos(camera, self.position)
+        scaling::as_world_pos(camera, (self.position.0, self.position.1))
     }
 
     pub fn get_delta(&self) -> (f32, f32) {
