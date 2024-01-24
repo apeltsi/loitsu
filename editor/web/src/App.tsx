@@ -12,6 +12,7 @@ function App() {
     const [popOut, setPopOut] = createSignal(false);
     const [loading, setLoading] = createSignal(true);
     const [selectBounds, setSelectBounds] = createSignal(["0", "0", "0", "0"]);
+    const [isMoving, setIsMoving] = createSignal<undefined | [number, number]>(undefined);
     let selected_entity = "";
     const [showSelection, setShowSelection] = createSignal(false);
     // @ts-ignore
@@ -29,8 +30,27 @@ function App() {
         }
     };
     add_select_listener(select_listener);
+    const move_listener = (ev: MouseEvent) => {
+        let moveVal = isMoving();
+        if (moveVal) {
+            console.log("mouse move");
+            const [startX, startY] = moveVal;
+            const dx = ev.pageX / window.innerWidth - startX;
+            const dy = ev.pageY / window.innerHeight - startY;
+            // @ts-ignore
+            window.move_selected(dx, -dy);
+            setIsMoving([ev.pageX / window.innerWidth, ev.pageY / window.innerHeight]);
+        }
+    };
+    const mouseup_listener = () => {
+        setIsMoving(undefined);
+    };
+    window.addEventListener("mousemove", move_listener);
+    window.addEventListener("mouseup", mouseup_listener);
     onCleanup(() => {
         remove_select_listener(select_listener);
+        window.removeEventListener("mousemove", move_listener);
+        window.removeEventListener("mouseup", mouseup_listener);
     });
 
     setTimeout(() => {
@@ -64,7 +84,13 @@ function App() {
                     <span class="camera-state">{camera()}</span>
                 </div>
                 <Show when={showSelection()}>
-                    <div class="select_bounds" style={{left: selectBounds()[0], top: selectBounds()[1], width: selectBounds()[2], height: selectBounds()[3]}}/>
+                    <div draggable={false} class="select_bounds" style={{left: selectBounds()[0], top: selectBounds()[1], width: selectBounds()[2], height: selectBounds()[3]}}>
+                        <div draggable={false} class="move_tool" onMouseDown={(ev: MouseEvent) => {
+                            console.log("is moving");
+                            setIsMoving([ev.pageX / window.innerWidth, ev.pageY / window.innerHeight]);
+                            ev.preventDefault();
+                        }}/>
+                    </div>
                 </Show>
             </div>
         </div>

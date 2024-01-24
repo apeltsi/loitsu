@@ -21,33 +21,24 @@ pub fn as_screen_scale(camera: &CameraState, pos: (f32, f32)) -> (f32, f32) {
 /// Here, (0, 0) represents the bottom-left corner of the screen.
 /// This is the inverse of `as_screen_pos`
 pub fn as_world_pos(camera: &CameraState, pos: (f32, f32)) -> (f32, f32) {
-    let mut aspect = camera.aspect;
-    if aspect.0 > aspect.1 {
-        aspect = (1.0 / aspect.0, 1.0);
-    } else {
-        aspect = (1.0, 1.0 / aspect.1);
-    }
+    let aspect = camera.aspect;
     let (x, y) = (pos.0 * 2.0, pos.1 * 2.0); // Scale the mouse position to the range -1.0 to 1.0
     let (x, y) = (x - 1.0, -y + 1.0); // Center the mouse position
-    let (x, y) = (x / aspect.0, y / aspect.1);
     let (x, y) = (x / camera.scale, y / camera.scale); // Scale the mouse position by the camera zoom
     let (x, y) = (x + camera.position.x, y + camera.position.y); // Move the mouse position by the camera position
-    (x, y)
+    (x / aspect.1, y / aspect.0)
 }
 
 /// Expects a vector, representing a position, in world space and returns a vector in screen space
 /// Here, (0, 0) represents the bottom-left corner of the screen.
 /// This is the inverse of `as_world_pos`
 pub fn as_screen_pos(camera: &CameraState, pos: (f32, f32)) -> (f32, f32) {
-    let mut aspect = camera.aspect;
-    if aspect.0 > aspect.1 {
-        aspect = (1.0 / aspect.0, 1.0);
-    } else {
-        aspect = (1.0, 1.0 / aspect.1);
-    }
-    let (x, y) = (pos.0 - camera.position.x, pos.1 - camera.position.y); // Move the mouse position by the camera position
+    let aspect = camera.aspect;
+    let (x, y) = (
+        pos.0 * aspect.1 - camera.position.x,
+        pos.1 * aspect.0 - camera.position.y,
+    ); // Move the mouse position by the camera position
     let (x, y) = (x * camera.scale, y * camera.scale); // Scale the mouse position by the camera zoom
-    let (x, y) = (x * aspect.0, y * aspect.1);
     let (x, y) = (x, y); // Scale the mouse position to the range -1.0 to 1.0
     let (x, y) = (x + 1.0, -y + 1.0); // Center the mouse position
     (x / 2.0, y / 2.0)
@@ -85,7 +76,7 @@ mod tests {
     fn test_as_world_pos() {
         let camera = CameraState {
             position: (0.0, 0.0).into(),
-            scale: 1.0,
+            scale: 3.0,
             aspect: (1.0, 2.0),
             dirty: false,
             view: [

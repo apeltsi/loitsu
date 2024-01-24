@@ -58,4 +58,5 @@ pub enum ClientEvent {
         field: String,
         property: Property,
     },
+    MoveSelected(f32, f32),
 }

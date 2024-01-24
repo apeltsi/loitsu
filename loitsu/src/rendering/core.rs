@@ -202,6 +202,25 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                                     updates.extend(ecs.run_component_methods(&mut scripting, ComponentFlags::EDITOR_UPDATE));
                                 }
                             },
+                            crate::editor::ClientEvent::MoveSelected(x, y) => {
+                                if let Some(entity) = &selected_entity {
+                                    let entity = (*entity).borrow_mut();
+                                    let (x, y) = crate::util::scaling::as_world_scale(&state.camera, (x, y));
+                                    match *entity.transform.borrow_mut() {
+                                        Transform::Transform2D {ref mut position, ref mut has_changed, ..} => {
+                                            position.0 += x;
+                                            position.1 += y;
+                                            *has_changed = true;
+                                        },
+                                        Transform::RectTransform { .. } => {
+
+                                        }
+                                    };
+                                    let as_entity = entity.as_entity();
+                                    let entity_bounds = get_entity_screen_space_bounds(&state.camera, &as_entity).unwrap();
+                                    ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
+                                }
+                            },
                         }
                     }
                 }
@@ -285,7 +304,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     #[cfg(feature = "editor")]
                     if input_state.mouse.right_button {
                         let delta = input_state.mouse.get_delta();
-                        let world_scale_delta = crate::util::scaling::as_world_scale(&state.camera, (-delta.0 / 2.0, delta.1));
+                        let world_scale_delta = crate::util::scaling::as_world_scale(&state.camera, (-delta.0 * state.camera.aspect.1, delta.1 * state.camera.aspect.0));
                         state.camera.position.x += world_scale_delta.0;
                         state.camera.position.y += world_scale_delta.1;
                         state.camera.dirty = true;
@@ -304,8 +323,6 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                             #[cfg(feature = "editor")]
                             if *element_state == ElementState::Pressed {
                                 let click_pos = input_state.mouse.get_world_position(&state.camera);
-                                // not sure why we have to divide by the aspect ratio here, but it works so I'm not gonna question it
-                                let click_pos = (click_pos.0 / state.camera.aspect.1, click_pos.1 / state.camera.aspect.0);
 
                                 if let Some(entity) = find_overlapping_entity(&ecs, click_pos) {
                                     selected_entity = Some(entity.clone());

@@ -111,6 +111,13 @@ pub fn set_component_property(id: String, component: String, field: String, valu
 }
 
 #[wasm_bindgen]
+pub fn move_selected(x: f32, y: f32) {
+    let event_handler = unsafe { EVENT_HANDLER.as_ref().unwrap().clone() };
+    let mut event_handler = event_handler.lock().unwrap();
+    event_handler.emit_client(ClientEvent::MoveSelected(x, y));
+}
+
+#[wasm_bindgen]
 extern "C" {
     fn set_scene_name(name: String);
     fn set_hierarchy(hierarchy: String);

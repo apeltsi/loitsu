@@ -24,6 +24,8 @@ body {
     url("./assets/cursor/pointer-cursor.svg") 8 0, auto;
     --dot-cursor: url("./assets/cursor/dot-cursor.png") 12 12, url("./assets/cursor/dot-cursor.svg") 12 12,
     auto;
+    --move-cursor: url("./assets/cursor/move.png") 12 12, url("./assets/cursor/move.svg") 12 12,
+    auto;
     color: var(--text-color);
     background-color: black;
     margin: 0;
