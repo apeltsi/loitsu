@@ -399,7 +399,7 @@ fn get_entity_screen_space_bounds(camera: &CameraState, entity: &Entity) -> Opti
 
 #[allow(dead_code)]
 fn find_overlapping_entity<T>(ecs: &ECS<T>, check_position: (f32, f32)) -> Option<Rc<RefCell<RuntimeEntity<T>>>> where T: ScriptingInstance {
-    for e in ecs.get_runtime_entities() {
+    for e in ecs.get_all_runtime_entities_flat() {
         let entity = e.borrow();
         match *(*entity.transform).borrow() {
             Transform::Transform2D {position, scale, ..} => {

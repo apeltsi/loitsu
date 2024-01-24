@@ -604,6 +604,7 @@ impl ScriptingInstance for RuneInstance {
             }
             for child in &mut entity.children {
                 let mut child = child.borrow_mut();
+                let mut entity_updates = Vec::new();
                 if child.is_new {
                     if child.component_flags & ComponentFlags::START == ComponentFlags::START {
                         entity_updates.extend(
@@ -615,6 +616,7 @@ impl ScriptingInstance for RuneInstance {
                 if child.component_flags & method == method {
                     entity_updates.extend(self.run_component_methods_on_entity(&mut child, method));
                 }
+                updates.push((child.transform.clone(), entity_updates));
             }
             updates.push((entity.transform.clone(), entity_updates));
         }

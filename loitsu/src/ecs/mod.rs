@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[cfg(not(feature = "scene_generation"))]
@@ -20,6 +21,7 @@ where
     pub active_scene: Scene,
     pub static_scene: Option<Scene>,
     runtime_entities: Vec<Rc<RefCell<RuntimeEntity<T>>>>,
+    entity_lookup: HashMap<Uuid, Rc<RefCell<RuntimeEntity<T>>>>,
     #[cfg(feature = "editor")]
     event_handler: Arc<Mutex<crate::editor::EventHandler<T>>>,
 }
@@ -259,6 +261,7 @@ impl<T: ScriptingInstance> ECS<T> {
             active_scene: Scene::new("INITIAL_SCENE".to_string()),
             static_scene: None,
             runtime_entities: Vec::new(),
+            entity_lookup: HashMap::new(),
         }
     }
 
@@ -268,6 +271,7 @@ impl<T: ScriptingInstance> ECS<T> {
             active_scene: Scene::new("INITIAL_SCENE".to_string()),
             static_scene: None,
             runtime_entities: Vec::new(),
+            entity_lookup: HashMap::new(),
             event_handler,
         }
     }
@@ -275,7 +279,8 @@ impl<T: ScriptingInstance> ECS<T> {
     pub fn load_scene(&mut self, scene: Scene, scripting: &mut T) {
         self.active_scene = scene.clone();
 
-        self.runtime_entities = init_entities(scene.clone().entities, scripting);
+        (self.runtime_entities, self.entity_lookup) =
+            init_entities(scene.clone().entities, scripting);
         #[cfg(feature = "editor")]
         self.emit(crate::editor::Event::SceneLoaded(scene));
 
@@ -301,12 +306,8 @@ impl<T: ScriptingInstance> ECS<T> {
     }
 
     pub fn get_entity(&self, id: &str) -> Option<Rc<RefCell<RuntimeEntity<T>>>> {
-        for runtime_entity in self.runtime_entities.iter() {
-            if runtime_entity.borrow().get_id() == id {
-                return Some(runtime_entity.clone());
-            }
-        }
-        None
+        let uuid = Uuid::parse_str(id).unwrap();
+        self.entity_lookup.get(&uuid).map(|entity| entity.clone())
     }
 
     pub fn run_build_step(&mut self, scripting: &mut T) {
@@ -351,6 +352,15 @@ impl<T: ScriptingInstance> ECS<T> {
     pub fn get_runtime_entities(&self) -> &Vec<Rc<RefCell<RuntimeEntity<T>>>> {
         &self.runtime_entities
     }
+    /// Returns a flat list of all entities in the scene
+    pub fn get_all_runtime_entities_flat(&self) -> Vec<Rc<RefCell<RuntimeEntity<T>>>> {
+        let mut entities = Vec::new();
+        for runtime_entity in &self.runtime_entities {
+            entities.push(runtime_entity.clone());
+            entities.append(&mut runtime_entity.borrow().get_all_runtime_entities());
+        }
+        entities
+    }
 }
 
 impl<T: ScriptingInstance> RuntimeEntity<T> {
@@ -371,6 +381,15 @@ impl<T: ScriptingInstance> RuntimeEntity<T> {
             transform: self.transform.borrow().clone(),
         }
     }
+
+    pub fn get_all_runtime_entities(&self) -> Vec<Rc<RefCell<RuntimeEntity<T>>>> {
+        let mut entities = Vec::new();
+        for runtime_entity in &self.children {
+            entities.push(runtime_entity.clone());
+            entities.append(&mut runtime_entity.borrow().get_all_runtime_entities());
+        }
+        entities
+    }
 }
 
 impl<T: ScriptingInstance> RuntimeComponent<T> {
@@ -386,23 +405,29 @@ impl<T: ScriptingInstance> RuntimeComponent<T> {
 fn init_entities<T>(
     proto_entities: Vec<Entity>,
     scripting: &mut T,
-) -> Vec<Rc<RefCell<RuntimeEntity<T>>>>
+) -> (
+    Vec<Rc<RefCell<RuntimeEntity<T>>>>,
+    HashMap<Uuid, Rc<RefCell<RuntimeEntity<T>>>>,
+)
 where
     T: ScriptingInstance,
 {
     // Lets recursively iterate over the entities and create a runtime entity for each one
     let mut runtime_entities = Vec::new();
+    let mut entity_lookup = HashMap::new();
     for proto_entity in proto_entities {
+        let children = init_entities(proto_entity.children.clone(), scripting);
         let mut runtime_entity = RuntimeEntity {
             name: proto_entity.name.clone(),
             id: Uuid::parse_str(proto_entity.id.as_str()).unwrap(),
             components: Vec::new(),
             entity_proto: proto_entity.clone(),
-            children: init_entities(proto_entity.children.clone(), scripting),
+            children: children.0,
             component_flags: ComponentFlags::EMPTY,
             transform: Rc::new(RefCell::new(proto_entity.transform.clone())),
             is_new: true,
         };
+        entity_lookup.extend(children.1);
 
         for proto_component in runtime_entity.entity_proto.components.clone() {
             let flags = scripting.get_component_flags(proto_component.name.as_str());
@@ -415,7 +440,10 @@ where
             };
             runtime_entity.components.push(runtime_component);
         }
-        runtime_entities.push(Rc::new(RefCell::new(runtime_entity)));
+        let runtime_entity = Rc::new(RefCell::new(runtime_entity));
+        runtime_entities.push(runtime_entity.clone());
+        let id = runtime_entity.borrow().id;
+        entity_lookup.insert(id, runtime_entity);
     }
-    runtime_entities
+    (runtime_entities, entity_lookup)
 }

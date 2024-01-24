@@ -33,7 +33,6 @@ function App() {
     const move_listener = (ev: MouseEvent) => {
         let moveVal = isMoving();
         if (moveVal) {
-            console.log("mouse move");
             const [startX, startY] = moveVal;
             const dx = ev.pageX / window.innerWidth - startX;
             const dy = ev.pageY / window.innerHeight - startY;
@@ -86,7 +85,6 @@ function App() {
                 <Show when={showSelection()}>
                     <div draggable={false} class="select_bounds" style={{left: selectBounds()[0], top: selectBounds()[1], width: selectBounds()[2], height: selectBounds()[3]}}>
                         <div draggable={false} class="move_tool" onMouseDown={(ev: MouseEvent) => {
-                            console.log("is moving");
                             setIsMoving([ev.pageX / window.innerWidth, ev.pageY / window.innerHeight]);
                             ev.preventDefault();
                         }}/>
