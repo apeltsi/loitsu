@@ -1,10 +1,7 @@
 pub mod sprite;
 use std::sync::{Arc, Mutex};
 
-use crate::{
-    asset_management::AssetManager,
-    ecs::{RuntimeTransform, Transform},
-};
+use crate::{asset_management::AssetManager, ecs::RuntimeTransform};
 use wgpu::RenderPass;
 
 use super::vertex::Vertex;
@@ -50,32 +47,9 @@ pub struct TransformUniform {
     transform: [[f32; 4]; 4],
 }
 impl TransformUniform {
-    pub fn new(transform: Transform) -> Self {
-        match transform {
-            Transform::Transform2D {
-                position, scale, ..
-            } => {
-                Self {
-                    transform: [
-                        // TODO: Rotation here
-                        [scale.0, 0.0, 0.0, position.0],
-                        [0.0, scale.1, 0.0, position.1],
-                        [0.0, 0.0, 1.0, 0.0],
-                        [0.0, 0.0, 0.0, 1.0],
-                    ],
-                }
-            }
-            Transform::RectTransform { position, .. } => {
-                Self {
-                    // TODO: THIS
-                    transform: [
-                        [1.0, 0.0, 0.0, position.0],
-                        [0.0, 1.0, 0.0, position.1],
-                        [0.0, 0.0, 1.0, 0.0],
-                        [0.0, 0.0, 0.0, 1.0],
-                    ],
-                }
-            }
+    pub fn new(transform: &mut RuntimeTransform, frame_num: u64) -> Self {
+        Self {
+            transform: transform.eval_transform_mat(frame_num),
         }
     }
 }

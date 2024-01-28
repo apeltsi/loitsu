@@ -102,8 +102,8 @@ impl<'b> Drawable<'b> for SpriteDrawable {
         );
         self.transform = Some(transform.clone());
         {
-            let rtransform = transform.lock().unwrap();
-            let initial_transform = TransformUniform::new(rtransform.transform.clone());
+            let mut rtransform = transform.lock().unwrap();
+            let initial_transform = TransformUniform::new(&mut rtransform, 0);
             self.transform_buffer = Some(device.create_buffer_init(
                 &wgpu::util::BufferInitDescriptor {
                     label: Some("Sprite Transform Buffer"),
@@ -129,7 +129,7 @@ impl<'b> Drawable<'b> for SpriteDrawable {
         let transform = self.transform.clone().unwrap();
         let mut rtransform = transform.lock().unwrap();
         if rtransform.check_changed(frame_num) {
-            let transform = TransformUniform::new(rtransform.transform.clone());
+            let transform = TransformUniform::new(&mut rtransform, frame_num);
             queue.write_buffer(
                 self.transform_buffer.as_ref().unwrap(),
                 0,

@@ -9,7 +9,7 @@ use crate::{log_render as log, scripting::{ScriptingInstance, EntityUpdate}, sce
 #[allow(unused_imports)]
 use crate::ecs::{ECS, ComponentFlags};
 use std::{cmp::max, cell::RefCell, rc::Rc, sync::{Mutex, Arc}};
-use crate::{asset_management::ASSET_MANAGER, scene_management::Entity, util::scaling, ecs::RuntimeTransform};
+use crate::{asset_management::ASSET_MANAGER, util::scaling, ecs::RuntimeTransform};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -187,7 +187,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                                     selected_entity = Some(entity.clone());
                                     let entity = (*entity).borrow();
                                     let as_entity = entity.as_entity();
-                                    let entity_bounds = get_entity_screen_space_bounds(&state.camera, &as_entity).unwrap();
+                                    let entity_bounds = get_entity_screen_space_bounds(&state.camera, &mut entity.transform.lock().unwrap(), frame_count - 1).unwrap();
                                     ecs.emit(crate::editor::Event::EntitySelected(as_entity));
                                     ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
                                 }
@@ -206,20 +206,24 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                                 if let Some(entity) = &selected_entity {
                                     let entity = (*entity).borrow_mut();
                                     let (x, y) = crate::util::scaling::as_world_scale(&state.camera, (x, y));
-                                    let mut rtransform = entity.transform.lock().unwrap();
-                                    match rtransform.transform {
-                                        Transform::Transform2D {ref mut position, ..} => {
-                                            position.0 += x;
-                                            position.1 += y;
-                                        },
-                                        Transform::RectTransform { .. } => {
+                                    {
+                                        let mut rtransform = entity.transform.lock().unwrap();
+                                        match rtransform.transform {
+                                            Transform::Transform2D {ref mut position, ..} => {
+                                                position.0 += x;
+                                                position.1 += y;
+                                            },
+                                            Transform::RectTransform { .. } => {
 
+                                            }
                                         }
+                                        rtransform.has_changed = true;
                                     }
-                                    rtransform.has_changed = true;
-                                    let as_entity = entity.as_entity();
-                                    let entity_bounds = get_entity_screen_space_bounds(&state.camera, &as_entity).unwrap();
-                                    ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
+                                    {
+                                        let mut rtransform = entity.transform.lock().unwrap();
+                                        let entity_bounds = get_entity_screen_space_bounds(&state.camera, &mut rtransform, frame_count - 1).unwrap();
+                                        ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
+                                    }
                                 }
                             },
                         }
@@ -310,8 +314,8 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         state.camera.position.y += world_scale_delta.1;
                         state.camera.dirty = true;
                         if let Some(entity) = &selected_entity {
-                            let as_entity = entity.borrow().as_entity();
-                            let entity_bounds = get_entity_screen_space_bounds(&state.camera, &as_entity).unwrap();
+                            let rentity = entity.borrow();
+                            let entity_bounds = get_entity_screen_space_bounds(&state.camera, &mut rentity.transform.lock().unwrap(), frame_count - 1).unwrap();
                             ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
                         }
                     }
@@ -325,11 +329,11 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                             if *element_state == ElementState::Pressed {
                                 let click_pos = input_state.mouse.get_world_position(&state.camera);
 
-                                if let Some(entity) = find_overlapping_entity(&ecs, click_pos) {
+                                if let Some(entity) = find_overlapping_entity(&ecs, click_pos, frame_count - 1) {
                                     selected_entity = Some(entity.clone());
                                     let entity = entity.borrow();
                                     let as_entity = entity.as_entity();
-                                    let entity_bounds = get_entity_screen_space_bounds(&state.camera, &as_entity).unwrap();
+                                    let entity_bounds = get_entity_screen_space_bounds(&state.camera, &mut entity.transform.lock().unwrap(), frame_count - 1).unwrap();
                                     ecs.emit(crate::editor::Event::EntitySelected(as_entity));
                                     ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
                                 }
@@ -360,8 +364,8 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         state.camera.scale = 0.1;
                     }
                     if let Some(entity) = &selected_entity {
-                        let as_entity = entity.borrow().as_entity();
-                        let entity_bounds = get_entity_screen_space_bounds(&state.camera, &as_entity).unwrap();
+                        let rentity = entity.borrow();
+                        let entity_bounds = get_entity_screen_space_bounds(&state.camera, &mut rentity.transform.lock().unwrap(), frame_count - 1).unwrap();
                         ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
                     }
                 },
@@ -386,32 +390,24 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
 }
 
 #[allow(dead_code)]
-fn get_entity_screen_space_bounds(camera: &CameraState, entity: &Entity) -> Option<(f32, f32, f32, f32)> {
-    match entity.transform {
-        Transform::Transform2D {position, scale, ..} => {
-            let screen_pos = scaling::as_screen_pos(camera, position);
-            let screen_scale = scaling::as_screen_scale(camera, scale);
-            return Some((screen_pos.0, screen_pos.1, screen_scale.0, screen_scale.1));
-        },
-        _ => {}
-    };
-    None
+fn get_entity_screen_space_bounds(camera: &CameraState, rtransform: &mut RuntimeTransform, frame_num: u64) -> Option<(f32, f32, f32, f32)> {
+
+    let (position, _rotation, scale) = rtransform.eval_transform(frame_num);
+    let screen_pos = scaling::as_screen_pos(camera, position);
+    let screen_scale = scaling::as_screen_scale(camera, scale);
+    return Some((screen_pos.0, screen_pos.1, screen_scale.0, screen_scale.1));
 }
 
 #[allow(dead_code)]
-fn find_overlapping_entity<T>(ecs: &ECS<T>, check_position: (f32, f32)) -> Option<Rc<RefCell<RuntimeEntity<T>>>> where T: ScriptingInstance {
+fn find_overlapping_entity<T>(ecs: &ECS<T>, check_position: (f32, f32), frame_num: u64) -> Option<Rc<RefCell<RuntimeEntity<T>>>> where T: ScriptingInstance {
     for e in ecs.get_all_runtime_entities_flat() {
         let entity = e.borrow();
-        let rtransform = entity.transform.lock().unwrap();
-        match rtransform.transform {
-            Transform::Transform2D {position, scale, ..} => {
-                if position.0 - scale.0 / 2.0 <= check_position.0 && position.0 + scale.0 / 2.0 >= check_position.0 &&
-                   position.1 - scale.0 / 2.0 <= check_position.1 && position.1 + scale.1 / 2.0 >= check_position.1 {
-                    return Some(e.clone());
-                }
-            },
-            _ => {}
-        };
+        let mut rtransform = entity.transform.lock().unwrap();
+        let (position, _rotation, scale) = rtransform.eval_transform(frame_num);
+        if position.0 - scale.0 / 2.0 <= check_position.0 && position.0 + scale.0 / 2.0 >= check_position.0 &&
+            position.1 - scale.0 / 2.0 <= check_position.1 && position.1 + scale.1 / 2.0 >= check_position.1 {
+                return Some(e.clone());
+            }
     }
     None
 }
@@ -562,7 +558,6 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device,
             drawable.draw(frame_num, &device, &queue, &mut r_pass, global_bind_group);
         }
     }
-
     queue.submit(Some(encoder.finish()));
     frame.present();
 }

@@ -66,6 +66,10 @@ pub struct RuntimeTransform {
     pub transform: Transform,
     parent: Option<Arc<Mutex<RuntimeTransform>>>,
     changed_frame: u64,
+    evaluated_position: (f32, f32),
+    evaluated_rotation: f32,
+    evaluated_scale: (f32, f32),
+    evaluated_frame: u64,
     pub has_changed: bool,
 }
 
@@ -173,12 +177,22 @@ impl RuntimeTransform {
         RuntimeTransform {
             transform,
             parent: None,
-            changed_frame: 0,
+            changed_frame: u64::MAX,
             has_changed: true,
+            evaluated_position: (0.0, 0.0),
+            evaluated_rotation: 0.0,
+            evaluated_scale: (1.0, 1.0),
+            evaluated_frame: u64::MAX,
         }
     }
 
     pub fn check_changed(&mut self, frame_num: u64) -> bool {
+        if self.parent.is_some() {
+            let mut parent = self.parent.as_ref().unwrap().lock().unwrap();
+            if parent.check_changed(frame_num) {
+                self.has_changed = true;
+            }
+        }
         if self.changed_frame == frame_num {
             return true;
         } else if self.has_changed {
@@ -196,6 +210,54 @@ impl RuntimeTransform {
 
     fn set_parent(&mut self, parent: Option<Arc<Mutex<RuntimeTransform>>>) {
         self.parent = parent;
+    }
+
+    pub fn eval_transform_mat(&mut self, frame_num: u64) -> [[f32; 4]; 4] {
+        let (position, rotation, scale) = self.eval_transform(frame_num);
+        let sin = rotation.sin();
+        let cos = rotation.cos();
+        [
+            [scale.0 * cos, scale.1 * -sin, 0.0, position.0],
+            [scale.0 * sin, scale.1 * cos, 0.0, position.1],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    }
+
+    pub fn eval_transform(&mut self, frame_num: u64) -> ((f32, f32), f32, (f32, f32)) {
+        if self.evaluated_frame == frame_num {
+            return (
+                self.evaluated_position,
+                self.evaluated_rotation,
+                self.evaluated_scale,
+            );
+        }
+        let (position, rotation, scale) = match &self.transform {
+            Transform::Transform2D {
+                position,
+                rotation,
+                scale,
+                ..
+            } => (*position, *rotation, *scale),
+            Transform::RectTransform { position, .. } => (*position, 0.0, (1.0, 1.0)),
+        };
+        let mut position = (position.0, position.1);
+        let mut rotation = rotation;
+        let mut scale = (scale.0, scale.1);
+        if let Some(parent) = &self.parent {
+            let mut parent = parent.lock().unwrap();
+            let (parent_position, parent_rotation, parent_scale) = parent.eval_transform(frame_num);
+            position.0 += parent_position.0;
+            position.1 += parent_position.1;
+            rotation += parent_rotation;
+            scale.0 *= parent_scale.0;
+            scale.1 *= parent_scale.1;
+        }
+        self.evaluated_position = position;
+        self.evaluated_rotation = rotation;
+        self.evaluated_scale = scale;
+        self.evaluated_frame = frame_num;
+        (position, rotation, scale)
     }
 }
 
