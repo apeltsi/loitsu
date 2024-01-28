@@ -1,9 +1,8 @@
 pub mod rune_runtime;
-use crate::ecs::ComponentFlags;
+use crate::ecs::{ComponentFlags, RuntimeTransform};
 use crate::input::InputState;
 use crate::scene_management::Property;
 use crate::{
-    ecs::Transform,
     rendering::drawable::{DrawableProperty, DrawablePrototype},
     scene_management::Component,
 };
@@ -64,7 +63,7 @@ pub trait ScriptingInstance: Sized {
         &mut self,
         entities: &mut [Rc<RefCell<crate::ecs::RuntimeEntity<Self>>>],
         method: ComponentFlags,
-    ) -> Vec<(Rc<RefCell<Transform>>, Vec<EntityUpdate>)>;
+    ) -> Vec<(Arc<Mutex<RuntimeTransform>>, Vec<EntityUpdate>)>;
     fn get_component_flags(&self, component_name: &str) -> ComponentFlags;
 }
 

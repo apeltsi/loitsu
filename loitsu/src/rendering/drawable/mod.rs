@@ -1,7 +1,10 @@
 pub mod sprite;
-use std::{cell::RefCell, rc::Rc};
+use std::sync::{Arc, Mutex};
 
-use crate::{asset_management::AssetManager, ecs::Transform};
+use crate::{
+    asset_management::AssetManager,
+    ecs::{RuntimeTransform, Transform},
+};
 use wgpu::RenderPass;
 
 use super::vertex::Vertex;
@@ -81,7 +84,7 @@ pub trait Drawable<'b> {
         &mut self,
         device: &wgpu::Device,
         asset_manager: &AssetManager,
-        transform: Rc<RefCell<Transform>>,
+        transform: Arc<Mutex<RuntimeTransform>>,
     ) where
         'a: 'b;
     fn draw<'a>(

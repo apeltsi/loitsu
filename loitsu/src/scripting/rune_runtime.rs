@@ -351,8 +351,6 @@ impl From<RuneTransform> for Transform {
             rotation: transform.rotation,
             scale: as_vec2(transform.scale).as_tuple(),
             r#static: false,
-            has_changed: false,
-            changed_frame: 0,
         }
     }
 }
@@ -586,7 +584,7 @@ impl ScriptingInstance for RuneInstance {
         &mut self,
         entities: &mut [Rc<RefCell<crate::ecs::RuntimeEntity<Self>>>],
         method: ComponentFlags,
-    ) -> Vec<(Rc<RefCell<crate::ecs::Transform>>, Vec<EntityUpdate>)> {
+    ) -> Vec<(Arc<Mutex<crate::ecs::RuntimeTransform>>, Vec<EntityUpdate>)> {
         let mut updates = Vec::new();
         for entity in entities {
             let mut entity_updates = Vec::new();
@@ -656,7 +654,7 @@ fn convert_entity(entity: &RuntimeEntity<RuneInstance>) -> RuneEntity {
         name: entity.get_name().to_string(),
         transform: Shared::new(
             AnyObj::new(Into::<RuneTransform>::into(
-                entity.transform.borrow().clone(),
+                entity.transform.lock().unwrap().transform.clone(),
             ))
             .unwrap(),
         )
@@ -715,23 +713,11 @@ impl RuneInstance {
         }
         let entity_obj = shared.downcast_borrow_ref::<RuneEntity>().unwrap();
         let rune_transform: RuneTransform = entity_obj.clone().transform.take_downcast().unwrap();
-        let mut new_transform: Transform = rune_transform.into();
-        if *entity.transform.borrow() != new_transform {
-            match new_transform {
-                Transform::Transform2D {
-                    ref mut has_changed,
-                    ..
-                } => {
-                    *has_changed = true;
-                }
-                Transform::RectTransform {
-                    ref mut has_changed,
-                    ..
-                } => {
-                    *has_changed = true;
-                }
-            }
-            *entity.transform.borrow_mut() = new_transform;
+        let new_transform: Transform = rune_transform.into();
+        let mut rtransform = entity.transform.lock().unwrap();
+        if rtransform.transform != new_transform {
+            rtransform.has_changed = true;
+            rtransform.transform = new_transform;
         }
         let mut updates = Vec::new();
         for drawable in &entity_obj.drawables {

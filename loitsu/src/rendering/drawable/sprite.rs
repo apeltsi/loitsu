@@ -1,11 +1,10 @@
 use super::{Drawable, TransformUniform, QUAD_INDICES, QUAD_VERTICES};
 use crate::{
     asset_management::{asset::Asset, asset_reference::AssetReference, AssetManager},
-    ecs::Transform,
+    ecs::RuntimeTransform,
     rendering::shader::ShaderManager,
 };
 use std::{
-    cell::RefCell,
     rc::Rc,
     sync::{Arc, Mutex},
 };
@@ -21,7 +20,7 @@ pub struct SpriteDrawable {
     transform_buffer: Option<wgpu::Buffer>,
     uniform: SpriteUniform,
     sprite: String,
-    transform: Option<Rc<RefCell<Transform>>>,
+    transform: Option<Arc<Mutex<RuntimeTransform>>>,
     uuid: uuid::Uuid,
     uniform_dirty: bool,
     sprite_dirty: bool,
@@ -65,7 +64,7 @@ impl<'b> Drawable<'b> for SpriteDrawable {
         &mut self,
         device: &wgpu::Device,
         asset_manager: &AssetManager,
-        transform: Rc<RefCell<Transform>>,
+        transform: Arc<Mutex<RuntimeTransform>>,
     ) where
         'a: 'b,
     {
@@ -101,15 +100,18 @@ impl<'b> Drawable<'b> for SpriteDrawable {
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             }),
         );
-        let initial_transform = TransformUniform::new(transform.borrow().clone());
         self.transform = Some(transform.clone());
-        self.transform_buffer = Some(device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Sprite Transform Buffer"),
-                contents: bytemuck::cast_slice(&[initial_transform]),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            },
-        ));
+        {
+            let rtransform = transform.lock().unwrap();
+            let initial_transform = TransformUniform::new(rtransform.transform.clone());
+            self.transform_buffer = Some(device.create_buffer_init(
+                &wgpu::util::BufferInitDescriptor {
+                    label: Some("Sprite Transform Buffer"),
+                    contents: bytemuck::cast_slice(&[initial_transform]),
+                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                },
+            ));
+        }
         self.create_bind_group(device, sprite_asset);
     }
 
@@ -124,14 +126,10 @@ impl<'b> Drawable<'b> for SpriteDrawable {
         if self.transform.is_none() {
             return;
         }
-        if self
-            .transform
-            .clone()
-            .unwrap()
-            .borrow_mut()
-            .check_changed(frame_num)
-        {
-            let transform = TransformUniform::new(self.transform.clone().unwrap().borrow().clone());
+        let transform = self.transform.clone().unwrap();
+        let mut rtransform = transform.lock().unwrap();
+        if rtransform.check_changed(frame_num) {
+            let transform = TransformUniform::new(rtransform.transform.clone());
             queue.write_buffer(
                 self.transform_buffer.as_ref().unwrap(),
                 0,

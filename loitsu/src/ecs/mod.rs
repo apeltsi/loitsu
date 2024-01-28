@@ -10,7 +10,6 @@ use crate::scripting::{EntityUpdate, ScriptingData, ScriptingInstance};
 use bitflags::bitflags;
 #[cfg(feature = "scene_generation")]
 use serde_json::{Map, Number, Value};
-#[cfg(feature = "editor")]
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
@@ -56,15 +55,18 @@ pub enum Transform {
         rotation: f32,
         scale: (f32, f32),
         r#static: bool,
-        changed_frame: u64,
-        has_changed: bool,
     },
     RectTransform {
         // TODO: Implement this :D
         position: (f32, f32),
-        changed_frame: u64,
-        has_changed: bool,
     },
+}
+
+pub struct RuntimeTransform {
+    pub transform: Transform,
+    parent: Option<Arc<Mutex<RuntimeTransform>>>,
+    changed_frame: u64,
+    pub has_changed: bool,
 }
 
 impl PartialEq for Transform {
@@ -162,44 +164,38 @@ impl Transform {
             rotation,
             scale,
             r#static,
+        }
+    }
+}
+
+impl RuntimeTransform {
+    pub fn new(transform: Transform) -> RuntimeTransform {
+        RuntimeTransform {
+            transform,
+            parent: None,
             changed_frame: 0,
             has_changed: true,
         }
     }
 
     pub fn check_changed(&mut self, frame_num: u64) -> bool {
-        match self {
-            Transform::Transform2D {
-                changed_frame,
-                has_changed,
-                ..
-            } => {
-                if *changed_frame == frame_num {
-                    return true;
-                } else if *has_changed {
-                    *changed_frame = frame_num;
-                    *has_changed = false;
-                    return true;
-                } else {
-                    return false;
-                }
-            }
-            Transform::RectTransform {
-                changed_frame,
-                has_changed,
-                ..
-            } => {
-                if *changed_frame == frame_num {
-                    return true;
-                } else if *has_changed {
-                    *changed_frame = frame_num;
-                    *has_changed = false;
-                    return true;
-                } else {
-                    return false;
-                }
-            }
+        if self.changed_frame == frame_num {
+            return true;
+        } else if self.has_changed {
+            self.changed_frame = frame_num;
+            self.has_changed = false;
+            return true;
+        } else {
+            return false;
         }
+    }
+
+    pub fn get_parent(&self) -> Option<Arc<Mutex<RuntimeTransform>>> {
+        self.parent.clone()
+    }
+
+    fn set_parent(&mut self, parent: Option<Arc<Mutex<RuntimeTransform>>>) {
+        self.parent = parent;
     }
 }
 
@@ -214,7 +210,7 @@ where
     entity_proto: Entity,
     pub children: Vec<Rc<RefCell<RuntimeEntity<T>>>>,
     pub component_flags: ComponentFlags, // this is the union of all the component flags, so we can quickly check if we need to run a method
-    pub transform: Rc<RefCell<Transform>>,
+    pub transform: Arc<Mutex<RuntimeTransform>>,
     pub is_new: bool,
 }
 
@@ -280,7 +276,7 @@ impl<T: ScriptingInstance> ECS<T> {
         self.active_scene = scene.clone();
 
         (self.runtime_entities, self.entity_lookup) =
-            init_entities(scene.clone().entities, scripting);
+            init_entities(scene.clone().entities, scripting, None);
         #[cfg(feature = "editor")]
         self.emit(crate::editor::Event::SceneLoaded(scene));
 
@@ -317,7 +313,7 @@ impl<T: ScriptingInstance> ECS<T> {
     pub fn run_frame(
         &mut self,
         scripting: &mut T,
-    ) -> Vec<(Rc<RefCell<Transform>>, Vec<EntityUpdate>)> {
+    ) -> Vec<(Arc<Mutex<RuntimeTransform>>, Vec<EntityUpdate>)> {
         self.run_component_methods(scripting, ComponentFlags::FRAME)
     }
 
@@ -325,7 +321,7 @@ impl<T: ScriptingInstance> ECS<T> {
         &mut self,
         scripting: &mut T,
         method: ComponentFlags,
-    ) -> Vec<(Rc<RefCell<Transform>>, Vec<EntityUpdate>)> {
+    ) -> Vec<(Arc<Mutex<RuntimeTransform>>, Vec<EntityUpdate>)> {
         // Lets iterate over the entities and run the build step on each component
         scripting.run_component_methods::<T>(self.runtime_entities.as_mut_slice(), method)
     }
@@ -378,7 +374,7 @@ impl<T: ScriptingInstance> RuntimeEntity<T> {
                 .iter()
                 .map(|runtime_entity| runtime_entity.borrow().as_entity())
                 .collect(),
-            transform: self.transform.borrow().clone(),
+            transform: self.transform.lock().unwrap().transform.clone(),
         }
     }
 
@@ -405,6 +401,7 @@ impl<T: ScriptingInstance> RuntimeComponent<T> {
 fn init_entities<T>(
     proto_entities: Vec<Entity>,
     scripting: &mut T,
+    parent_transform: Option<Arc<Mutex<RuntimeTransform>>>,
 ) -> (
     Vec<Rc<RefCell<RuntimeEntity<T>>>>,
     HashMap<Uuid, Rc<RefCell<RuntimeEntity<T>>>>,
@@ -416,7 +413,14 @@ where
     let mut runtime_entities = Vec::new();
     let mut entity_lookup = HashMap::new();
     for proto_entity in proto_entities {
-        let children = init_entities(proto_entity.children.clone(), scripting);
+        let mut transform = RuntimeTransform::new(proto_entity.transform.clone());
+        transform.set_parent(parent_transform.clone());
+        let transform = Arc::new(Mutex::new(transform));
+        let children = init_entities(
+            proto_entity.children.clone(),
+            scripting,
+            Some(transform.clone()),
+        );
         let mut runtime_entity = RuntimeEntity {
             name: proto_entity.name.clone(),
             id: Uuid::parse_str(proto_entity.id.as_str()).unwrap(),
@@ -424,7 +428,7 @@ where
             entity_proto: proto_entity.clone(),
             children: children.0,
             component_flags: ComponentFlags::EMPTY,
-            transform: Rc::new(RefCell::new(proto_entity.transform.clone())),
+            transform,
             is_new: true,
         };
         entity_lookup.extend(children.1);

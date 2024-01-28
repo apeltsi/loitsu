@@ -9,7 +9,7 @@ use crate::{log_render as log, scripting::{ScriptingInstance, EntityUpdate}, sce
 #[allow(unused_imports)]
 use crate::ecs::{ECS, ComponentFlags};
 use std::{cmp::max, cell::RefCell, rc::Rc, sync::{Mutex, Arc}};
-use crate::{asset_management::ASSET_MANAGER, scene_management::Entity, util::scaling};
+use crate::{asset_management::ASSET_MANAGER, scene_management::Entity, util::scaling, ecs::RuntimeTransform};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -206,16 +206,17 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                                 if let Some(entity) = &selected_entity {
                                     let entity = (*entity).borrow_mut();
                                     let (x, y) = crate::util::scaling::as_world_scale(&state.camera, (x, y));
-                                    match *entity.transform.borrow_mut() {
-                                        Transform::Transform2D {ref mut position, ref mut has_changed, ..} => {
+                                    let mut rtransform = entity.transform.lock().unwrap();
+                                    match rtransform.transform {
+                                        Transform::Transform2D {ref mut position, ..} => {
                                             position.0 += x;
                                             position.1 += y;
-                                            *has_changed = true;
                                         },
                                         Transform::RectTransform { .. } => {
 
                                         }
-                                    };
+                                    }
+                                    rtransform.has_changed = true;
                                     let as_entity = entity.as_entity();
                                     let entity_bounds = get_entity_screen_space_bounds(&state.camera, &as_entity).unwrap();
                                     ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
@@ -401,7 +402,8 @@ fn get_entity_screen_space_bounds(camera: &CameraState, entity: &Entity) -> Opti
 fn find_overlapping_entity<T>(ecs: &ECS<T>, check_position: (f32, f32)) -> Option<Rc<RefCell<RuntimeEntity<T>>>> where T: ScriptingInstance {
     for e in ecs.get_all_runtime_entities_flat() {
         let entity = e.borrow();
-        match *(*entity.transform).borrow() {
+        let rtransform = entity.transform.lock().unwrap();
+        match rtransform.transform {
             Transform::Transform2D {position, scale, ..} => {
                 if position.0 - scale.0 / 2.0 <= check_position.0 && position.0 + scale.0 / 2.0 >= check_position.0 &&
                    position.1 - scale.0 / 2.0 <= check_position.1 && position.1 + scale.1 / 2.0 >= check_position.1 {
@@ -418,7 +420,7 @@ fn process_entity_updates(device: &wgpu::Device,
                           asset_manager: &AssetManager, 
                           shader_manager: &ShaderManager,
                           drawables: &mut Vec<Box<dyn Drawable>>,
-                          updates: Vec<(Rc<RefCell<Transform>>, Vec<EntityUpdate>)>) {
+                          updates: Vec<(Arc<Mutex<RuntimeTransform>>, Vec<EntityUpdate>)>) {
     for entity_updates in updates {
         for update in entity_updates.1 {
             match update {
