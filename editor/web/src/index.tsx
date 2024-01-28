@@ -3,7 +3,7 @@ import { render } from 'solid-js/web';
 
 import './index.css';
 import App, { queued_events } from './App';
-import init, {start_editor, override_asset_path, resize, request_select_entity, set_component_property, move_selected} from '../public/wasm/loitsu-editor.js';
+import init, {start_editor, override_asset_path, resize, request_select_entity, set_component_property, move_selected, save_scene} from '../public/wasm/loitsu-editor.js';
 
 window.addEventListener("resize", () => resize());
 
@@ -68,6 +68,8 @@ if (window.set_status === undefined) {
     window.set_component_property = set_component_property;
     // @ts-ignore
     window.move_selected = move_selected;
+    // @ts-ignore
+    window.save_scene = save_scene;
 
     // @ts-ignore
     window.select_entity = (e: string) => {

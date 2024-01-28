@@ -55,6 +55,8 @@ export default function TopBar() {
                     <span>{tasksText()}</span>
                 </div>
             </Show>
+            {/* @ts-ignore */}
+            <button onClick={() => window.save_scene()}>Save</button>
             <span>{sceneName()}</span>
         </div>
     )

@@ -257,6 +257,7 @@ impl Component {
             "properties".to_string(),
             serde_json::Value::Object(properties),
         );
+        component.insert("id".to_string(), serde_json::Value::String(self.id.clone()));
         Value::Object(component)
     }
 }

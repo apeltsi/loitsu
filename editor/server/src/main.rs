@@ -20,10 +20,11 @@ async fn main() {
     let cors = warp::cors()
         .allow_origin("http://localhost:5173")
         .allow_methods(vec!["GET", "POST", "DELETE"]);
+    let preferences_clone = preferences.clone();
     let main_scene_route = warp::get()
         .and(warp::path("LOITSU_MAIN_SCENE"))
         .map(move || {
-            let main_scene_path = preferences.default_scene.clone();
+            let main_scene_path = preferences_clone.default_scene.clone();
             let mut path = asset_path_clone.clone();
             path.push(format!("{}.scene.json", main_scene_path));
             let mut file = File::open(path).unwrap();
@@ -56,13 +57,14 @@ async fn main() {
                 .body(serde_json::to_string(&scripts).unwrap())
         })
         .with(cors.clone());
+    let asset_path_clone = asset_path.clone();
     let assets_route = warp::get()
         .and(warp::path("assets"))
         .and(warp::path::tail())
         .and_then(move |tail: warp::path::Tail| {
             use tokio::fs::File;
             use tokio::io::AsyncReadExt;
-            let asset_path = asset_path.clone();
+            let asset_path = asset_path_clone.clone();
             let overrides = overrides.clone();
             async move {
                 let mut path = asset_path;
@@ -99,6 +101,24 @@ async fn main() {
             .or(scripts_route)
             .or(assets_route),
     );
+    // the client will post a json object with the scene data,
+    // this will be save to the default scene
+    let save_route = warp::post()
+        .and(warp::path("save_scene"))
+        .and(warp::body::bytes())
+        .and_then(move |body: warp::hyper::body::Bytes| {
+            let asset_path = asset_path.clone();
+            let mut path = asset_path.clone();
+            path.push(format!(
+                "{}.scene.json",
+                (preferences.clone().default_scene).clone()
+            ));
+            let mut file = File::create(path).unwrap();
+            use std::io::Write;
+            file.write_all(&body).unwrap();
+            async move { Ok::<_, warp::Rejection>(Response::builder().body("")) }
+        });
+    let route = route.or(save_route);
     println!("Editor live at http://localhost:5969");
     warp::serve(route).run(([127, 0, 0, 1], 5969)).await;
 }

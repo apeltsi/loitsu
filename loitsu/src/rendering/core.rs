@@ -226,6 +226,10 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                                     }
                                 }
                             },
+                            crate::editor::ClientEvent::SaveScene => {
+                                #[cfg(target_arch = "wasm32")]
+                                crate::editor::save_scene(ecs.as_scene().to_json());
+                            }
                         }
                     }
                 }

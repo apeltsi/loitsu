@@ -116,6 +116,12 @@ pub fn move_selected(x: f32, y: f32) {
     let mut event_handler = event_handler.lock().unwrap();
     event_handler.emit_client(ClientEvent::MoveSelected(x, y));
 }
+#[wasm_bindgen]
+pub fn save_scene() {
+    let event_handler = unsafe { EVENT_HANDLER.as_ref().unwrap().clone() };
+    let mut event_handler = event_handler.lock().unwrap();
+    event_handler.emit_client(ClientEvent::SaveScene);
+}
 
 #[wasm_bindgen]
 extern "C" {

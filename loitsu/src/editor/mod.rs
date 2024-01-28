@@ -3,6 +3,8 @@ use crate::{
     scene_management::{Entity, Property, Scene},
     scripting,
 };
+#[cfg(target_arch = "wasm32")]
+use web_sys::{Request, RequestInit, RequestMode};
 pub struct EventHandler<T>
 where
     T: scripting::ScriptingInstance,
@@ -52,11 +54,33 @@ pub enum Event {
 pub enum ClientEvent {
     /// A request to select an entity with the given uuid
     SelectEntity(String),
+    /// A request to set the given property on the given entity
     SetComponentProperty {
         entity: String,
         component: String,
         field: String,
         property: Property,
     },
+    /// A request to move the selected entity by the given amount
     MoveSelected(f32, f32),
+    /// A request to save the current scene
+    SaveScene,
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn save_scene(scene: String) {
+    // we need to send a post request to the server at /save_scene
+    // with the scene data as the body
+    let mut opts = RequestInit::new();
+    opts.method("POST");
+    opts.mode(RequestMode::Cors);
+    opts.body(Some(&scene.into()));
+    let request = Request::new_with_str_and_init("/save_scene", &opts).unwrap();
+    request
+        .headers()
+        .set("Content-Type", "application/json")
+        .unwrap();
+    // now lets send the request
+    let window = web_sys::window().unwrap();
+    let _ = window.fetch_with_request(&request);
 }

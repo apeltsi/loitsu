@@ -392,6 +392,9 @@ impl ScriptingData<RuneInstance> for RuneComponent {
             let component_data = data.clone().into_mut().unwrap();
             let component_data_obj = component_data.data();
             for (key, value) in component_data_obj.iter() {
+                if key.to_string().starts_with("__") {
+                    continue;
+                }
                 proto
                     .properties
                     .insert(key.to_string(), value.clone().into());
