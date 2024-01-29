@@ -15,6 +15,8 @@ body {
     --backdrop-blur: 10px;
     --accent: #5544C2;
     --accent-hover: #8646E0;
+    --error: #C25464;
+    --error-bg: #C2545450;
     cursor: url("./assets/cursor/cursor.png"), url("./assets/cursor/cursor.svg"), auto;
     --text-cursor: url("./assets/cursor/text-cursor.png") 12 12, url("./assets/cursor/text-cursor.svg") 12 12,
     auto;

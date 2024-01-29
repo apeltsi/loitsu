@@ -189,6 +189,11 @@ impl AssetManager {
                             error!("Failed to load asset: Asset was empty");
                             #[cfg(feature = "editor")]
                             crate::web::remove_editor_loading_task("Loading assets");
+                            crate::web::notify(
+                                2,
+                                "Couldn't load asset",
+                                format!("'{}' is empty or missing", name).as_str(),
+                            );
                             return;
                         }
                         // lets parse the asset
@@ -198,6 +203,11 @@ impl AssetManager {
                     }
                     Err(e) => {
                         error!("Failed to load asset: {:?}", e.message);
+                        crate::web::notify(
+                            2,
+                            "Couldn't load asset",
+                            format!("'{}' couldn't be found", name).as_str(),
+                        );
                     }
                 }
                 #[cfg(feature = "editor")]

@@ -4,9 +4,11 @@ use crate::{
     scripting,
 };
 #[cfg(target_arch = "wasm32")]
+use wasm_bindgen::JsCast;
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 #[cfg(target_arch = "wasm32")]
-use web_sys::{Request, RequestInit, RequestMode};
+use web_sys::{Request, RequestInit, RequestMode, Response};
 pub struct EventHandler<T>
 where
     T: scripting::ScriptingInstance,
@@ -68,7 +70,6 @@ pub enum ClientEvent {
     /// A request to save the current scene
     SaveScene,
 }
-
 #[cfg(target_arch = "wasm32")]
 pub fn save_scene(scene: String) {
     #[cfg(feature = "editor")]
@@ -87,10 +88,28 @@ pub fn save_scene(scene: String) {
     // now lets send the request
     let window = web_sys::window().unwrap();
     spawn_local(async move {
-        let _ = JsFuture::from(window.fetch_with_request(&request))
+        let resp_value = JsFuture::from(window.fetch_with_request(&request))
             .await
             .unwrap();
-        #[cfg(feature = "editor")]
+
+        let response: Response = resp_value.dyn_into().unwrap();
         crate::web::remove_editor_loading_task("Saving Scene");
+        if response.status() != 200 {
+            crate::web::notify(
+                2,
+                "Scene Save Failed",
+                format!(
+                    "There was an error saving the scene. (Error {})",
+                    response.status()
+                )
+                .as_str(),
+            );
+        } else {
+            crate::web::notify(
+                0,
+                "Scene Saved",
+                "All current edits to the scene have been saved",
+            );
+        }
     });
 }

@@ -6,6 +6,7 @@ import Inspector from './components/Inspector';
 import TopBar from './components/TopBar';
 import { Show } from 'solid-js/web';
 import { add_select_listener, remove_select_listener } from '.';
+import Notifications from './components/Notifications';
 
 function App() {
     const [camera, setCamera] = createSignal("(0,0) x1");
@@ -91,6 +92,7 @@ function App() {
                     </div>
                 </Show>
             </div>
+            <Notifications/>
         </div>
     </>
     )

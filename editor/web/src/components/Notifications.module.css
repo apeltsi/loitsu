@@ -1,0 +1,102 @@
+.notificationContainer {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    z-index: 9999;
+    width: 100%;
+    max-width: 300px;
+    height: 100vh;
+    overflow: hidden;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    padding: 1rem;
+    overflow-y: auto;
+    scrollbar-width: none;
+    overflow-x: hidden;
+}
+
+.notification {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 300px;
+    background-color: var(--panel-bg-color);
+    color: var(--text-color);
+    border-radius: 0.25rem;
+    border: 2px solid var(--accent);
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    transition-duration: 0.1s;
+    transition-property: background-color;
+    pointer-events: auto;
+    backdrop-filter: blur(var(--backdrop-blur));
+    animation: slideIn 0.35s ease-out, fadeOut 0.35s ease-out 9.65s;
+    position: relative;
+    overflow-y: hidden;
+}
+
+.error {
+    border: 2px solid var(--error) !important;
+    background-color: var(--error-bg) !important;
+}
+
+.notification h3 {
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+/* Progress bar */
+.notification::after {
+    content: '';
+    display: block;
+    width: 0%;
+    height: 5px;
+    background-color: var(--accent-hover);
+    position: absolute;
+    bottom: 0px;
+    left: 0;
+    border-radius: 0.25rem;
+    animation: progress 10s linear;
+}
+
+.notification.error::after {
+    background-color: var(--error);
+}
+
+.notification:hover {
+    background-color: var(--panel-bg-highlight-color);
+    border: 2px solid var(--accent-hover);
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        filter: opacity(0%);
+    }
+    to {
+        transform: translateX(0%);
+        filter: opacity(100%);
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        margin-bottom: 0.5rem;
+        filter: opacity(100%);
+        max-height: 100px;
+    }
+    to {
+        margin-bottom: 0rem;
+        filter: opacity(0%);
+        max-height: 0%;
+    }
+}
+
+@keyframes progress {
+    from {
+        width: 0%;
+    }
+    to {
+        width: 100%;
+    }
+}
