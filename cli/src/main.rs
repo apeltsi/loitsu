@@ -36,7 +36,10 @@ enum Commands {
         #[arg(short, long, default_value = "false")]
         force: bool,
     },
-    Edit,
+    Edit {
+        #[arg(short, long, default_value = "")]
+        scene: String,
+    },
     Clean,
 }
 #[tokio::main]
@@ -54,13 +57,16 @@ async fn main() {
             release,
             force,
         } => build(&target, release, true, force).await,
-        Commands::Edit => run_editor(),
+        Commands::Edit { scene } => run_editor(scene),
         Commands::Clean => clean(),
     }
 }
 
-fn run_editor() {
+fn run_editor(scene: String) {
     let mut command = std::process::Command::new("loitsu-editor");
+    if scene != "" {
+        command.arg(format!("--scene={}", scene));
+    }
     // now lets run the command and wait for it to finish
     let mut child = command.spawn().unwrap();
     child.wait().unwrap();

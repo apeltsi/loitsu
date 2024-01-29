@@ -21,12 +21,19 @@ async fn main() {
         .allow_origin("http://localhost:5173")
         .allow_methods(vec!["GET", "POST", "DELETE"]);
     let preferences_clone = preferences.clone();
+    let mut open_scene_path = preferences_clone.default_scene.clone();
+    // lets check if the user provided a scene to open
+    for arg in std::env::args() {
+        if arg.starts_with("--scene=") {
+            open_scene_path = arg.replace("--scene=", "");
+        }
+    }
+    let open_scene_clone = open_scene_path.clone();
     let main_scene_route = warp::get()
         .and(warp::path("LOITSU_MAIN_SCENE"))
         .map(move || {
-            let main_scene_path = preferences_clone.default_scene.clone();
             let mut path = asset_path_clone.clone();
-            path.push(format!("{}.scene.json", main_scene_path));
+            path.push(format!("{}.scene.json", open_scene_clone));
             let mut file = File::open(path).unwrap();
             let mut data = String::new();
             file.read_to_string(&mut data).unwrap();
@@ -109,10 +116,7 @@ async fn main() {
         .and_then(move |body: warp::hyper::body::Bytes| {
             let asset_path = asset_path.clone();
             let mut path = asset_path.clone();
-            path.push(format!(
-                "{}.scene.json",
-                (preferences.clone().default_scene).clone()
-            ));
+            path.push(format!("{}.scene.json", open_scene_path));
             let mut file = File::create(path).unwrap();
             use std::io::Write;
             file.write_all(&body).unwrap();
