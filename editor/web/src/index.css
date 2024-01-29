@@ -38,6 +38,20 @@ span, h1, h2, h3, h4, h5, h6, p {
 
 button {
     cursor: var(--pointer-cursor);
+    background-color: var(--accent);
+    color: var(--text-color);
+    border: none;
+    border-radius: 0.25rem;
+    transition-duration: 0.1s;
+    transition-property: background-color;
+    padding: 0.5rem;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+    margin: 1rem;
+    font-size: 1rem;
+}
+button:hover {
+    background-color: var(--accent-hover);
 }
 
 canvas {

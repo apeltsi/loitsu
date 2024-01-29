@@ -4,6 +4,8 @@ use crate::{
     scripting,
 };
 #[cfg(target_arch = "wasm32")]
+use wasm_bindgen_futures::{spawn_local, JsFuture};
+#[cfg(target_arch = "wasm32")]
 use web_sys::{Request, RequestInit, RequestMode};
 pub struct EventHandler<T>
 where
@@ -69,6 +71,8 @@ pub enum ClientEvent {
 
 #[cfg(target_arch = "wasm32")]
 pub fn save_scene(scene: String) {
+    #[cfg(feature = "editor")]
+    crate::web::add_editor_loading_task("Saving Scene");
     // we need to send a post request to the server at /save_scene
     // with the scene data as the body
     let mut opts = RequestInit::new();
@@ -82,5 +86,11 @@ pub fn save_scene(scene: String) {
         .unwrap();
     // now lets send the request
     let window = web_sys::window().unwrap();
-    let _ = window.fetch_with_request(&request);
+    spawn_local(async move {
+        let _ = JsFuture::from(window.fetch_with_request(&request))
+            .await
+            .unwrap();
+        #[cfg(feature = "editor")]
+        crate::web::remove_editor_loading_task("Saving Scene");
+    });
 }

@@ -22,6 +22,7 @@
     transition-duration: 0.1s;
     border-radius: 0.5em;
     pointer-events: auto;
+    margin: 0;
 }
 
 .hierarchyItem:hover {
