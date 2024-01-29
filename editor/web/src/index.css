@@ -1,0 +1,97 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono&family=Roboto:ital,wght@0,100;0,300;0,400;0,700;1,400;1,700&display=swap');
+
+body {
+    --topbar-bg-color: #252525E5;
+    --bg-color: #4E4E4E;
+    --panel-bg-color: #3E3E3EA0;
+    --panel-bg-highlight-color: #3E3E45A0;
+    --subpanel-bg-color: #2E2E3E;
+    --line-color: #333333;
+    --text-color: #FFFFFF;
+    --backdrop-blur: 10px;
+    --input-bg-color: #202040;
+    --input-bg-color-hover: #303050;
+    --input-outline-color: #606060;
+    --backdrop-blur: 10px;
+    --accent: #5544C2;
+    --accent-hover: #8646E0;
+    --error: #C25464;
+    --error-bg: #C2545450;
+    cursor: url("./assets/cursor/cursor.png"), url("./assets/cursor/cursor.svg"), auto;
+    --text-cursor: url("./assets/cursor/text-cursor.png") 12 12, url("./assets/cursor/text-cursor.svg") 12 12,
+    auto;
+    --timeline-cursor: url("./assets/cursor/timeline.png") 12 12, url("./assets/cursor/timeline.svg") 12 12,
+    auto;
+    --pointer-cursor: url("./assets/cursor/pointer-cursor.png") 8 0,
+    url("./assets/cursor/pointer-cursor.svg") 8 0, auto;
+    --dot-cursor: url("./assets/cursor/dot-cursor.png") 12 12, url("./assets/cursor/dot-cursor.svg") 12 12,
+    auto;
+    --move-cursor: url("./assets/cursor/move.png") 12 12, url("./assets/cursor/move.svg") 12 12,
+    auto;
+    color: var(--text-color);
+    background-color: black;
+    margin: 0;
+    font-family: 'Roboto', sans-serif;
+}
+
+span, h1, h2, h3, h4, h5, h6, p {
+    cursor: var(--text-cursor);
+}
+
+button {
+    cursor: var(--pointer-cursor);
+    background-color: var(--accent);
+    color: var(--text-color);
+    border: none;
+    border-radius: 0.25rem;
+    transition-duration: 0.1s;
+    transition-property: background-color;
+    padding: 0.5rem;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+    margin: 1rem;
+    font-size: 1rem;
+}
+button:hover {
+    background-color: var(--accent-hover);
+}
+
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+}
+
+canvas.grabbing {
+    cursor: var(--dot-cursor);
+}
+
+.root {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+input {
+    font-family: 'Roboto Mono', monospace;
+    background-color: var(--input-bg-color);
+    color: var(--text-color);
+    border: none;
+    border-radius: 5px;
+    padding: 5px;
+    outline: 1px solid transparent;
+    transition-duration: 0.1s;
+    cursor: var(--text-cursor);
+}
+
+input:hover {
+    background-color: var(--input-bg-color-hover);
+    outline: 1px solid var(--input-outline-color);
+}
+
+input:focus {
+    background-color: var(--input-bg-color-hover);
+    outline: 2px solid var(--input-outline-color);
+}

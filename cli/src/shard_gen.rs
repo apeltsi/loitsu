@@ -1,23 +1,20 @@
 use loitsu::asset_management::static_shard::StaticShard;
-use loitsu::scripting::ScriptingSource;
 use loitsu::scene_management::Scene;
-use std::collections::HashMap;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hasher, Hash};
-use std::fs::File;
-use std::io::Read;
-use crate::asset_builder::AssetOverride;
-use image::io::Reader as ImageReader;
-use std::path::PathBuf;
-use std::io::Cursor;
+use loitsu::scripting::ScriptingSource;
 use loitsu::Preferences;
+use loitsu_asset_gen::{handle_override, AssetOverride};
+use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
+use std::fs::File;
+use std::hash::{Hash, Hasher};
+use std::io::Read;
 
 #[derive(Debug, Clone)]
 pub struct Shard {
     pub assets: Vec<String>,
     pub is_root: bool,
     pub dependents: Vec<String>,
-    pub name: String
+    pub name: String,
 }
 
 impl PartialEq for Shard {
@@ -42,7 +39,7 @@ impl Shard {
             assets,
             is_root,
             dependents,
-            name: "".to_string()
+            name: "".to_string(),
         }
     }
 
@@ -61,7 +58,7 @@ impl Shard {
         // a new shard with the duplicates
         let mut is_different = false;
         let mut others = others.clone();
-    
+
         let index_of_self = others.iter().position(|x| x == self).unwrap();
 
         for i in 0..others.len() {
@@ -75,7 +72,16 @@ impl Shard {
                 others[index_of_self].remove_items(duplicates.clone());
                 others[i].remove_items(duplicates.clone());
                 // lets create a new shard with the duplicates
-                let new_shard = Shard::new(duplicates, false, others[index_of_self].dependents.clone().into_iter().chain(other.dependents.clone()).collect());
+                let new_shard = Shard::new(
+                    duplicates,
+                    false,
+                    others[index_of_self]
+                        .dependents
+                        .clone()
+                        .into_iter()
+                        .chain(other.dependents.clone())
+                        .collect(),
+                );
                 // lets add the new shard to the list of shards
                 others.push(new_shard);
                 is_different = true;
@@ -87,7 +93,7 @@ impl Shard {
         Some(others)
     }
 
-    pub fn encode(&self, overrides: &HashMap<String, AssetOverride>) -> Vec<u8> {
+    pub async fn encode(&self, overrides: &HashMap<String, AssetOverride>) -> Vec<u8> {
         let mut path = std::env::current_dir().unwrap();
         path.push("assets");
         let mut actual_shard = loitsu::asset_management::shard::Shard::new(self.name.clone());
@@ -95,12 +101,13 @@ impl Shard {
             // lets read the raw file
             let mut file_path = path.clone();
             file_path.push(asset.clone());
-            let mut file = File::open(file_path.clone()).expect(format!("Unable to open {}", asset).as_str());
+            let mut file =
+                File::open(file_path.clone()).expect(format!("Unable to open {}", asset).as_str());
             let mut data = Vec::new();
             file.read_to_end(&mut data).unwrap();
             // lets check if we have an override
             if let Some(override_data) = overrides.get(asset) {
-                data = handle_override(file_path, data, override_data);
+                data = handle_override(file_path, data, override_data).await;
             }
             actual_shard.add_file(asset.to_string(), data);
         }
@@ -127,7 +134,11 @@ impl Shard {
     }
 }
 
-pub fn generate_shards(scenes: Vec<Scene>, scripts: Vec<ScriptingSource>, preferences: &Preferences) -> (Vec<Shard>, StaticShard) {
+pub fn generate_shards(
+    scenes: Vec<Scene>,
+    scripts: Vec<ScriptingSource>,
+    preferences: &Preferences,
+) -> (Vec<Shard>, StaticShard) {
     let mut initial_shards = Vec::new();
     for scene in scenes.clone() {
         initial_shards.push(Shard::new(scene.required_assets, true, vec![scene.name]));
@@ -144,7 +155,7 @@ pub fn generate_shards(scenes: Vec<Scene>, scripts: Vec<ScriptingSource>, prefer
                 Some(new_shards) => {
                     shards = new_shards;
                     did_change = true;
-                },
+                }
                 None => {}
             }
         }
@@ -152,7 +163,7 @@ pub fn generate_shards(scenes: Vec<Scene>, scripts: Vec<ScriptingSource>, prefer
 
     // remove any empty shards
     shards = shards.into_iter().filter(|x| x.assets.len() > 0).collect();
-    
+
     // and finally lets generate our names
     for i in 0..shards.len() {
         shards[i].generate_name();
@@ -178,37 +189,4 @@ pub fn generate_shards(scenes: Vec<Scene>, scripts: Vec<ScriptingSource>, prefer
     let static_shard = StaticShard::new(map, scripts, scenes, preferences.clone());
 
     (shards, static_shard)
-}
-
-fn handle_override(file_path: PathBuf, file_data: Vec<u8>, asset_override: &AssetOverride) -> Vec<u8> {
-    let extension = file_path.extension().unwrap().to_str().unwrap();
-    match extension {
-        "png" | "jpeg" => {
-            let data = ImageReader::new(Cursor::new(file_data)).with_guessed_format().unwrap().decode().unwrap();
-            let mut data = data.to_rgba8();
-           
-            // lets apply the overrides
-
-            // first, resolution_mutliplier
-            if let Some(resolution_multiplier) = asset_override.resolution_multiplier {
-                let (width, height) = data.dimensions();
-                let new_width = (width as f32 * resolution_multiplier).round() as u32;
-                let new_height = (height as f32 * resolution_multiplier).round() as u32;
-                data = image::imageops::resize(&data, new_width, new_height, image::imageops::FilterType::Nearest);
-            }
-
-            // finally lets re-encode the image and return the data
-            let mut buffer: Vec<u8> = Vec::new();
-            let format = match extension {
-                "png" => image::ImageOutputFormat::Png,
-                "jpeg" => image::ImageOutputFormat::Jpeg(90),
-                _ => image::ImageOutputFormat::Png
-            };
-            data.write_to(&mut Cursor::new(&mut buffer), format).unwrap();
-            buffer
-        },
-        _ => {
-            file_data
-        }
-    }
 }

@@ -1,0 +1,221 @@
+.panel-shadow {
+    height: calc(100vh - 30px);
+    width: 100vw;
+}
+
+.panel-shadow::after {
+    content: '';
+    position: absolute;
+    top: 30px;
+    left: 0;
+    height: calc(100% - 30px);
+    width: 100%;
+    box-shadow: inset 0 -12vh 8vh 5vh #262626;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.primary {
+    position: absolute;
+    pointer-events: none;
+    top: 30px;
+    left: 0;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 0.4fr 1.2fr 0.5fr;
+    grid-template-rows: 1fr 0.35fr;
+    height: calc(100vh - 30px);
+    width: 100vw;
+    transition-duration: 0.2s;
+    overflow: hidden;
+}
+
+.inspector {
+    pointer-events: auto;
+    grid-column: 3;
+    grid-row: 1 / 3;
+    border-left: 2px solid var(--line-color);
+    backdrop-filter: blur(var(--backdrop-blur));
+}
+
+.primary.popout .inspector {
+    position: absolute;
+    right: 1rem;
+    top: 1rem;
+    height: calc(100vh - 5rem);
+    border-radius: 0.75rem;
+    width: 20vw;
+    height: auto;
+    max-height: 80vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    animation: popFadeIn 0.25s ease-out;
+    border: 2px solid var(--line-color);
+}
+
+.file-explorer {
+    pointer-events: auto;
+    grid-column: 1 / 3;
+    grid-row: 2;
+    border-top: 2px solid var(--line-color);
+    transition-duration: 0.2s !important;
+    transition-property: filter, transform !important;
+    filter: opacity(1);
+    backdrop-filter: blur(var(--backdrop-blur));
+}
+
+.primary.popout .file-explorer {
+    pointer-events: none;
+    filter: opacity(0);
+    transform: translateY(100%);
+}
+
+.hierarchy {
+    pointer-events: auto;
+    grid-column: 1 / 2;
+    grid-row: 1;
+    border-right: 2px solid var(--line-color);
+    backdrop-filter: blur(var(--backdrop-blur));
+}
+
+.primary.popout .hierarchy {
+    position: absolute;
+    left: 1rem;
+    top: 1rem;
+    height: calc(100vh - 5rem);
+    border-radius: 0.75rem;
+    width: 17.5vw;
+    height: auto;
+    max-height: 80vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    animation: popFadeIn 0.25s ease-out;
+    border: 2px solid var(--line-color);
+}
+
+.overlays {
+    pointer-events: none;
+    grid-column: 2 / 3;
+    grid-row: 1;
+    padding: 0.5rem;
+}
+
+.primary.popout .overlays > * {
+    animation: popFadeIn 0.25s ease-out;
+}
+
+.primary.popout .overlays {
+    padding: 0;
+    padding-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    position: relative;
+    height: calc(100vh - 30px - 0.5rem);
+}
+
+.camera-state {
+    background-color: var(--panel-bg-color);
+    backdrop-filter: blur(var(--backdrop-blur));
+    border-radius: 0.5rem;
+    padding: 0.25rem;
+    font-family: 'Roboto Mono', monospace;
+}
+
+.splash {
+    position: absolute;
+    top: 30px;
+    left: 0;
+    width: 100vw;
+    height: calc(100vh - 30px);
+    z-index: 100;
+    background-color: #232036;
+    background-image: url('/splash-bg.svg');
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    transition-duration: 0.2s;
+    transition-property: filter;
+}
+
+.splash.done {
+    filter: opacity(0);
+    pointer-events: none;
+}
+
+@keyframes popFadeIn {
+    from {
+        transform: scale(0.9);
+        filter: opacity(0);
+    }
+    to {
+        transform: scale(1);
+        filter: opacity(1);
+    }
+}
+
+.select_bounds {
+    position: absolute;
+    border: 2px solid var(--accent-hover);
+    pointer-events: none;
+    z-index: 1000;
+    border-radius: 0.2rem;
+    box-shadow: 0 0 10px 5px var(--accent);
+    animation: select 0.1s ease-out;
+    transform: translate(-2px, -2px);
+    z-index: -1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+}
+
+.move_tool {
+    cursor: var(--move-cursor);
+    width: 50px;
+    height: 50px;
+    background-color: var(--panel-bg-color);
+    border-radius: 50%;
+    backdrop-filter: blur(var(--backdrop-blur));
+    animation: move_tool_appear 0.2s ease-out;
+    pointer-events: all;
+    flex-shrink: 0;
+    transition: width 0.1s ease-out, height 0.1s ease-out, background-color 0.15s ease-out, background-size 0.15s ease-out, opacity 0.1s linear;
+    background-image: url('assets/cursor/move.svg');
+    background-size: 40px 40px;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.move_tool:hover {
+    opacity: 0.6;
+    width: 65px;
+    height: 65px;
+    background-color: var(--accent-hover);
+    background-size: 0px 0px;
+}
+
+@keyframes select {
+    from {
+        opacity: 0.25;
+        transform: translate(-2px, -2px) scale(1.1);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-2px, -2px) scale(1);
+    }
+}
+
+@keyframes move_tool_appear {
+    from {
+        opacity: 0;
+        transform: scale(0.5);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}

@@ -1,0 +1,42 @@
+.bar {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--topbar-bg-color);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: calc(100vw - 40px);
+    z-index: 1;
+    height: 30px;
+    padding: 0 20px;
+    backdrop-filter: blur(var(--backdrop-blur));
+}
+.bar button {
+    height: 28px;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.tasks {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.spinner {
+    height: 25px;
+    width: 25px;
+    margin-right: 10px;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}

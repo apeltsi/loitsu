@@ -1,12 +1,15 @@
+#[allow(unused_imports)]
 use winit::{
-    event::{Event, WindowEvent},
+    event::{Event, WindowEvent, MouseButton, ElementState, MouseScrollDelta},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
-use crate::{log, scripting::{ScriptingInstance, EntityUpdate}, scene_management::Scene, rendering::drawable::{sprite::SpriteDrawable, DrawablePrototype}};
-use crate::ecs::ECS;
-use std::cmp::max;
-use crate::asset_management::ASSET_MANAGER;
+#[allow(unused_imports)]
+use crate::{log_render as log, scripting::{ScriptingInstance, EntityUpdate}, scene_management::Scene, rendering::drawable::{sprite::SpriteDrawable, DrawablePrototype}, asset_management::AssetManager, ecs::{Transform, RuntimeEntity}, log_scripting, input::InputState};
+#[allow(unused_imports)]
+use crate::ecs::{ECS, ComponentFlags};
+use std::{cmp::max, cell::RefCell, rc::Rc, sync::{Mutex, Arc}};
+use crate::{asset_management::ASSET_MANAGER, util::scaling, ecs::RuntimeTransform};
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -109,8 +112,11 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     let mut state = State {
         camera: CameraState::new()
     };
+    let input_state = Arc::new(Mutex::new(InputState::new()));
     state.camera.set_scale(1.0);
     state.camera.set_position([0.0, 0.0].into());
+    #[cfg(feature = "editor")]
+    let mut selected_entity: Option<Rc<RefCell<RuntimeEntity<T>>>> = None;
     event_loop.run(move |event, _, control_flow| {
         let _ = (&instance, &adapter);
         *control_flow = ControlFlow::Poll;
@@ -123,19 +129,21 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 window.set_inner_size(window_size);
                 if frame_count == 0 {
                     let max = max(window_size.width as i32, window_size.height as i32);
-                    queue.write_buffer(&camera_matrix_buffer, 0, bytemuck::cast_slice(&[CameraMatrix {
-                        view: [
+                    state.camera.view = [
                             [(size.height as f32) / max as f32, 0.0, 0.0, 0.0], 
                             [0.0, (size.width as f32) / max as f32, 0.0, 0.0],
                             [0.0, 0.0, 1.0, 0.0],
                             [0.0, 0.0, 0.0, 1.0]
-                        ],
+                    ];
+                    queue.write_buffer(&camera_matrix_buffer, 0, bytemuck::cast_slice(&[CameraMatrix {
+                        view: state.camera.view,
                         camera: state.camera.get_transformation_matrix()
                     }]));
                 }
                 unsafe {WEB_RESIZED = false;}
             }
         }
+
         match event {
             Event::MainEventsCleared => {
                 window.request_redraw();
@@ -152,26 +160,88 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 // okay gamers lets resize the screen & camera matrix buffers
                 // from atlas :D
                 let max = max(size.width, size.height);
-                queue.write_buffer(&camera_matrix_buffer, 0, bytemuck::cast_slice(&[CameraMatrix {
-                    view: [
+                state.camera.aspect = (size.width as f32 / max as f32, size.height as f32 / max as f32);
+                state.camera.view = [
                         [(size.height as f32) / max as f32, 0.0, 0.0, 0.0], 
                         [0.0, (size.width as f32) / max as f32, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
                         [0.0, 0.0, 0.0, 1.0]
-                    ],
+                ];
+                queue.write_buffer(&camera_matrix_buffer, 0, bytemuck::cast_slice(&[CameraMatrix {
+                    view: state.camera.view,
                     camera: state.camera.get_transformation_matrix()
                 }]));
                 // On macos the window needs to be redrawn manually after resizing
                 window.request_redraw();
-            }
+            },
             Event::RedrawRequested(_) => {
+                #[allow(unused_mut)]
+                let mut updates = Vec::new();
+                #[cfg(feature = "editor")]
+                {
+                    let client_events = ecs.poll_client_events();
+                    for event in client_events {
+                        match event {
+                            crate::editor::ClientEvent::SelectEntity(id) => {
+                                if let Some(entity) = ecs.get_entity(id.as_str()) {
+                                    selected_entity = Some(entity.clone());
+                                    let entity = (*entity).borrow();
+                                    let as_entity = entity.as_entity();
+                                    let entity_bounds = get_entity_screen_space_bounds(&state.camera, &mut entity.transform.lock().unwrap(), frame_count - 1).unwrap();
+                                    ecs.emit(crate::editor::Event::EntitySelected(as_entity));
+                                    ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
+                                }
+                            },
+                            crate::editor::ClientEvent::SetComponentProperty { entity, component, field, property } => {
+                                if let Some(entity) = ecs.get_entity(entity.as_str()) {
+                                    {
+                                        let mut entity = (*entity).borrow_mut();
+                                        let component = entity.get_component_mut(component.as_str()).unwrap();
+                                        component.set_property(field.as_str(), property);
+                                    }
+                                    updates.extend(ecs.run_component_methods(&mut scripting, ComponentFlags::EDITOR_UPDATE));
+                                }
+                            },
+                            crate::editor::ClientEvent::MoveSelected(x, y) => {
+                                if let Some(entity) = &selected_entity {
+                                    let entity = (*entity).borrow_mut();
+                                    let (x, y) = crate::util::scaling::as_world_scale(&state.camera, (x, y));
+                                    {
+                                        let mut rtransform = entity.transform.lock().unwrap();
+                                        match rtransform.transform {
+                                            Transform::Transform2D {ref mut position, ..} => {
+                                                position.0 += x;
+                                                position.1 += y;
+                                            },
+                                            Transform::RectTransform { .. } => {
+
+                                            }
+                                        }
+                                        rtransform.has_changed = true;
+                                    }
+                                    {
+                                        let mut rtransform = entity.transform.lock().unwrap();
+                                        let entity_bounds = get_entity_screen_space_bounds(&state.camera, &mut rtransform, frame_count - 1).unwrap();
+                                        ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
+                                    }
+                                }
+                            },
+                            crate::editor::ClientEvent::SaveScene => {
+                                #[cfg(target_arch = "wasm32")]
+                                crate::editor::save_scene(ecs.as_scene().to_json());
+                            }
+                        }
+                    }
+                }
+
+                #[cfg(not(feature = "direct_asset_management"))]
                 if !ecs_initialized {
                     let scene: Option<Scene> = {
                         let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
                         let x = if let Some(static_shard) = &asset_manager.assets.lock().unwrap().static_shard {
                             // init scripts
-                            scripting.initialize(static_shard.get_scripts().clone()).unwrap();
-                            log!("Scripting initialized");
+                            scripting.initialize(static_shard.get_scripts().clone(), input_state.clone()).unwrap();
+                            log_scripting!("Scripting initialized");
                             let default_scene_name = static_shard.get_preferences().default_scene.as_str();
                             let scene = static_shard.get_scene(default_scene_name);
                             Some(scene.expect(
@@ -193,55 +263,197 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     let mut asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
                     asset_manager.initialize_shards(&device, &queue);
                     if frame_count > 1 && ecs_initialized && asset_manager.pending_tasks.load(std::sync::atomic::Ordering::SeqCst) == 0 {
-                        let updates = ecs.run_frame(&mut scripting);
-                        for entity_updates in updates {
-                            for update in entity_updates.1 {
-                                match update {
-                                    EntityUpdate::AddDrawable(drawable) => {
-                                        match drawable {
-                                            DrawablePrototype::Sprite {sprite, color, id} => {
-                                                let mut drawable = Box::new(SpriteDrawable::new(sprite.as_str(), color, id, &shader_manager));
-                                                drawable.init(&device, &asset_manager, entity_updates.0.clone());
-                                                drawables.push(drawable);
-                                            }
-                                        }
-                                    },
-                                    EntityUpdate::RemoveDrawable(id) => {
-                                        // NOTE: This could be more efficient, maybe use a hashmap?
-                                        for i in 0..drawables.len() {
-                                            if drawables[i].get_uuid().to_string() == id {
-                                                drawables.remove(i);
-                                                break;
-                                            }
-                                        }
-                                    },
-                                    EntityUpdate::SetDrawableProperty(id, field_name, property) => {
-                                        // NOTE: Same as above, maybe use a hashmap?
-                                        for i in 0..drawables.len() {
-                                            if drawables[i].get_uuid().to_string() == id {
-                                                drawables[i].set_property(field_name, property);
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                        #[cfg(not(feature = "disable_common_ecs_methods"))]
+                        {
+                            updates.extend(ecs.run_frame(&mut scripting));
                         }
+                    }
+                }
+                #[cfg(feature = "editor")]
+                {
+                    if !ecs_initialized {
+                        updates.extend(ecs.run_component_methods(&mut scripting, crate::ecs::ComponentFlags::EDITOR_START));
+                        #[cfg(target_arch = "wasm32")]
+                        crate::web::remove_editor_loading_task("Starting render pipeline...");
+                        ecs_initialized = true;
+                    }
+                }
+                {
+                    let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
+                    process_entity_updates(&device, &asset_manager, &shader_manager, &mut drawables, updates);
+                }
+                {
+                    let mut input_state = input_state.lock().unwrap();
+                    input_state.new_keys.clear();
+                    input_state.up_keys.clear();
+                }
+                if state.camera.dirty {
+                    queue.write_buffer(&camera_matrix_buffer, 0, bytemuck::cast_slice(&[CameraMatrix {
+                        view: state.camera.view,
+                        camera: state.camera.get_transformation_matrix()
+                    }]));
+                    state.camera.dirty = false;
+                    #[cfg(feature = "editor")]
+                    {
+                        ecs.emit(crate::editor::Event::CameraChanged(state.camera.position.x, state.camera.position.y, state.camera.scale));
                     }
                 }
                 render_frame(&surface, &device, &queue, &mut drawables, &global_bind_group, ecs_initialized, frame_count);
                 frame_count += 1;
-            }
+            },
             Event::WindowEvent {
                 ref event,
                 window_id,
             } if window_id == window.id() => match event {
                 WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                WindowEvent::CursorMoved { position, ..} => {
+                    let mut input_state = input_state.lock().unwrap();
+                    input_state.mouse.last_position = Some(input_state.mouse.position);
+                    input_state.mouse.position = (position.x as f32 / config.width as f32, position.y as f32 / config.height as f32);
+                    #[cfg(feature = "editor")]
+                    if input_state.mouse.right_button {
+                        let delta = input_state.mouse.get_delta();
+                        let world_scale_delta = crate::util::scaling::as_world_scale(&state.camera, (-delta.0 * state.camera.aspect.1, delta.1 * state.camera.aspect.0));
+                        state.camera.position.x += world_scale_delta.0;
+                        state.camera.position.y += world_scale_delta.1;
+                        state.camera.dirty = true;
+                        if let Some(entity) = &selected_entity {
+                            let rentity = entity.borrow();
+                            let entity_bounds = get_entity_screen_space_bounds(&state.camera, &mut rentity.transform.lock().unwrap(), frame_count - 1).unwrap();
+                            ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
+                        }
+                    }
+                },
+                WindowEvent::MouseInput { state: element_state, button, .. } => {
+                    let mut input_state = input_state.lock().unwrap();
+                    match button {
+                        MouseButton::Left => {
+                            input_state.mouse.left_button = *element_state == ElementState::Pressed;
+                            #[cfg(feature = "editor")]
+                            if *element_state == ElementState::Pressed {
+                                let click_pos = input_state.mouse.get_world_position(&state.camera);
+
+                                if let Some(entity) = find_overlapping_entity(&ecs, click_pos, frame_count - 1) {
+                                    selected_entity = Some(entity.clone());
+                                    let entity = entity.borrow();
+                                    let as_entity = entity.as_entity();
+                                    let entity_bounds = get_entity_screen_space_bounds(&state.camera, &mut entity.transform.lock().unwrap(), frame_count - 1).unwrap();
+                                    ecs.emit(crate::editor::Event::EntitySelected(as_entity));
+                                    ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
+                                }
+                            }
+                        },
+                        MouseButton::Right => {
+                            input_state.mouse.right_button = *element_state == ElementState::Pressed;
+                        },
+                        MouseButton::Middle => {
+                            input_state.mouse.middle_button = *element_state == ElementState::Pressed;
+                        },
+                        _ => {}
+                    }
+                },
+                #[cfg(feature = "editor")]
+                WindowEvent::MouseWheel { delta, .. } => {
+                    match delta {
+                        MouseScrollDelta::LineDelta(_x, y) => {
+                            state.camera.scale += y * 0.001;
+                            state.camera.dirty = true;
+                        },
+                        MouseScrollDelta::PixelDelta(pos) => {
+                            state.camera.scale += pos.y as f32 * 0.001;
+                            state.camera.dirty = true;
+                        }
+                    }
+                    if state.camera.scale < 0.1 {
+                        state.camera.scale = 0.1;
+                    }
+                    if let Some(entity) = &selected_entity {
+                        let rentity = entity.borrow();
+                        let entity_bounds = get_entity_screen_space_bounds(&state.camera, &mut rentity.transform.lock().unwrap(), frame_count - 1).unwrap();
+                        ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
+                    }
+                },
+                WindowEvent::KeyboardInput { input, .. } => {
+                    if let Some(key) = input.virtual_keycode {
+                        let mut input_state = input_state.lock().unwrap();
+                        // check if we should add or remove the key
+                        if input.state == ElementState::Released {
+                            input_state.down_keys.retain(|&x| x != key);
+                            input_state.up_keys.push(key);
+                        } else {
+                            input_state.down_keys.push(key);
+                            input_state.new_keys.push(key);
+                        }
+                    }
+                },
                 _ => {}
             },
             _ => {}
         }
     });
+}
+
+#[allow(dead_code)]
+fn get_entity_screen_space_bounds(camera: &CameraState, rtransform: &mut RuntimeTransform, frame_num: u64) -> Option<(f32, f32, f32, f32)> {
+
+    let (position, _rotation, scale) = rtransform.eval_transform(frame_num);
+    let screen_pos = scaling::as_screen_pos(camera, position);
+    let screen_scale = scaling::as_screen_scale(camera, scale);
+    return Some((screen_pos.0, screen_pos.1, screen_scale.0, screen_scale.1));
+}
+
+#[allow(dead_code)]
+fn find_overlapping_entity<T>(ecs: &ECS<T>, check_position: (f32, f32), frame_num: u64) -> Option<Rc<RefCell<RuntimeEntity<T>>>> where T: ScriptingInstance {
+    for e in ecs.get_all_runtime_entities_flat() {
+        let entity = e.borrow();
+        let mut rtransform = entity.transform.lock().unwrap();
+        let (position, _rotation, scale) = rtransform.eval_transform(frame_num);
+        if position.0 - scale.0 / 2.0 <= check_position.0 && position.0 + scale.0 / 2.0 >= check_position.0 &&
+            position.1 - scale.0 / 2.0 <= check_position.1 && position.1 + scale.1 / 2.0 >= check_position.1 {
+                return Some(e.clone());
+            }
+    }
+    None
+}
+
+fn process_entity_updates(device: &wgpu::Device, 
+                          asset_manager: &AssetManager, 
+                          shader_manager: &ShaderManager,
+                          drawables: &mut Vec<Box<dyn Drawable>>,
+                          updates: Vec<(Arc<Mutex<RuntimeTransform>>, Vec<EntityUpdate>)>) {
+    for entity_updates in updates {
+        for update in entity_updates.1 {
+            match update {
+                EntityUpdate::AddDrawable(drawable) => {
+                    match drawable {
+                        DrawablePrototype::Sprite {sprite, color, id} => {
+                            let mut drawable = Box::new(SpriteDrawable::new(sprite.as_str(), color, id, shader_manager));
+                            drawable.init(device, asset_manager, entity_updates.0.clone());
+                            drawables.push(drawable);
+                        }
+                    }
+                },
+                EntityUpdate::RemoveDrawable(id) => {
+                    // NOTE: This could be more efficient, maybe use a hashmap?
+                    for i in 0..drawables.len() {
+                        if drawables[i].get_uuid().to_string() == id {
+                            drawables.remove(i);
+                            break;
+                        }
+                    }
+                },
+                EntityUpdate::SetDrawableProperty(id, field_name, property) => {
+                    // NOTE: Same as above, maybe use a hashmap?
+                    for drawable in &mut *drawables {
+                        if drawable.get_uuid().to_string() == id {
+                            drawable.set_property(field_name, property);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[repr(C)]
@@ -255,31 +467,39 @@ struct State {
     camera: CameraState
 }
 
-struct CameraState {
-    position: cgmath::Vector2<f32>,
-    scale: f32
+pub struct CameraState {
+    pub position: cgmath::Vector2<f32>,
+    pub scale: f32,
+    pub aspect: (f32, f32),
+    pub dirty: bool,
+    pub view: [[f32; 4]; 4]
 }
 
 impl CameraState {
     fn new() -> CameraState {
         CameraState {
             position: cgmath::Vector2::<f32> {x: 0.0, y: 0.0},
-            scale: 1.0
+            scale: 1.0,
+            aspect: (1.0, 1.0),
+            dirty: false,
+            view: [[0.0,0.0,0.0,0.0], [0.0,0.0,0.0,0.0], [0.0,0.0,0.0,0.0], [0.0,0.0,0.0,0.0]]
         }
     }
 
     fn set_position(&mut self, position: cgmath::Vector2<f32>) {
         self.position = position;
+        self.dirty = true;
     }
 
     fn set_scale(&mut self, scale: f32) {
         self.scale = scale;
+        self.dirty = true;
     }
 
     fn get_transformation_matrix(&self) -> [[f32; 4]; 4] {
         [
-            [self.scale, 0.0, 0.0, -self.position.x], // position is inverted because we want to move the world, not the camera
-            [0.0, self.scale, 0.0, -self.position.y],
+            [self.scale, 0.0, 0.0, -self.position.x * self.scale], // position is inverted because we want to move the world, not the camera
+            [0.0, self.scale, 0.0, -self.position.y * self.scale],
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
         ]
@@ -342,7 +562,6 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device,
             drawable.draw(frame_num, &device, &queue, &mut r_pass, global_bind_group);
         }
     }
-
     queue.submit(Some(encoder.finish()));
     frame.present();
 }

@@ -1,12 +1,15 @@
 [package]
 name = "loitsu"
-version = "0.1.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["Amos Peltonen"]
 
 [features]
-scene_generation = ["dep:serde_json"]
+scene_generation = ["dep:serde_json", "dep:serde"]
 json_preference_parse = ["dep:serde_json", "dep:serde"]
+disable_common_ecs_methods = []
+editor = ["disable_common_ecs_methods", "scene_generation", "direct_asset_management"]
+direct_asset_management = []
 
 [dependencies]
 env_logger = "0.10.0"
@@ -27,8 +30,8 @@ cgmath = "0.18.0"
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
 console_log = "1.0.0"
-wasm-bindgen = "0.2.87"
-wasm-bindgen-futures = "0.4.37"
+wasm-bindgen = "0.2.88"
+wasm-bindgen-futures = "0.4.39"
 web-sys = {version = "0.3.64", features = ["Headers", "Request", "RequestInit", "RequestMode", "Response", "Window"]}
 wgpu = {version = "0.18.0", features = ["webgl"]}
 js-sys = "0.3.64"
@@ -39,4 +42,6 @@ instant = { version = "0.1", features = [ "wasm-bindgen" ] }
 wgpu = "0.18.0"
 zstd = "0.13"
 instant = "0.1"
-tokio = { version = "1.0", features=["full"]}
+tokio = { version = "1.35", features=["full"]}
+colored = "2.0.4"
+futures = "0.3.29"

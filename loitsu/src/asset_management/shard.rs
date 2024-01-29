@@ -1,9 +1,10 @@
 use std::collections::HashMap;
-use std::io::{Write, Read};
+use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
+use super::asset::Asset;
+use super::parse::parse;
 use super::AssetError;
-use super::asset::{Asset, image_from_bytes};
 
 #[cfg(not(target_arch = "wasm32"))]
 use tokio::task::spawn as spawn_local;
@@ -11,28 +12,29 @@ use tokio::task::spawn as spawn_local;
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
 pub struct Shard {
     name: String,
-    assets: HashMap<String, ShardFile>
+    assets: HashMap<String, ShardFile>,
 }
 
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
 pub struct ShardFile {
-    name: String,
-    data: Vec<u8>,
+    pub name: String,
+    pub data: Vec<u8>,
 }
 
 impl Shard {
     pub fn new(name: String) -> Shard {
         Shard {
             name,
-            assets: HashMap::new()
+            assets: HashMap::new(),
         }
     }
 
     pub fn add_file(&mut self, name: String, data: Vec<u8>) {
-        self.assets.insert(name.clone(), ShardFile {
-            name,
-            data
-        });
+        self.assets.insert(name.clone(), ShardFile { name, data });
+    }
+
+    pub fn get_assets(&self) -> &HashMap<String, ShardFile> {
+        &self.assets
     }
 
     pub fn get_file(&self, name: &str) -> Option<&ShardFile> {
@@ -69,24 +71,13 @@ impl Shard {
         for (name, file) in self.assets.drain() {
             let assets = assets.clone();
             let task = async move {
-                let asset: Arc<Mutex<Asset>> = match name.split(".").last().unwrap() {
-                    "png" => {
-                        Arc::new(Mutex::new(image_from_bytes(file.data, &file.name)))
-                    },
-                    _ => {
-                        #[cfg(not(target_arch = "wasm32"))]
-                        return Err(AssetError::new("Unknown file type"));
-                        #[cfg(target_arch = "wasm32")]
-                        return;
-                    }
-                };
+                let asset = parse(file).unwrap();
                 assets.lock().unwrap().insert(name, asset);
-                #[cfg(not(target_arch = "wasm32"))]
-                Ok(())
             };
             #[cfg(target_arch = "wasm32")]
             task.await;
-            #[cfg(not(target_arch = "wasm32"))] {
+            #[cfg(not(target_arch = "wasm32"))]
+            {
                 let future = spawn_local(task);
                 futures.push(future);
             }
@@ -94,13 +85,11 @@ impl Shard {
 
         // no multi-threading on wasm :(
         #[cfg(not(target_arch = "wasm32"))]
-        for future in futures {
-            future.await??;
-        }
+        futures::future::join_all(futures).await;
         Ok(ConsumedShard {
             name: self.name.clone(),
             assets: assets.clone().lock().unwrap().clone(),
-            is_initialized: false
+            is_initialized: false,
         })
     }
 }
@@ -108,15 +97,19 @@ impl Shard {
 pub struct ConsumedShard {
     pub name: String,
     pub assets: HashMap<String, Arc<Mutex<Asset>>>,
-    pub is_initialized: bool
+    pub is_initialized: bool,
 }
 
 impl ConsumedShard {
     pub fn initialize(&mut self, graphics_device: &wgpu::Device, queue: &wgpu::Queue) {
-        // assets such as sprites have to be initialized 
+        // assets such as sprites have to be initialized
         // (with access to the graphics device)
         for (_, asset) in self.assets.iter_mut() {
-            asset.lock().unwrap().initialize(graphics_device, queue).unwrap();
+            asset
+                .lock()
+                .unwrap()
+                .initialize(graphics_device, queue)
+                .unwrap();
         }
         self.is_initialized = true;
     }

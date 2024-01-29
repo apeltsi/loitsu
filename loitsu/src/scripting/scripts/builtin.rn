@@ -6,34 +6,48 @@ pub fn v2(x, y) {
 
 struct SpriteRenderer {
     sprite,
-    drawable
+    __drawable
 }
 
 impl SpriteRenderer {
 	pub fn new() {
 		SpriteRenderer {
             sprite: "",
-            drawable: ""
+            __drawable: ""
         }
 	}
 
     pub fn set_color(self, entity, color) {
-        self.drawable = entity.set_drawable_color("color", color);
+        self.__drawable = entity.set_drawable_color("color", color);
     }
 
     pub fn start(self, entity) {
         let drawable = Drawable::sprite(self.sprite, Color::white());
-        self.drawable = entity.register_drawable(drawable);
+        self.__drawable = entity.register_drawable(drawable);
+    }
+
+    pub fn editor_start(self, entity) {
+        let drawable = Drawable::sprite(self.sprite, Color::white());
+        self.__drawable = entity.register_drawable(drawable);
+    }
+
+    pub fn editor_update(self, entity) {
+        if self.__drawable != "" {
+            entity.unregister_drawable(self.__drawable);
+        }
+        let drawable = Drawable::sprite(self.sprite, Color::white());
+        self.__drawable = entity.register_drawable(drawable);
+    }
+
+    pub fn editor_destroy(self, entity) {
+        entity.unregister_drawable(self.__drawable);
     }
 
     pub fn build(self, entity) {
         require_asset(self.sprite);
     }
 
-	pub fn frame(self, entity) {
-	}
-
     pub fn destroy(self, entity) {
-        entity.unregister_drawable(self.drawable);
+        entity.unregister_drawable(self.__drawable);
     }
 }

@@ -1,11 +1,18 @@
 #[cfg(feature = "scene_generation")]
-use serde_json::{Value, Map};
+use serde_json::{Map, Value};
 
-use std::collections::HashMap;
 use bitcode;
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display},
+};
 
 use crate::ecs::Transform;
 
+#[cfg_attr(
+    feature = "scene_generation",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
 #[bitcode(recursive)]
 pub enum Property {
@@ -17,14 +24,66 @@ pub enum Property {
     ComponentReference(String), // Reference to another component in the scene (Represents the ID)
 }
 
+impl Debug for Property {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Property::String(s) => write!(f, "{}", s),
+            Property::Number(n) => write!(f, "{}", n),
+            Property::Boolean(b) => write!(f, "{}", b),
+            Property::Array(a) => {
+                write!(f, "[")?;
+                for (i, item) in a.iter().enumerate() {
+                    write!(f, "{:?}", item)?;
+                    if i != a.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "]")
+            }
+            Property::EntityReference(id) => write!(f, "EntityReference({})", id),
+            Property::ComponentReference(id) => write!(f, "ComponentReference({})", id),
+        }
+    }
+}
+
+impl Display for Property {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Property::String(s) => write!(f, "{}", s),
+            Property::Number(n) => write!(f, "{}", n),
+            Property::Boolean(b) => write!(f, "{}", b),
+            Property::Array(a) => {
+                write!(f, "[")?;
+                for (i, item) in a.iter().enumerate() {
+                    write!(f, "{}", item)?;
+                    if i != a.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "]")
+            }
+            Property::EntityReference(id) => write!(f, "EntityReference({})", id),
+            Property::ComponentReference(id) => write!(f, "ComponentReference({})", id),
+        }
+    }
+}
+
+#[cfg_attr(
+    feature = "scene_generation",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
 pub struct Scene {
     pub name: String,
     pub entities: Vec<Entity>,
     pub required_assets: Vec<String>,
-    pub shards: Vec<String>
+    pub shards: Vec<String>,
 }
 
+#[cfg_attr(
+    feature = "scene_generation",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
 #[bitcode(recursive)]
 pub struct Entity {
@@ -36,6 +95,10 @@ pub struct Entity {
     pub transform: Transform,
 }
 
+#[cfg_attr(
+    feature = "scene_generation",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
 pub struct Component {
     pub name: String,
@@ -50,7 +113,7 @@ impl Scene {
             name,
             entities: Vec::new(),
             required_assets: Vec::new(),
-            shards: Vec::new()
+            shards: Vec::new(),
         }
     }
     #[cfg(feature = "scene_generation")]
@@ -75,10 +138,20 @@ impl Scene {
         let mut scene: HashMap<&str, Value> = HashMap::new();
         scene.insert("name", serde_json::Value::String(self.name.clone()));
         scene.insert("entities", serde_json::Value::Array(entities));
-        scene.insert("required_assets", serde_json::Value::Array(self.required_assets.clone().into_iter().map(|asset| serde_json::Value::String(asset)).collect()));
+        scene.insert(
+            "required_assets",
+            serde_json::Value::Array(
+                self.required_assets
+                    .clone()
+                    .into_iter()
+                    .map(|asset| serde_json::Value::String(asset))
+                    .collect(),
+            ),
+        );
         serde_json::to_string(&scene).unwrap()
     }
 }
+
 #[cfg(feature = "scene_generation")]
 fn collect_entities(entities: Vec<Value>) -> Vec<Entity> {
     // lets iterate over the entities, collect their components, properties AND children
@@ -96,12 +169,13 @@ fn collect_entities(entities: Vec<Value>) -> Vec<Entity> {
             let properties = component["properties"].as_object().unwrap();
             for property in properties {
                 let property_name = property.0.clone();
-                out_component.add_property(property_name, json_value_as_property(property.1.clone()));
+                out_component
+                    .add_property(property_name, json_value_as_property(property.1.clone()));
             }
             out_entity.add_component(out_component);
         }
         out_entity.children = collect_entities(entity["children"].as_array().unwrap().to_vec());
-        
+
         // lets parse the transform
         let transform = entity["transform"].as_object().unwrap();
         out_entity.transform = Transform::from_json(transform);
@@ -109,7 +183,6 @@ fn collect_entities(entities: Vec<Value>) -> Vec<Entity> {
     }
     out_entities
 }
-
 
 impl Entity {
     pub fn new(name: String, id: String) -> Entity {
@@ -123,9 +196,7 @@ impl Entity {
                 rotation: 0.0,
                 scale: (1.0, 1.0),
                 r#static: false,
-                has_changed: true,
-                changed_frame: 0
-            }
+            },
         }
     }
 
@@ -140,9 +211,15 @@ impl Entity {
             components.push(component.to_json());
         }
         let mut entity = Map::new();
-        entity.insert("name".to_string(), serde_json::Value::String(self.name.clone()));
+        entity.insert(
+            "name".to_string(),
+            serde_json::Value::String(self.name.clone()),
+        );
         entity.insert("id".to_string(), serde_json::Value::String(self.id.clone()));
-        entity.insert("components".to_string(), serde_json::Value::Array(components));
+        entity.insert(
+            "components".to_string(),
+            serde_json::Value::Array(components),
+        );
         entity.insert("transform".to_string(), self.transform.clone().to_json());
         let mut children = Vec::new();
         for child in self.children.clone() {
@@ -172,8 +249,15 @@ impl Component {
             properties.insert(property.0, property.1.to_json());
         }
         let mut component = Map::new();
-        component.insert("name".to_string(), serde_json::Value::String(self.name.clone()));
-        component.insert("properties".to_string(), serde_json::Value::Object(properties));
+        component.insert(
+            "name".to_string(),
+            serde_json::Value::String(self.name.clone()),
+        );
+        component.insert(
+            "properties".to_string(),
+            serde_json::Value::Object(properties),
+        );
+        component.insert("id".to_string(), serde_json::Value::String(self.id.clone()));
         Value::Object(component)
     }
 }
