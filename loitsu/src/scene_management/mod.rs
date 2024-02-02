@@ -20,8 +20,8 @@ pub enum Property {
     Number(f32),
     Boolean(bool),
     Array(Vec<Property>),
-    EntityReference(String), // Reference to another entity in the scene (Represents the ID)
-    ComponentReference(String), // Reference to another component in the scene (Represents the ID)
+    EntityReference(u32), // Reference to another entity in the scene (Represents the ID)
+    ComponentReference(u32), // Reference to another component in the scene (Represents the ID)
 }
 
 impl Debug for Property {
@@ -78,6 +78,7 @@ pub struct Scene {
     pub entities: Vec<Entity>,
     pub required_assets: Vec<String>,
     pub shards: Vec<String>,
+    pub id_space: u32,
 }
 
 #[cfg_attr(
@@ -112,14 +113,17 @@ impl Scene {
             entities: Vec::new(),
             required_assets: Vec::new(),
             shards: Vec::new(),
+            id_space: 0,
         }
     }
+
     #[cfg(feature = "scene_generation")]
     pub fn from_json(name: String, json: String) -> Scene {
         let v: Value = serde_json::from_str(&json).unwrap();
         let name = name;
         let mut scene = Scene::new(name);
         scene.entities = collect_entities(v["entities"].as_array().unwrap().to_vec());
+        scene.id_space = v["id_space"].as_number().unwrap().as_u64().unwrap() as u32;
         scene
     }
 
@@ -130,7 +134,9 @@ impl Scene {
     #[cfg(feature = "scene_generation")]
     pub fn to_json(&self) -> String {
         let mut entities = Vec::new();
-        for entity in self.entities.clone() {
+        let mut scene_entities = self.entities.clone();
+        let (scene_entities, id_space) = normalize_ids(&mut scene_entities);
+        for entity in scene_entities {
             entities.push(entity.to_json());
         }
         let mut scene: HashMap<&str, Value> = HashMap::new();
@@ -146,8 +152,45 @@ impl Scene {
                     .collect(),
             ),
         );
+        scene.insert(
+            "id_space",
+            serde_json::Value::Number(serde_json::Number::from(id_space)),
+        );
         serde_json::to_string(&scene).unwrap()
     }
+}
+
+/// Will change all entities and components to the smallest possible IDs while preserving
+/// uniqueness
+fn normalize_ids(entities: &mut Vec<Entity>) -> (Vec<Entity>, u32) {
+    let mut id_map: HashMap<u32, u32> = HashMap::new();
+    let mut next_id = 0;
+    for entity in entities.iter_mut() {
+        let old_id = entity.id;
+        let new_id = match id_map.get(&old_id) {
+            Some(id) => *id,
+            None => {
+                id_map.insert(old_id, next_id);
+                next_id += 1;
+                next_id - 1
+            }
+        };
+        entity.id = new_id;
+        for component in entity.components.iter_mut() {
+            let old_id = component.id;
+            let new_id = match id_map.get(&old_id) {
+                Some(id) => *id,
+                None => {
+                    id_map.insert(old_id, next_id);
+                    next_id += 1;
+                    next_id - 1
+                }
+            };
+            component.id = new_id;
+        }
+        normalize_ids(&mut entity.children);
+    }
+    (entities.clone(), next_id)
 }
 
 #[cfg(feature = "scene_generation")]
@@ -155,24 +198,17 @@ fn collect_entities(entities: Vec<Value>) -> Vec<Entity> {
     // lets iterate over the entities, collect their components, properties AND children
     // recursively
 
-    use crate::error;
     let mut out_entities = Vec::new();
     for entity in entities {
         let name = entity["name"].as_str().unwrap().to_string();
-        let id = entity["id"].as_number();
-        if id.is_none() {
-            error!(
-                "Couldn't parse entity ID: '{}'",
-                entity["id"].as_str().unwrap()
-            );
-            continue;
-        }
-        let id = id.unwrap().as_u64().unwrap() as u32;
+        let id = entity["id"].as_str().unwrap();
+        let id = parse_component_or_entity_id(id).unwrap();
         let mut out_entity = Entity::new(name, id);
         let components = entity["components"].as_array().unwrap();
         for component in components {
             let name = component["name"].as_str().unwrap().to_string();
-            let id = component["id"].as_number().unwrap().as_u64().unwrap() as u32;
+            let id = component["id"].as_str().unwrap();
+            let id = parse_component_or_entity_id(id).unwrap();
             let mut out_component = Component::new(name, id);
             let properties = component["properties"].as_object().unwrap();
             for property in properties {
@@ -223,7 +259,10 @@ impl Entity {
             "name".to_string(),
             serde_json::Value::String(self.name.clone()),
         );
-        entity.insert("id".to_string(), serde_json::Value::Number(self.id.into()));
+        entity.insert(
+            "id".to_string(),
+            serde_json::Value::String(format!("EID{}", self.id)),
+        );
         entity.insert(
             "components".to_string(),
             serde_json::Value::Array(components),
@@ -265,15 +304,37 @@ impl Component {
             "properties".to_string(),
             serde_json::Value::Object(properties),
         );
-        component.insert("id".to_string(), serde_json::Value::Number(self.id.into()));
+        component.insert(
+            "id".to_string(),
+            serde_json::Value::String(format!("CID{}", self.id)),
+        );
         Value::Object(component)
     }
+}
+
+fn parse_component_or_entity_id(id: &str) -> Option<u32> {
+    let id = id[3..].parse::<u32>();
+    if let Ok(id) = id {
+        return Some(id);
+    }
+    None
 }
 
 #[cfg(feature = "scene_generation")]
 fn json_value_as_property(value: Value) -> Property {
     match value {
-        Value::String(s) => Property::String(s),
+        Value::String(s) => {
+            if s.starts_with("EID") {
+                if let Some(id) = parse_component_or_entity_id(&s) {
+                    return Property::EntityReference(id);
+                }
+            } else if s.starts_with("CID") {
+                if let Some(id) = parse_component_or_entity_id(&s) {
+                    return Property::ComponentReference(id);
+                }
+            }
+            Property::String(s)
+        }
         Value::Number(n) => Property::Number(n.as_f64().unwrap() as f32),
         Value::Bool(b) => Property::Boolean(b),
         Value::Array(a) => {

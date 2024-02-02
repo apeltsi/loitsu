@@ -441,12 +441,8 @@ impl ToValue for Property {
                 }
                 VmResult::Ok(Value::Vec(Shared::new(vec).unwrap()))
             }
-            Property::EntityReference(value) => rune::alloc::String::try_from(value.clone())
-                .unwrap()
-                .to_value(),
-            Property::ComponentReference(value) => rune::alloc::String::try_from(value.clone())
-                .unwrap()
-                .to_value(),
+            Property::EntityReference(value) => VmResult::Ok(Value::Integer(value.into())),
+            Property::ComponentReference(value) => VmResult::Ok(Value::Integer(value.into())),
         }
     }
 }

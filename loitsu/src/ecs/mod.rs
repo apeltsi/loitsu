@@ -398,6 +398,7 @@ impl<T: ScriptingInstance> ECS<T> {
                 .collect(),
             required_assets: Vec::new(),
             shards: Vec::new(),
+            id_space: 0, // calculated later
         }
     }
 
