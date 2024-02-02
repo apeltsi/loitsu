@@ -11,7 +11,6 @@ use bitflags::bitflags;
 #[cfg(feature = "scene_generation")]
 use serde_json::{Map, Number, Value};
 use std::sync::{Arc, Mutex};
-use uuid::Uuid;
 
 pub struct ECS<T>
 where
@@ -20,7 +19,7 @@ where
     pub active_scene: Scene,
     pub static_scene: Option<Scene>,
     runtime_entities: Vec<Rc<RefCell<RuntimeEntity<T>>>>,
-    entity_lookup: HashMap<Uuid, Rc<RefCell<RuntimeEntity<T>>>>,
+    entity_lookup: HashMap<u32, Rc<RefCell<RuntimeEntity<T>>>>,
     #[cfg(feature = "editor")]
     event_handler: Arc<Mutex<crate::editor::EventHandler<T>>>,
 }
@@ -267,7 +266,7 @@ where
     T: ScriptingInstance,
 {
     name: String,
-    id: Uuid,
+    id: u32,
     pub components: Vec<RuntimeComponent<T>>,
     entity_proto: Entity,
     pub children: Vec<Rc<RefCell<RuntimeEntity<T>>>>,
@@ -284,15 +283,11 @@ where
         &self.name
     }
 
-    pub fn get_id(&self) -> String {
-        self.id.to_string()
-    }
-
-    pub fn get_uuid(&self) -> Uuid {
+    pub fn get_id(&self) -> u32 {
         self.id
     }
 
-    pub fn get_component_mut(&mut self, id: &str) -> Option<&mut RuntimeComponent<T>> {
+    pub fn get_component_mut(&mut self, id: u32) -> Option<&mut RuntimeComponent<T>> {
         for component in self.components.iter_mut() {
             if component.component_proto.id == id {
                 return Some(component);
@@ -363,9 +358,8 @@ impl<T: ScriptingInstance> ECS<T> {
         self.event_handler.lock().unwrap().poll_client_events()
     }
 
-    pub fn get_entity(&self, id: &str) -> Option<Rc<RefCell<RuntimeEntity<T>>>> {
-        let uuid = Uuid::parse_str(id).unwrap();
-        self.entity_lookup.get(&uuid).map(|entity| entity.clone())
+    pub fn get_entity(&self, id: u32) -> Option<Rc<RefCell<RuntimeEntity<T>>>> {
+        self.entity_lookup.get(&id).map(|entity| entity.clone())
     }
 
     pub fn run_build_step(&mut self, scripting: &mut T) {
@@ -425,7 +419,7 @@ impl<T: ScriptingInstance> RuntimeEntity<T> {
     pub fn as_entity(&self) -> Entity {
         Entity {
             name: self.name.clone(),
-            id: self.id.to_string(),
+            id: self.id,
             components: self
                 .components
                 .iter()
@@ -466,7 +460,7 @@ fn init_entities<T>(
     parent_transform: Option<Arc<Mutex<RuntimeTransform>>>,
 ) -> (
     Vec<Rc<RefCell<RuntimeEntity<T>>>>,
-    HashMap<Uuid, Rc<RefCell<RuntimeEntity<T>>>>,
+    HashMap<u32, Rc<RefCell<RuntimeEntity<T>>>>,
 )
 where
     T: ScriptingInstance,
@@ -485,7 +479,7 @@ where
         );
         let mut runtime_entity = RuntimeEntity {
             name: proto_entity.name.clone(),
-            id: Uuid::parse_str(proto_entity.id.as_str()).unwrap(),
+            id: proto_entity.id,
             components: Vec::new(),
             entity_proto: proto_entity.clone(),
             children: children.0,

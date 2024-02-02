@@ -90,14 +90,14 @@ where
 }
 
 #[wasm_bindgen]
-pub fn request_select_entity(id: String) {
+pub fn request_select_entity(id: u32) {
     let event_handler = unsafe { EVENT_HANDLER.as_ref().unwrap().clone() };
     let mut event_handler = event_handler.lock().unwrap();
     event_handler.emit_client(ClientEvent::SelectEntity(id));
 }
 
 #[wasm_bindgen]
-pub fn set_component_property(id: String, component: String, field: String, value: String) {
+pub fn set_component_property(id: u32, component: u32, field: String, value: String) {
     let event_handler = unsafe { EVENT_HANDLER.as_ref().unwrap().clone() };
     let mut event_handler = event_handler.lock().unwrap();
     event_handler.emit_client(ClientEvent::SetComponentProperty {

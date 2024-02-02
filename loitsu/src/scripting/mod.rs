@@ -39,8 +39,8 @@ impl fmt::Display for ScriptingError {
 
 pub enum EntityUpdate {
     AddDrawable(DrawablePrototype),
-    RemoveDrawable(String),
-    SetDrawableProperty(String, String, DrawableProperty),
+    RemoveDrawable(u32),
+    SetDrawableProperty(u32, String, DrawableProperty),
 }
 
 pub trait ScriptingInstance: Sized {

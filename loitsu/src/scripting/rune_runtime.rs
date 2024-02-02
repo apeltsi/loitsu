@@ -16,7 +16,6 @@ use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-use uuid::Uuid;
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
 #[cfg(feature = "scene_generation")]
@@ -256,37 +255,37 @@ struct RuneEntity {
     // avoid circular references
     #[rune(get, set)]
     pub transform: Shared<AnyObj>,
-    drawables: Vec<(Drawable, Uuid)>,
-    remove_drawables: Vec<String>,
-    property_updates: Vec<(String, String, DrawableProperty)>,
+    drawables: Vec<(Drawable, u32)>,
+    remove_drawables: Vec<u32>,
+    property_updates: Vec<(u32, String, DrawableProperty)>,
 }
 
 impl RuneEntity {
     #[rune::function]
-    fn register_drawable(&mut self, drawable: Drawable) -> String {
-        let id = crate::util::random::uuid();
+    fn register_drawable(&mut self, drawable: Drawable) -> u32 {
+        let id = crate::util::id::get_unique_id();
         self.drawables.push((drawable, id));
-        id.to_string()
+        id
     }
 
     #[rune::function]
-    fn unregister_drawable(&mut self, uuid: &str) {
-        self.remove_drawables.push(uuid.to_string());
+    fn unregister_drawable(&mut self, id: u32) {
+        self.remove_drawables.push(id);
     }
 
     #[rune::function]
-    fn set_drawable_color(&mut self, drawable: &str, property: &str, color: Color) {
+    fn set_drawable_color(&mut self, drawable: u32, property: &str, color: Color) {
         self.property_updates.push((
-            drawable.to_string(),
+            drawable,
             property.to_string(),
             DrawableProperty::Color((&color).into()),
         ));
     }
 
     #[rune::function]
-    fn set_drawable_sprite(&mut self, drawable: &str, property: &str, sprite: &str) {
+    fn set_drawable_sprite(&mut self, drawable: u32, property: &str, sprite: &str) {
         self.property_updates.push((
-            drawable.to_string(),
+            drawable,
             property.to_string(),
             DrawableProperty::Sprite(sprite.to_string()),
         ));
@@ -306,8 +305,8 @@ impl Drawable {
     }
 }
 
-impl From<&(Drawable, Uuid)> for DrawablePrototype {
-    fn from(drawable: &(Drawable, Uuid)) -> Self {
+impl From<&(Drawable, u32)> for DrawablePrototype {
+    fn from(drawable: &(Drawable, u32)) -> Self {
         match &drawable.0 {
             Drawable::Sprite(sprite, color) => DrawablePrototype::Sprite {
                 sprite: sprite.to_string(),

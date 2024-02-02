@@ -88,8 +88,7 @@ pub struct Scene {
 #[bitcode(recursive)]
 pub struct Entity {
     pub name: String,
-    #[bitcode_hint(ascii_lowercase)]
-    pub id: String,
+    pub id: u32,
     pub components: Vec<Component>,
     pub children: Vec<Entity>,
     pub transform: Transform,
@@ -102,8 +101,7 @@ pub struct Entity {
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
 pub struct Component {
     pub name: String,
-    #[bitcode_hint(ascii_lowercase)]
-    pub id: String,
+    pub id: u32,
     pub properties: HashMap<String, Property>,
 }
 
@@ -156,15 +154,25 @@ impl Scene {
 fn collect_entities(entities: Vec<Value>) -> Vec<Entity> {
     // lets iterate over the entities, collect their components, properties AND children
     // recursively
+
+    use crate::error;
     let mut out_entities = Vec::new();
     for entity in entities {
         let name = entity["name"].as_str().unwrap().to_string();
-        let id = entity["id"].as_str().unwrap().to_string();
+        let id = entity["id"].as_number();
+        if id.is_none() {
+            error!(
+                "Couldn't parse entity ID: '{}'",
+                entity["id"].as_str().unwrap()
+            );
+            continue;
+        }
+        let id = id.unwrap().as_u64().unwrap() as u32;
         let mut out_entity = Entity::new(name, id);
         let components = entity["components"].as_array().unwrap();
         for component in components {
             let name = component["name"].as_str().unwrap().to_string();
-            let id = component["id"].as_str().unwrap().to_string();
+            let id = component["id"].as_number().unwrap().as_u64().unwrap() as u32;
             let mut out_component = Component::new(name, id);
             let properties = component["properties"].as_object().unwrap();
             for property in properties {
@@ -185,7 +193,7 @@ fn collect_entities(entities: Vec<Value>) -> Vec<Entity> {
 }
 
 impl Entity {
-    pub fn new(name: String, id: String) -> Entity {
+    pub fn new(name: String, id: u32) -> Entity {
         Entity {
             name,
             id,
@@ -215,7 +223,7 @@ impl Entity {
             "name".to_string(),
             serde_json::Value::String(self.name.clone()),
         );
-        entity.insert("id".to_string(), serde_json::Value::String(self.id.clone()));
+        entity.insert("id".to_string(), serde_json::Value::Number(self.id.into()));
         entity.insert(
             "components".to_string(),
             serde_json::Value::Array(components),
@@ -231,7 +239,7 @@ impl Entity {
 }
 
 impl Component {
-    pub fn new(name: String, id: String) -> Component {
+    pub fn new(name: String, id: u32) -> Component {
         Component {
             name,
             id,
@@ -257,7 +265,7 @@ impl Component {
             "properties".to_string(),
             serde_json::Value::Object(properties),
         );
-        component.insert("id".to_string(), serde_json::Value::String(self.id.clone()));
+        component.insert("id".to_string(), serde_json::Value::Number(self.id.into()));
         Value::Object(component)
     }
 }

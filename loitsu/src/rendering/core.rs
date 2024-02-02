@@ -183,7 +183,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     for event in client_events {
                         match event {
                             crate::editor::ClientEvent::SelectEntity(id) => {
-                                if let Some(entity) = ecs.get_entity(id.as_str()) {
+                                if let Some(entity) = ecs.get_entity(id) {
                                     selected_entity = Some(entity.clone());
                                     let entity = (*entity).borrow();
                                     let as_entity = entity.as_entity();
@@ -193,10 +193,10 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                                 }
                             },
                             crate::editor::ClientEvent::SetComponentProperty { entity, component, field, property } => {
-                                if let Some(entity) = ecs.get_entity(entity.as_str()) {
+                                if let Some(entity) = ecs.get_entity(entity) {
                                     {
                                         let mut entity = (*entity).borrow_mut();
-                                        let component = entity.get_component_mut(component.as_str()).unwrap();
+                                        let component = entity.get_component_mut(component).unwrap();
                                         component.set_property(field.as_str(), property);
                                     }
                                     updates.extend(ecs.run_component_methods(&mut scripting, ComponentFlags::EDITOR_UPDATE));
@@ -436,7 +436,7 @@ fn process_entity_updates(device: &wgpu::Device,
                 EntityUpdate::RemoveDrawable(id) => {
                     // NOTE: This could be more efficient, maybe use a hashmap?
                     for i in 0..drawables.len() {
-                        if drawables[i].get_uuid().to_string() == id {
+                        if drawables[i].get_id() == id {
                             drawables.remove(i);
                             break;
                         }
@@ -445,7 +445,7 @@ fn process_entity_updates(device: &wgpu::Device,
                 EntityUpdate::SetDrawableProperty(id, field_name, property) => {
                     // NOTE: Same as above, maybe use a hashmap?
                     for drawable in &mut *drawables {
-                        if drawable.get_uuid().to_string() == id {
+                        if drawable.get_id() == id {
                             drawable.set_property(field_name, property);
                             break;
                         }

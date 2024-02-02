@@ -31,7 +31,7 @@ pub enum DrawablePrototype {
     Sprite {
         sprite: String,
         color: [f32; 4],
-        id: uuid::Uuid,
+        id: u32,
     },
 }
 
@@ -69,6 +69,6 @@ pub trait Drawable<'b> {
         pass: &mut RenderPass<'a>,
         global_bind_group: &'a wgpu::BindGroup,
     );
-    fn get_uuid(&self) -> uuid::Uuid;
+    fn get_id(&self) -> u32;
     fn set_property(&mut self, name: String, property: DrawableProperty);
 }
