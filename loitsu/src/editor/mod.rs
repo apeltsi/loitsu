@@ -45,7 +45,7 @@ pub enum Event {
     /// A scene has been loaded
     SceneLoaded(Scene),
     /// An entity has been updated
-    EntityUpdated(String),
+    EntityUpdated(u32),
     /// An entity has been selected
     EntitySelected(Entity),
     /// The camera has changed (x, y, zoom)
@@ -56,12 +56,12 @@ pub enum Event {
 
 /// This is a list of events that the client can send to the editor backend
 pub enum ClientEvent {
-    /// A request to select an entity with the given uuid
-    SelectEntity(String),
+    /// A request to select an entity with the given id
+    SelectEntity(u32),
     /// A request to set the given property on the given entity
     SetComponentProperty {
-        entity: String,
-        component: String,
+        entity: u32,
+        component: u32,
         field: String,
         property: Property,
     },

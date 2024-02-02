@@ -21,7 +21,7 @@ pub struct SpriteDrawable {
     uniform: SpriteUniform,
     sprite: String,
     transform: Option<Arc<Mutex<RuntimeTransform>>>,
-    uuid: uuid::Uuid,
+    id: u32,
     uniform_dirty: bool,
     sprite_dirty: bool,
     asset_ref: Option<Arc<Mutex<AssetReference>>>,
@@ -34,12 +34,7 @@ pub struct SpriteUniform {
 }
 
 impl<'a> SpriteDrawable {
-    pub fn new(
-        sprite: &str,
-        color: [f32; 4],
-        uuid: uuid::Uuid,
-        shader_manager: &ShaderManager,
-    ) -> Self {
+    pub fn new(sprite: &str, color: [f32; 4], id: u32, shader_manager: &ShaderManager) -> Self {
         Self {
             vertex_buffer: None,
             index_buffer: None,
@@ -50,7 +45,7 @@ impl<'a> SpriteDrawable {
             uniform: SpriteUniform { color },
             sprite: sprite.to_string(),
             transform: None,
-            uuid,
+            id,
             uniform_dirty: false,
             sprite_dirty: false,
             asset_ref: None,
@@ -197,8 +192,8 @@ impl<'b> Drawable<'b> for SpriteDrawable {
         pass.draw_indexed(0..QUAD_INDICES.len() as u32, 0, 0..1);
     }
 
-    fn get_uuid(&self) -> uuid::Uuid {
-        self.uuid
+    fn get_id(&self) -> u32 {
+        self.id
     }
 
     fn set_property(&mut self, name: String, property: super::DrawableProperty) {
