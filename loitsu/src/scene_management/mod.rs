@@ -158,10 +158,18 @@ impl Scene {
         );
         serde_json::to_string(&scene).unwrap()
     }
+
+    pub fn reserve_ids(&mut self) {
+        let id_space_begin = crate::util::id::reserve_id_space(self.id_space);
+        for entity in self.entities.iter_mut() {
+            entity.reserve_ids(id_space_begin);
+        }
+    }
 }
 
 /// Will change all entities and components to the smallest possible IDs while preserving
 /// uniqueness
+#[allow(dead_code)]
 fn normalize_ids(entities: &mut Vec<Entity>) -> (Vec<Entity>, u32) {
     let mut id_map: HashMap<u32, u32> = HashMap::new();
     let mut next_id = 0;
@@ -275,6 +283,23 @@ impl Entity {
         entity.insert("children".to_string(), serde_json::Value::Array(children));
         Value::Object(entity)
     }
+
+    pub fn reserve_ids(&mut self, id_space_begin: u32) {
+        self.id += id_space_begin;
+        for component in self.components.iter_mut() {
+            component.id += id_space_begin;
+            for property in component.properties.iter_mut() {
+                match property.1 {
+                    Property::EntityReference(ref mut id) => *id += id_space_begin,
+                    Property::ComponentReference(ref mut id) => *id += id_space_begin,
+                    _ => {}
+                }
+            }
+        }
+        for child in self.children.iter_mut() {
+            child.reserve_ids(id_space_begin);
+        }
+    }
 }
 
 impl Component {
@@ -312,6 +337,7 @@ impl Component {
     }
 }
 
+#[allow(dead_code)]
 fn parse_component_or_entity_id(id: &str) -> Option<u32> {
     let id = id[3..].parse::<u32>();
     if let Ok(id) = id {

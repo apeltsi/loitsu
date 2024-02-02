@@ -330,12 +330,14 @@ impl<T: ScriptingInstance> ECS<T> {
     }
 
     pub fn load_scene(&mut self, scene: Scene, scripting: &mut T) {
-        self.active_scene = scene.clone();
+        let mut scene = scene.clone();
+        scene.reserve_ids();
+        self.active_scene = scene;
 
         (self.runtime_entities, self.entity_lookup) =
-            init_entities(scene.clone().entities, scripting, None);
+            init_entities(self.active_scene.clone().entities, scripting, None);
         #[cfg(feature = "editor")]
-        self.emit(crate::editor::Event::SceneLoaded(scene));
+        self.emit(crate::editor::Event::SceneLoaded(self.active_scene.clone()));
 
         // next up we'll have to figure out how to load our assets
         // lets start by requesting the appropriate shards
@@ -343,7 +345,7 @@ impl<T: ScriptingInstance> ECS<T> {
         ASSET_MANAGER
             .lock()
             .unwrap()
-            .request_shards(scene.shards.clone());
+            .request_shards(self.active_scene.shards.clone());
     }
 
     #[cfg(feature = "editor")]
