@@ -61,7 +61,7 @@ pub trait ScriptingInstance: Sized {
         T: rune::runtime::Args;
     fn run_component_methods<T>(
         &mut self,
-        entities: &mut [Rc<RefCell<crate::ecs::RuntimeEntity<Self>>>],
+        entities: &[Rc<RefCell<crate::ecs::RuntimeEntity<Self>>>],
         method: ComponentFlags,
     ) -> Vec<(Arc<Mutex<RuntimeTransform>>, Vec<EntityUpdate>)>;
     fn get_component_flags(&self, component_name: &str) -> ComponentFlags;

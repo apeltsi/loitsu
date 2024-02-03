@@ -356,7 +356,7 @@ impl<T: ScriptingInstance> ECS<T> {
     }
 
     #[cfg(feature = "editor")]
-    pub fn poll_client_events(&mut self) -> Vec<crate::editor::ClientEvent> {
+    pub fn poll_client_events(&self) -> Vec<crate::editor::ClientEvent> {
         self.event_handler.lock().unwrap().poll_client_events()
     }
 
@@ -369,19 +369,23 @@ impl<T: ScriptingInstance> ECS<T> {
     }
 
     pub fn run_frame(
-        &mut self,
+        &self,
         scripting: &mut T,
     ) -> Vec<(Arc<Mutex<RuntimeTransform>>, Vec<EntityUpdate>)> {
         self.run_component_methods(scripting, ComponentFlags::FRAME)
     }
 
     pub fn run_component_methods(
-        &mut self,
+        &self,
         scripting: &mut T,
         method: ComponentFlags,
     ) -> Vec<(Arc<Mutex<RuntimeTransform>>, Vec<EntityUpdate>)> {
         // Lets iterate over the entities and run the build step on each component
-        scripting.run_component_methods::<T>(self.runtime_entities.as_mut_slice(), method)
+        scripting.run_component_methods::<T>(self.runtime_entities.as_slice(), method)
+    }
+
+    pub fn get_runtime_entities(&self) -> Vec<Rc<RefCell<RuntimeEntity<T>>>> {
+        self.runtime_entities.clone()
     }
 
     pub fn clear(&mut self) {
@@ -404,9 +408,6 @@ impl<T: ScriptingInstance> ECS<T> {
         }
     }
 
-    pub fn get_runtime_entities(&self) -> &Vec<Rc<RefCell<RuntimeEntity<T>>>> {
-        &self.runtime_entities
-    }
     /// Returns a flat list of all entities in the scene
     pub fn get_all_runtime_entities_flat(&self) -> Vec<Rc<RefCell<RuntimeEntity<T>>>> {
         let mut entities = Vec::new();

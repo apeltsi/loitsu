@@ -2,11 +2,11 @@ use crate::ecs::ECS;
 use crate::log;
 use crate::scripting::ScriptingInstance;
 use crate::web::update_loading_status;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use winit::event_loop::EventLoop;
 use winit::platform::web::WindowExtWebSys;
 
-pub fn init_view<T>(scripting: T, ecs: Arc<Mutex<ECS<T>>>)
+pub fn init_view<T>(scripting: T, ecs: Arc<RwLock<ECS<T>>>)
 where
     T: ScriptingInstance + 'static,
 {

@@ -580,7 +580,7 @@ impl ScriptingInstance for RuneInstance {
 
     fn run_component_methods<RuneComponent>(
         &mut self,
-        entities: &mut [Rc<RefCell<crate::ecs::RuntimeEntity<Self>>>],
+        entities: &[Rc<RefCell<crate::ecs::RuntimeEntity<Self>>>],
         method: ComponentFlags,
     ) -> Vec<(Arc<Mutex<crate::ecs::RuntimeTransform>>, Vec<EntityUpdate>)> {
         let mut updates = Vec::new();
