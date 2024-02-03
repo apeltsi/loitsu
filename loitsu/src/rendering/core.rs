@@ -26,7 +26,7 @@ use crate::web::update_loading_status;
 
 use super::{drawable::Drawable, shader::ShaderManager};
 
-pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T, mut ecs: ECS<T>) where T: ScriptingInstance + 'static {
+pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T, ecs: Arc<Mutex<ECS<T>>>) where T: ScriptingInstance + 'static {
     unsafe { HAS_RENDERED = false; }
     unsafe { HAS_LOADED = false; }
     #[cfg(target_arch = "wasm32")]
@@ -179,6 +179,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 let mut updates = Vec::new();
                 #[cfg(feature = "editor")]
                 {
+                    let mut ecs = ecs.lock().unwrap();
                     let client_events = ecs.poll_client_events();
                     for event in client_events {
                         match event {
@@ -254,12 +255,15 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         }; x
                     };
                     if let Some(scene) = scene {
+                        let mut ecs = ecs.lock().unwrap();
                         ecs.load_scene(
                             scene, &mut scripting);
                         ecs_initialized = true;
                         log!("ECS initialized");
                     }
                 } else {
+                    #[allow(unused)]
+                    let mut ecs = ecs.lock().unwrap();
                     let mut asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
                     asset_manager.initialize_shards(&device, &queue);
                     if frame_count > 1 && ecs_initialized && asset_manager.pending_tasks.load(std::sync::atomic::Ordering::SeqCst) == 0 {
@@ -272,6 +276,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 #[cfg(feature = "editor")]
                 {
                     if !ecs_initialized {
+                        let mut ecs = ecs.lock().unwrap();
                         updates.extend(ecs.run_component_methods(&mut scripting, crate::ecs::ComponentFlags::EDITOR_START));
                         #[cfg(target_arch = "wasm32")]
                         crate::web::remove_editor_loading_task("Starting render pipeline...");
@@ -295,6 +300,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     state.camera.dirty = false;
                     #[cfg(feature = "editor")]
                     {
+                        let mut ecs = ecs.lock().unwrap();
                         ecs.emit(crate::editor::Event::CameraChanged(state.camera.position.x, state.camera.position.y, state.camera.scale));
                     }
                 }
@@ -320,7 +326,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         if let Some(entity) = &selected_entity {
                             let rentity = entity.borrow();
                             let entity_bounds = get_entity_screen_space_bounds(&state.camera, &mut rentity.transform.lock().unwrap(), frame_count - 1).unwrap();
-                            ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
+                            ecs.lock().unwrap().emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
                         }
                     }
                 },
@@ -333,6 +339,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                             if *element_state == ElementState::Pressed {
                                 let click_pos = input_state.mouse.get_world_position(&state.camera);
 
+                                let mut ecs = ecs.lock().unwrap();
                                 if let Some(entity) = find_overlapping_entity(&ecs, click_pos, frame_count - 1) {
                                     selected_entity = Some(entity.clone());
                                     let entity = entity.borrow();
@@ -370,7 +377,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     if let Some(entity) = &selected_entity {
                         let rentity = entity.borrow();
                         let entity_bounds = get_entity_screen_space_bounds(&state.camera, &mut rentity.transform.lock().unwrap(), frame_count - 1).unwrap();
-                        ecs.emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
+                        ecs.lock().unwrap().emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
                     }
                 },
                 WindowEvent::KeyboardInput { input, .. } => {

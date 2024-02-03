@@ -1,9 +1,10 @@
 use crate::ecs::ECS;
 use crate::log_render as log;
 use crate::scripting::ScriptingInstance;
+use std::sync::{Arc, Mutex};
 use winit::event_loop::EventLoop;
 
-pub fn init_window<T>(scripting: T, ecs: ECS<T>)
+pub fn init_window<T>(scripting: T, ecs: Arc<Mutex<ECS<T>>>)
 where
     T: ScriptingInstance + 'static,
 {

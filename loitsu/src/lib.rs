@@ -9,6 +9,8 @@ pub mod scene_management;
 pub mod scripting;
 pub mod util;
 use scripting::ScriptingInstance;
+#[allow(unused_imports)]
+use std::sync::{Arc, Mutex};
 
 #[cfg_attr(feature = "json_preference_parse", derive(serde::Deserialize))]
 #[derive(Clone, bitcode::Decode, bitcode::Encode)]
@@ -65,13 +67,13 @@ pub fn load_scene_in_edit_mode(
     #[cfg(not(target_arch = "wasm32"))]
     {
         use rendering::desktop;
-        desktop::init_window(rune, e);
+        desktop::init_window(rune, Arc::new(Mutex::new(e)));
     }
 
     #[cfg(target_arch = "wasm32")]
     {
         use rendering::web;
-        web::init_view(rune, e);
+        web::init_view(rune, Arc::new(Mutex::new(e)));
     }
 }
 
@@ -92,13 +94,13 @@ pub fn init_engine() {
     #[cfg(not(target_arch = "wasm32"))]
     {
         use rendering::desktop;
-        desktop::init_window(rune, ecs);
+        desktop::init_window(rune, Arc::new(Mutex::new(ecs)));
     }
 
     #[cfg(target_arch = "wasm32")]
     {
         use rendering::web;
-        web::init_view(rune, ecs);
+        web::init_view(rune, Arc::new(Mutex::new(ecs)));
     }
 }
 
