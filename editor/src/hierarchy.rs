@@ -18,7 +18,7 @@ where
     let mut hierarchy = Vec::new();
     // lets walk the ecs tree and generate the hierarchy
     for entity in ecs.get_runtime_entities() {
-        hierarchy.push(generate_hierarchy_element(&entity.borrow()));
+        hierarchy.push(generate_hierarchy_element(&entity.lock().unwrap()));
     }
     hierarchy
 }
@@ -29,7 +29,7 @@ where
 {
     let mut children = Vec::new();
     for child in &entity.children {
-        children.push(generate_hierarchy_element(&child.borrow()));
+        children.push(generate_hierarchy_element(&child.lock().unwrap()));
     }
     HierarchyElement {
         name: entity.get_name().to_string(),

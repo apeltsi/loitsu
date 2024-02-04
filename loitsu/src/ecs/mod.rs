@@ -1,6 +1,4 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 
 #[cfg(not(feature = "scene_generation"))]
 use crate::asset_management::ASSET_MANAGER;
@@ -18,8 +16,8 @@ where
 {
     pub active_scene: Scene,
     pub static_scene: Option<Scene>,
-    runtime_entities: Vec<Rc<RefCell<RuntimeEntity<T>>>>,
-    entity_lookup: HashMap<u32, Rc<RefCell<RuntimeEntity<T>>>>,
+    runtime_entities: Vec<Arc<Mutex<RuntimeEntity<T>>>>,
+    entity_lookup: HashMap<u32, Arc<Mutex<RuntimeEntity<T>>>>,
     #[cfg(feature = "editor")]
     event_handler: Arc<Mutex<crate::editor::EventHandler<T>>>,
 }
@@ -269,7 +267,7 @@ where
     id: u32,
     pub components: Vec<RuntimeComponent<T>>,
     entity_proto: Entity,
-    pub children: Vec<Rc<RefCell<RuntimeEntity<T>>>>,
+    pub children: Vec<Arc<Mutex<RuntimeEntity<T>>>>,
     pub component_flags: ComponentFlags, // this is the union of all the component flags, so we can quickly check if we need to run a method
     pub transform: Arc<Mutex<RuntimeTransform>>,
     pub is_new: bool,
@@ -281,6 +279,10 @@ where
 {
     pub fn get_name(&self) -> &str {
         &self.name
+    }
+
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
     }
 
     pub fn get_id(&self) -> u32 {
@@ -360,11 +362,11 @@ impl<T: ScriptingInstance> ECS<T> {
         self.event_handler.lock().unwrap().poll_client_events()
     }
 
-    pub fn get_entity(&self, id: u32) -> Option<Rc<RefCell<RuntimeEntity<T>>>> {
+    pub fn get_entity(&self, id: u32) -> Option<Arc<Mutex<RuntimeEntity<T>>>> {
         self.entity_lookup.get(&id).map(|entity| entity.clone())
     }
 
-    pub fn run_build_step(&mut self, scripting: &mut T) {
+    pub fn run_build_step(&self, scripting: &mut T) {
         self.run_component_methods(scripting, ComponentFlags::BUILD);
     }
 
@@ -381,10 +383,14 @@ impl<T: ScriptingInstance> ECS<T> {
         method: ComponentFlags,
     ) -> Vec<(Arc<Mutex<RuntimeTransform>>, Vec<EntityUpdate>)> {
         // Lets iterate over the entities and run the build step on each component
-        scripting.run_component_methods::<T>(self.runtime_entities.as_slice(), method)
+        scripting.run_component_methods::<T>(
+            self.runtime_entities.as_slice(),
+            self.entity_lookup.clone(),
+            method,
+        )
     }
 
-    pub fn get_runtime_entities(&self) -> Vec<Rc<RefCell<RuntimeEntity<T>>>> {
+    pub fn get_runtime_entities(&self) -> Vec<Arc<Mutex<RuntimeEntity<T>>>> {
         self.runtime_entities.clone()
     }
 
@@ -400,7 +406,7 @@ impl<T: ScriptingInstance> ECS<T> {
             entities: self
                 .runtime_entities
                 .iter()
-                .map(|runtime_entity| runtime_entity.borrow().as_entity())
+                .map(|runtime_entity| runtime_entity.lock().unwrap().as_entity())
                 .collect(),
             required_assets: Vec::new(),
             shards: Vec::new(),
@@ -409,11 +415,11 @@ impl<T: ScriptingInstance> ECS<T> {
     }
 
     /// Returns a flat list of all entities in the scene
-    pub fn get_all_runtime_entities_flat(&self) -> Vec<Rc<RefCell<RuntimeEntity<T>>>> {
+    pub fn get_all_runtime_entities_flat(&self) -> Vec<Arc<Mutex<RuntimeEntity<T>>>> {
         let mut entities = Vec::new();
         for runtime_entity in &self.runtime_entities {
             entities.push(runtime_entity.clone());
-            entities.append(&mut runtime_entity.borrow().get_all_runtime_entities());
+            entities.append(&mut runtime_entity.lock().unwrap().get_all_runtime_entities());
         }
         entities
     }
@@ -432,17 +438,17 @@ impl<T: ScriptingInstance> RuntimeEntity<T> {
             children: self
                 .children
                 .iter()
-                .map(|runtime_entity| runtime_entity.borrow().as_entity())
+                .map(|runtime_entity| runtime_entity.lock().unwrap().as_entity())
                 .collect(),
             transform: self.transform.lock().unwrap().transform.clone(),
         }
     }
 
-    pub fn get_all_runtime_entities(&self) -> Vec<Rc<RefCell<RuntimeEntity<T>>>> {
+    pub fn get_all_runtime_entities(&self) -> Vec<Arc<Mutex<RuntimeEntity<T>>>> {
         let mut entities = Vec::new();
         for runtime_entity in &self.children {
             entities.push(runtime_entity.clone());
-            entities.append(&mut runtime_entity.borrow().get_all_runtime_entities());
+            entities.append(&mut runtime_entity.lock().unwrap().get_all_runtime_entities());
         }
         entities
     }
@@ -463,8 +469,8 @@ fn init_entities<T>(
     scripting: &mut T,
     parent_transform: Option<Arc<Mutex<RuntimeTransform>>>,
 ) -> (
-    Vec<Rc<RefCell<RuntimeEntity<T>>>>,
-    HashMap<u32, Rc<RefCell<RuntimeEntity<T>>>>,
+    Vec<Arc<Mutex<RuntimeEntity<T>>>>,
+    HashMap<u32, Arc<Mutex<RuntimeEntity<T>>>>,
 )
 where
     T: ScriptingInstance,
@@ -504,9 +510,9 @@ where
             };
             runtime_entity.components.push(runtime_component);
         }
-        let runtime_entity = Rc::new(RefCell::new(runtime_entity));
+        let id = runtime_entity.id;
+        let runtime_entity = Arc::new(Mutex::new(runtime_entity));
         runtime_entities.push(runtime_entity.clone());
-        let id = runtime_entity.borrow().id;
         entity_lookup.insert(id, runtime_entity);
     }
     (runtime_entities, entity_lookup)

@@ -8,7 +8,7 @@ use winit::{
 use crate::{log_render as log, scripting::{ScriptingInstance, EntityUpdate}, scene_management::Scene, rendering::drawable::{sprite::SpriteDrawable, DrawablePrototype}, asset_management::AssetManager, ecs::{Transform, RuntimeEntity}, log_scripting, input::InputState};
 #[allow(unused_imports)]
 use crate::ecs::{ECS, ComponentFlags};
-use std::{cmp::max, cell::RefCell, rc::Rc, sync::{Mutex, Arc, RwLock}};
+use std::{cmp::max, sync::{Mutex, Arc, RwLock}};
 use crate::{asset_management::ASSET_MANAGER, util::scaling, ecs::RuntimeTransform};
 
 #[cfg(target_arch = "wasm32")]
@@ -116,7 +116,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     state.camera.set_scale(1.0);
     state.camera.set_position([0.0, 0.0].into());
     #[cfg(feature = "editor")]
-    let mut selected_entity: Option<Rc<RefCell<RuntimeEntity<T>>>> = None;
+    let mut selected_entity: Option<Arc<Mutex<RuntimeEntity<T>>>> = None;
     event_loop.run(move |event, _, control_flow| {
         let _ = (&instance, &adapter);
         *control_flow = ControlFlow::Poll;
@@ -186,7 +186,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                             crate::editor::ClientEvent::SelectEntity(id) => {
                                 if let Some(entity) = ecs.get_entity(id) {
                                     selected_entity = Some(entity.clone());
-                                    let entity = (*entity).borrow();
+                                    let entity = (*entity).lock().unwrap();
                                     let as_entity = entity.as_entity();
                                     let entity_bounds = get_entity_screen_space_bounds(&state.camera, &mut entity.transform.lock().unwrap(), frame_count - 1).unwrap();
                                     ecs.emit(crate::editor::Event::EntitySelected(as_entity));
@@ -196,7 +196,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                             crate::editor::ClientEvent::SetComponentProperty { entity, component, field, property } => {
                                 if let Some(entity) = ecs.get_entity(entity) {
                                     {
-                                        let mut entity = (*entity).borrow_mut();
+                                        let mut entity = (*entity).lock().unwrap();
                                         let component = entity.get_component_mut(component).unwrap();
                                         component.set_property(field.as_str(), property);
                                     }
@@ -205,7 +205,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                             },
                             crate::editor::ClientEvent::MoveSelected(x, y) => {
                                 if let Some(entity) = &selected_entity {
-                                    let entity = (*entity).borrow_mut();
+                                    let entity = (*entity).lock().unwrap();
                                     let (x, y) = crate::util::scaling::as_world_scale(&state.camera, (x, y));
                                     {
                                         let mut rtransform = entity.transform.lock().unwrap();
@@ -241,7 +241,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         let asset_manager = crate::asset_management::ASSET_MANAGER.lock().unwrap();
                         let x = if let Some(static_shard) = &asset_manager.assets.lock().unwrap().static_shard {
                             // init scripts
-                            scripting.initialize(static_shard.get_scripts().clone(), input_state.clone()).unwrap();
+                            scripting.initialize(static_shard.get_scripts().clone(), input_state.clone(), ecs.clone()).unwrap();
                             log_scripting!("Scripting initialized");
                             let default_scene_name = static_shard.get_preferences().default_scene.as_str();
                             let scene = static_shard.get_scene(default_scene_name);
@@ -324,7 +324,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         state.camera.position.y += world_scale_delta.1;
                         state.camera.dirty = true;
                         if let Some(entity) = &selected_entity {
-                            let rentity = entity.borrow();
+                            let rentity = entity.lock().unwrap();
                             let entity_bounds = get_entity_screen_space_bounds(&state.camera, &mut rentity.transform.lock().unwrap(), frame_count - 1).unwrap();
                             ecs.write().unwrap().emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
                         }
@@ -342,7 +342,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                                 let mut ecs = ecs.write().unwrap();
                                 if let Some(entity) = find_overlapping_entity(&ecs, click_pos, frame_count - 1) {
                                     selected_entity = Some(entity.clone());
-                                    let entity = entity.borrow();
+                                    let entity = entity.lock().unwrap();
                                     let as_entity = entity.as_entity();
                                     let entity_bounds = get_entity_screen_space_bounds(&state.camera, &mut entity.transform.lock().unwrap(), frame_count - 1).unwrap();
                                     ecs.emit(crate::editor::Event::EntitySelected(as_entity));
@@ -375,7 +375,7 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         state.camera.scale = 0.1;
                     }
                     if let Some(entity) = &selected_entity {
-                        let rentity = entity.borrow();
+                        let rentity = entity.lock().unwrap();
                         let entity_bounds = get_entity_screen_space_bounds(&state.camera, &mut rentity.transform.lock().unwrap(), frame_count - 1).unwrap();
                         ecs.write().unwrap().emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
                     }
@@ -410,9 +410,9 @@ fn get_entity_screen_space_bounds(camera: &CameraState, rtransform: &mut Runtime
 }
 
 #[allow(dead_code)]
-fn find_overlapping_entity<T>(ecs: &ECS<T>, check_position: (f32, f32), frame_num: u64) -> Option<Rc<RefCell<RuntimeEntity<T>>>> where T: ScriptingInstance {
+fn find_overlapping_entity<T>(ecs: &ECS<T>, check_position: (f32, f32), frame_num: u64) -> Option<Arc<Mutex<RuntimeEntity<T>>>> where T: ScriptingInstance {
     for e in ecs.get_all_runtime_entities_flat() {
-        let entity = e.borrow();
+        let entity = e.lock().unwrap();
         let mut rtransform = entity.transform.lock().unwrap();
         let (position, _rotation, scale) = rtransform.eval_transform(frame_num);
         if position.0 - scale.0 / 2.0 <= check_position.0 && position.0 + scale.0 / 2.0 >= check_position.0 &&

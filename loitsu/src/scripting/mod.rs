@@ -1,5 +1,5 @@
 pub mod rune_runtime;
-use crate::ecs::{ComponentFlags, RuntimeTransform};
+use crate::ecs::{ComponentFlags, RuntimeTransform, ECS};
 use crate::input::InputState;
 use crate::scene_management::Property;
 use crate::{
@@ -7,8 +7,9 @@ use crate::{
     scene_management::Component,
 };
 use bitcode;
-use std::sync::{Arc, Mutex};
-use std::{cell::RefCell, fmt, rc::Rc};
+use std::collections::HashMap;
+use std::fmt;
+use std::sync::{Arc, Mutex, RwLock};
 
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
@@ -45,7 +46,7 @@ pub enum EntityUpdate {
 
 pub trait ScriptingInstance: Sized {
     type Data: ScriptingData<Self>;
-    fn new_with_sources(sources: Vec<ScriptingSource>) -> Result<Self>
+    fn new_with_sources(sources: Vec<ScriptingSource>, ecs: Arc<RwLock<ECS<Self>>>) -> Result<Self>
     where
         Self: Sized;
     fn new_uninitialized() -> Result<Self>
@@ -55,13 +56,15 @@ pub trait ScriptingInstance: Sized {
         &mut self,
         sources: Vec<ScriptingSource>,
         input_state: Arc<Mutex<InputState>>,
+        ecs: Arc<RwLock<ECS<Self>>>,
     ) -> Result<()>;
     fn call<T>(&mut self, path: [&str; 2], args: T) -> Result<rune::runtime::Value>
     where
         T: rune::runtime::Args;
     fn run_component_methods<T>(
         &mut self,
-        entities: &[Rc<RefCell<crate::ecs::RuntimeEntity<Self>>>],
+        entities: &[Arc<Mutex<crate::ecs::RuntimeEntity<Self>>>],
+        lookup: HashMap<u32, Arc<Mutex<crate::ecs::RuntimeEntity<Self>>>>,
         method: ComponentFlags,
     ) -> Vec<(Arc<Mutex<RuntimeTransform>>, Vec<EntityUpdate>)>;
     fn get_component_flags(&self, component_name: &str) -> ComponentFlags;

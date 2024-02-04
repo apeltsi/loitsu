@@ -1,4 +1,6 @@
 // Some built-in components and methods
+use std::option::Option::{Some, None};
+use std::result::Result::{Err, Ok};
 
 pub fn v2(x, y) {
     Vec2 {x, y}

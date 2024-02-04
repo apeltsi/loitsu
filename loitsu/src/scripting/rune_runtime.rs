@@ -1,5 +1,5 @@
 use super::EntityUpdate;
-use crate::ecs::{ComponentFlags, RuntimeEntity, Transform};
+use crate::ecs::{ComponentFlags, RuntimeEntity, Transform, ECS};
 use crate::input::{str_to_key, InputState};
 use crate::rendering::drawable::{DrawableProperty, DrawablePrototype};
 use crate::scene_management::{Component, Property};
@@ -12,10 +12,9 @@ use rune::termcolor::{ColorChoice, StandardStream};
 use rune::{
     Any, BuildError, Context, ContextError, Diagnostics, Module, Source, Sources, ToValue, Vm,
 };
-use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 pub type Result<T> = std::result::Result<T, ScriptingError>;
 
 #[cfg(feature = "scene_generation")]
@@ -23,6 +22,7 @@ static mut REQUIRED_ASSETS: Vec<String> = Vec::new();
 
 pub struct RuneInstance {
     virtual_machine: Option<Vm>,
+    shared_entities: Arc<RwLock<HashMap<u32, SharedWrapper>>>,
 }
 
 pub struct RuneComponent {
@@ -248,13 +248,15 @@ impl From<&Color> for [f32; 4] {
 
 #[derive(Debug, Clone, Any)]
 struct RuneEntity {
-    #[rune(get)]
+    #[rune(get, set)]
     pub name: String,
     // pub components: Vec<RuneComponent>, TODO: NOT IMPLEMENTED
     // pub children: Vec<RuneEntity>, TODO: NOT IMPLEMENTED, should use a string id reference to
     // avoid circular references
     #[rune(get, set)]
     pub transform: Shared<AnyObj>,
+    #[rune(get)]
+    pub id: u32,
     drawables: Vec<(Drawable, u32)>,
     remove_drawables: Vec<u32>,
     property_updates: Vec<(u32, String, DrawableProperty)>,
@@ -480,10 +482,16 @@ impl From<VmError> for ScriptingError {
 impl ScriptingInstance for RuneInstance {
     type Data = RuneComponent;
 
-    fn new_with_sources(sources: Vec<ScriptingSource>) -> Result<Self> {
+    fn new_with_sources(
+        sources: Vec<ScriptingSource>,
+        ecs: Arc<RwLock<ECS<RuneInstance>>>,
+    ) -> Result<Self> {
         let mut context = Context::new();
-        let core_module = core_module(None)?;
-        context.install(&core_module)?;
+        let shared_entities = Arc::new(RwLock::new(HashMap::new()));
+        let core_modules = core_modules(None, ecs, shared_entities.clone())?;
+        for core_module in core_modules {
+            context.install(&core_module)?;
+        }
         let runtime = context.runtime()?;
         let mut rune_sources = Sources::new();
         rune_sources
@@ -515,12 +523,14 @@ impl ScriptingInstance for RuneInstance {
 
         Ok(Self {
             virtual_machine: Some(vm),
+            shared_entities,
         })
     }
 
     fn new_uninitialized() -> Result<Self> {
         Ok(Self {
             virtual_machine: None,
+            shared_entities: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
@@ -528,10 +538,13 @@ impl ScriptingInstance for RuneInstance {
         &mut self,
         sources: Vec<ScriptingSource>,
         input_state: Arc<Mutex<InputState>>,
+        ecs: Arc<RwLock<ECS<RuneInstance>>>,
     ) -> Result<()> {
         let mut context = Context::new();
-        let core_module = core_module(Some(input_state))?;
-        context.install(&core_module)?;
+        let core_modules = core_modules(Some(input_state), ecs, self.shared_entities.clone())?;
+        for core_module in core_modules {
+            context.install(&core_module)?;
+        }
         let runtime = context.runtime()?;
         let mut rune_sources = Sources::new();
         rune_sources
@@ -580,37 +593,50 @@ impl ScriptingInstance for RuneInstance {
 
     fn run_component_methods<RuneComponent>(
         &mut self,
-        entities: &[Rc<RefCell<crate::ecs::RuntimeEntity<Self>>>],
+        entities: &[Arc<Mutex<crate::ecs::RuntimeEntity<Self>>>],
+        lookup: HashMap<u32, Arc<Mutex<crate::ecs::RuntimeEntity<Self>>>>,
         method: ComponentFlags,
     ) -> Vec<(Arc<Mutex<crate::ecs::RuntimeTransform>>, Vec<EntityUpdate>)> {
         let mut updates = Vec::new();
         for entity in entities {
             let mut entity_updates = Vec::new();
-            let mut entity = entity.borrow_mut();
+            let mut entity = entity.lock().unwrap();
             if entity.is_new {
                 if entity.component_flags & ComponentFlags::START == ComponentFlags::START {
-                    entity_updates.extend(
-                        self.run_component_methods_on_entity(&mut entity, ComponentFlags::START),
-                    );
+                    entity_updates.extend(self.run_component_methods_on_entity(
+                        &mut entity,
+                        lookup.clone(),
+                        ComponentFlags::START,
+                    ));
                 }
                 entity.is_new = false;
             }
             if entity.component_flags & method == method {
-                entity_updates.extend(self.run_component_methods_on_entity(&mut entity, method));
+                entity_updates.extend(self.run_component_methods_on_entity(
+                    &mut entity,
+                    lookup.clone(),
+                    method,
+                ));
             }
             for child in &mut entity.children {
-                let mut child = child.borrow_mut();
+                let mut child = child.lock().unwrap();
                 let mut entity_updates = Vec::new();
                 if child.is_new {
                     if child.component_flags & ComponentFlags::START == ComponentFlags::START {
-                        entity_updates.extend(
-                            self.run_component_methods_on_entity(&mut child, ComponentFlags::START),
-                        );
+                        entity_updates.extend(self.run_component_methods_on_entity(
+                            &mut child,
+                            lookup.clone(),
+                            ComponentFlags::START,
+                        ));
                     }
                     child.is_new = false;
                 }
                 if child.component_flags & method == method {
-                    entity_updates.extend(self.run_component_methods_on_entity(&mut child, method));
+                    entity_updates.extend(self.run_component_methods_on_entity(
+                        &mut child,
+                        lookup.clone(),
+                        method,
+                    ));
                 }
                 updates.push((child.transform.clone(), entity_updates));
             }
@@ -657,6 +683,7 @@ fn convert_entity(entity: &RuntimeEntity<RuneInstance>) -> RuneEntity {
             .unwrap(),
         )
         .unwrap(),
+        id: entity.get_id(),
         drawables: Vec::new(),
         remove_drawables: Vec::new(),
         property_updates: Vec::new(),
@@ -667,6 +694,7 @@ impl RuneInstance {
     fn run_component_methods_on_entity(
         &mut self,
         entity: &mut crate::ecs::RuntimeEntity<Self>,
+        entity_lookup: HashMap<u32, Arc<Mutex<crate::ecs::RuntimeEntity<Self>>>>,
         c_flags: ComponentFlags,
     ) -> Vec<EntityUpdate> {
         #[cfg(feature = "disable_common_ecs_methods")]
@@ -677,6 +705,12 @@ impl RuneInstance {
         }
         let mut entity_obj = convert_entity(entity);
         let (shared, _guard) = unsafe { Shared::from_mut(&mut entity_obj).unwrap() };
+        self.shared_entities.write().unwrap().insert(
+            entity.get_id(),
+            SharedWrapper {
+                shared: shared.clone(),
+            },
+        );
         let method = flags_to_method(c_flags);
         for component in &entity.components {
             if component.flags & c_flags != c_flags {
@@ -709,14 +743,16 @@ impl RuneInstance {
                 }
             }
         }
-        let entity_obj = shared.downcast_borrow_ref::<RuneEntity>().unwrap();
-        let rune_transform: RuneTransform = entity_obj.clone().transform.take_downcast().unwrap();
-        let new_transform: Transform = rune_transform.into();
-        let mut rtransform = entity.transform.lock().unwrap();
-        if rtransform.transform != new_transform {
-            rtransform.has_changed = true;
-            rtransform.transform = new_transform;
+        for (id, shared) in self.shared_entities.read().unwrap().iter() {
+            let entity_obj = shared.shared.downcast_borrow_ref::<RuneEntity>().unwrap();
+            if *id != entity.get_id() {
+                let mut entity = entity_lookup.get(id).unwrap().lock().unwrap();
+                process_entity_update(entity_obj.clone(), &mut entity);
+            } else {
+                process_entity_update(entity_obj.clone(), entity);
+            }
         }
+        self.shared_entities.write().unwrap().clear();
         let mut updates = Vec::new();
         for drawable in &entity_obj.drawables {
             updates.push(EntityUpdate::AddDrawable(Into::<DrawablePrototype>::into(
@@ -734,6 +770,19 @@ impl RuneInstance {
             ));
         }
         updates
+    }
+}
+
+fn process_entity_update(entity_obj: RuneEntity, entity: &mut RuntimeEntity<RuneInstance>) {
+    if entity_obj.name != entity.get_name() {
+        entity.set_name(entity_obj.name.clone());
+    }
+    let rune_transform: RuneTransform = entity_obj.clone().transform.take_downcast().unwrap();
+    let new_transform: Transform = rune_transform.into();
+    let mut rtransform = entity.transform.lock().unwrap();
+    if rtransform.transform != new_transform {
+        rtransform.has_changed = true;
+        rtransform.transform = new_transform;
     }
 }
 
@@ -765,7 +814,22 @@ pub unsafe fn clear_required_assets() {
     REQUIRED_ASSETS.clear();
 }
 
-fn core_module(input_state: Option<Arc<Mutex<InputState>>>) -> Result<Module> {
+// im really sorry for what im about to do...
+struct SharedWrapper {
+    shared: Shared<AnyObj>,
+}
+unsafe impl Send for RuneComponent {}
+unsafe impl Send for SharedWrapper {}
+unsafe impl Sync for SharedWrapper {}
+#[cfg(feature = "editor")]
+unsafe impl<T: ScriptingInstance> Send for crate::editor::EventHandler<T> {}
+// lets just ignore that that ever happened......
+
+fn core_modules(
+    input_state: Option<Arc<Mutex<InputState>>>,
+    ecs: Arc<RwLock<ECS<RuneInstance>>>,
+    shared_entities: Arc<RwLock<HashMap<u32, SharedWrapper>>>,
+) -> Result<Vec<Module>> {
     let mut m = Module::new();
 
     // Types
@@ -863,6 +927,31 @@ fn core_module(input_state: Option<Arc<Mutex<InputState>>>) -> Result<Module> {
         }
     })
     .build()?;
+    m.function("e", move |id: u32| {
+        let e = ecs.read().unwrap().get_entity(id);
+        if let Some(e) = e {
+            let entity = e.try_lock();
+            if let Ok(entity) = entity {
+                let converted = convert_entity(&entity);
+                let shared = Shared::new(AnyObj::new(converted).unwrap()).unwrap();
+                shared_entities.write().unwrap().insert(
+                    id,
+                    SharedWrapper {
+                        shared: shared.clone(),
+                    },
+                );
+                Some(shared)
+            } else {
+                log!(
+                    "Couldn't get entity. Are you trying to access the currently executing entity?"
+                );
+                None
+            }
+        } else {
+            None
+        }
+    })
+    .build()?;
     // Math Constants
     m.constant("PI", std::f64::consts::PI).build()?;
     m.constant("E", std::f64::consts::E).build()?;
@@ -896,5 +985,23 @@ fn core_module(input_state: Option<Arc<Mutex<InputState>>>) -> Result<Module> {
         m.function("require_asset", |_asset: &str| Ok::<(), ()>(()))
             .build()?;
     }
-    Ok(m)
+    m.raw_function("dbg", dbg_impl).build()?;
+    Ok(vec![
+        rune::modules::core::module()?,
+        rune::modules::option::module()?,
+        rune::modules::result::module()?,
+        rune::modules::iter::module()?,
+        rune::modules::collections::module()?,
+        rune::modules::ops::module()?,
+        m,
+    ])
+}
+
+fn dbg_impl(stack: &mut rune::runtime::Stack, args: usize) -> VmResult<()> {
+    for value in rune::vm_try!(stack.drain(args)) {
+        log!("{:?}", value);
+    }
+
+    rune::vm_try!(stack.push(Value::EmptyTuple));
+    VmResult::Ok(())
 }
