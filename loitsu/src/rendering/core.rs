@@ -8,7 +8,7 @@ use winit::{
 use crate::{log_render as log, scripting::{ScriptingInstance, EntityUpdate}, scene_management::Scene, rendering::drawable::{sprite::SpriteDrawable, DrawablePrototype}, asset_management::AssetManager, ecs::{Transform, RuntimeEntity}, log_scripting, input::InputState};
 #[allow(unused_imports)]
 use crate::ecs::{ECS, ComponentFlags};
-use std::{cmp::max, sync::{Mutex, Arc, RwLock}};
+use std::{cmp::max, sync::{Mutex, Arc, RwLock}, rc::Rc, cell::RefCell};
 use crate::{asset_management::ASSET_MANAGER, util::scaling, ecs::RuntimeTransform};
 
 #[cfg(target_arch = "wasm32")]
@@ -31,10 +31,16 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     unsafe { HAS_LOADED = false; }
     #[cfg(target_arch = "wasm32")]
     update_loading_status(2);
-    let size = window.inner_size();
+    let mut size = window.inner_size();
+    size.width = size.width.max(1);
+    size.height = size.height.max(1);
 
     let instance = wgpu::Instance::default();
-    let surface = unsafe {instance.create_surface(&window).unwrap()};
+
+    let window = Rc::new(RefCell::new(window));
+    let window_clone = window.clone();
+    let win = &*window_clone.borrow();
+    let surface = instance.create_surface(win).unwrap();
     let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::HighPerformance,
         force_fallback_adapter: false,
@@ -43,9 +49,11 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
 
     let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor {
         label: None,
-        features: wgpu::Features::empty(),
-        limits: wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits())
+        required_features: wgpu::Features::empty(),
+        required_limits: wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits())
     }, None).await.expect("Unable to create device");
+    let adapter_info = adapter.get_info();
+    log!("Backend: {:?} | Adapter: {:?} | Driver: {:?}", adapter_info.backend, adapter_info.name, adapter_info.driver_info);
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
     let swapchain_format = swapchain_capabilities.formats[0];
@@ -57,9 +65,10 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
         format: swapchain_format,
         width: size.width,
         height: size.height,
-        present_mode: wgpu::PresentMode::Fifo,
+        present_mode: wgpu::PresentMode::AutoVsync,
         alpha_mode: swapchain_capabilities.alpha_modes[0],
         view_formats: vec![],
+        desired_maximum_frame_latency: 2
     };
     surface.configure(&device, &config);
     
@@ -117,16 +126,28 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
     state.camera.set_position([0.0, 0.0].into());
     #[cfg(feature = "editor")]
     let mut selected_entity: Option<Arc<Mutex<RuntimeEntity<T>>>> = None;
-    event_loop.run(move |event, _, control_flow| {
+    #[cfg(not(target_arch = "wasm32"))]
+    #[allow(unused)]
+    let mut last_frame_time = std::time::Instant::now();
+
+    event_loop.run(move |event, window_target| {
         let _ = (&instance, &adapter);
-        *control_flow = ControlFlow::Poll;
+        if frame_count == 0 {
+            window.borrow().request_redraw();
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        window_target.set_control_flow(ControlFlow::Poll);
+        #[cfg(target_arch = "wasm32")]
+        window_target.set_control_flow(ControlFlow::Wait);
         #[cfg(target_arch = "wasm32")] {
             if unsafe {WEB_RESIZED} {
-                let window_size = {
+                let mut window_size = {
                     let win = web_sys::window().unwrap();
                     winit::dpi::LogicalSize::new(win.inner_width().unwrap().as_f64().unwrap(), win.inner_height().unwrap().as_f64().unwrap())
                 };
-                window.set_inner_size(window_size);
+                window_size.width = window_size.width.max(1.0);
+                window_size.height = window_size.height.max(1.0);
+                let _ = window.borrow().request_inner_size(window_size);
                 if frame_count == 0 {
                     let max = max(window_size.width as i32, window_size.height as i32);
                     state.camera.view = [
@@ -145,25 +166,26 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
         }
 
         match event {
-            Event::MainEventsCleared => {
-                window.request_redraw();
-            },
             Event::WindowEvent {
-                event: WindowEvent::Resized(size),
+                event: WindowEvent::Resized(new_size),
                 ..
             } => {
+                if frame_count == 0 && size.height != 1 && size.width != 1 && size.width != new_size.width && size.height != new_size.height {
+                    window.borrow().request_redraw();
+                    return;
+                }
                 // Reconfigure the surface with the new size
-                config.width = size.width;
-                config.height = size.height;
+                config.width = new_size.width.max(1);
+                config.height = new_size.height.max(1);
                 surface.configure(&device, &config);
 
                 // okay gamers lets resize the screen & camera matrix buffers
                 // from atlas :D
-                let max = max(size.width, size.height);
-                state.camera.aspect = (size.width as f32 / max as f32, size.height as f32 / max as f32);
+                let max = max(new_size.width, new_size.height);
+                state.camera.aspect = (new_size.width as f32 / max as f32, new_size.height as f32 / max as f32);
                 state.camera.view = [
-                        [(size.height as f32) / max as f32, 0.0, 0.0, 0.0], 
-                        [0.0, (size.width as f32) / max as f32, 0.0, 0.0],
+                        [(new_size.height as f32) / max as f32, 0.0, 0.0, 0.0], 
+                        [0.0, (new_size.width as f32) / max as f32, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
                         [0.0, 0.0, 0.0, 1.0]
                 ];
@@ -172,9 +194,32 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                     camera: state.camera.get_transformation_matrix()
                 }]));
                 // On macos the window needs to be redrawn manually after resizing
-                window.request_redraw();
+                window.borrow().request_redraw();
             },
-            Event::RedrawRequested(_) => {
+            Event::WindowEvent {
+                event: WindowEvent::RedrawRequested,
+                ..
+            } => {
+                /*
+                // Some scheduler code, it helps with GPU and CPU usage but leads to sudden FPS drops
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    // Attempt to sync with display refresh rate
+                    let target_fps = calculate_target_fps(&window.borrow());
+                    let target_frame_time = 1.0 / target_fps;
+
+                    let current_time = std::time::Instant::now();
+                    let elapsed_frame_time = current_time.duration_since(last_frame_time).as_secs_f32();
+
+                    if elapsed_frame_time < target_frame_time {
+                        let sleep_time = target_frame_time - elapsed_frame_time;
+                        let sleep_until = std::time::Instant::now() + std::time::Duration::from_secs_f32(sleep_time);
+                        std::thread::sleep(sleep_until - std::time::Instant::now());
+                    }
+
+                    last_frame_time = std::time::Instant::now();
+                }*/
+                // okay lets start
                 #[allow(unused_mut)]
                 let mut updates = Vec::new();
                 #[cfg(feature = "editor")]
@@ -306,12 +351,13 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                 }
                 render_frame(&surface, &device, &queue, &mut drawables, &global_bind_group, ecs_initialized, frame_count);
                 frame_count += 1;
+                window.borrow().request_redraw();
             },
             Event::WindowEvent {
                 ref event,
                 window_id,
-            } if window_id == window.id() => match event {
-                WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+            } if window_id == window.borrow().id() => match event {
+                WindowEvent::CloseRequested => window_target.exit(),
                 WindowEvent::CursorMoved { position, ..} => {
                     let mut input_state = input_state.lock().unwrap();
                     input_state.mouse.last_position = Some(input_state.mouse.position);
@@ -380,16 +426,16 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
                         ecs.write().unwrap().emit(crate::editor::Event::SelectedEntityPosition(entity_bounds.0, entity_bounds.1, entity_bounds.2, entity_bounds.3));
                     }
                 },
-                WindowEvent::KeyboardInput { input, .. } => {
-                    if let Some(key) = input.virtual_keycode {
-                        let mut input_state = input_state.lock().unwrap();
-                        // check if we should add or remove the key
-                        if input.state == ElementState::Released {
-                            input_state.down_keys.retain(|&x| x != key);
-                            input_state.up_keys.push(key);
-                        } else {
-                            input_state.down_keys.push(key);
-                            input_state.new_keys.push(key);
+                WindowEvent::KeyboardInput { event, .. } => {
+                    let mut input_state = input_state.lock().unwrap();
+                    // check if we should add or remove the key
+                    if event.state == ElementState::Released {
+                        input_state.down_keys.retain(|x| *x != event.logical_key);
+                        input_state.up_keys.push(event.logical_key.clone());
+                    } else {
+                        if !input_state.down_keys.contains(&event.logical_key) {
+                            input_state.down_keys.push(event.logical_key.clone());
+                            input_state.new_keys.push(event.logical_key.clone());
                         }
                     }
                 },
@@ -397,7 +443,15 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
             },
             _ => {}
         }
-    });
+    }).unwrap();
+}
+#[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
+fn calculate_target_fps(window: &winit::window::Window) -> f32 {
+    let monitor = window.current_monitor().unwrap();
+    let video_mode = monitor.video_modes().next().unwrap();
+    let refresh_rate = video_mode.refresh_rate_millihertz() as f32 / 1000.0;
+    return refresh_rate;
 }
 
 #[allow(dead_code)]

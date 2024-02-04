@@ -13,7 +13,7 @@ where
     log!("Initializing web...");
     update_loading_status(1);
 
-    let event_loop = EventLoop::new();
+    let event_loop = EventLoop::new().unwrap();
     let window = winit::window::WindowBuilder::new()
         .with_title("loitsu")
         .with_inner_size(winit::dpi::LogicalSize::new(20.0, 20.0))
@@ -24,7 +24,7 @@ where
         .and_then(|win| win.document())
         .and_then(|doc| doc.body())
         .and_then(|body| {
-            body.append_child(&web_sys::Element::from(window.canvas()))
+            body.append_child(&web_sys::Element::from(window.canvas().unwrap()))
                 .ok()
         })
         .expect("couldn't append canvas to document body");
