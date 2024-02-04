@@ -605,7 +605,7 @@ impl ScriptingInstance for RuneInstance {
                 if entity.component_flags & ComponentFlags::START == ComponentFlags::START {
                     entity_updates.extend(self.run_component_methods_on_entity(
                         &mut entity,
-                        lookup.clone(),
+                        &lookup,
                         ComponentFlags::START,
                     ));
                 }
@@ -614,7 +614,7 @@ impl ScriptingInstance for RuneInstance {
             if entity.component_flags & method == method {
                 entity_updates.extend(self.run_component_methods_on_entity(
                     &mut entity,
-                    lookup.clone(),
+                    &lookup,
                     method,
                 ));
             }
@@ -625,18 +625,15 @@ impl ScriptingInstance for RuneInstance {
                     if child.component_flags & ComponentFlags::START == ComponentFlags::START {
                         entity_updates.extend(self.run_component_methods_on_entity(
                             &mut child,
-                            lookup.clone(),
+                            &lookup,
                             ComponentFlags::START,
                         ));
                     }
                     child.is_new = false;
                 }
                 if child.component_flags & method == method {
-                    entity_updates.extend(self.run_component_methods_on_entity(
-                        &mut child,
-                        lookup.clone(),
-                        method,
-                    ));
+                    entity_updates
+                        .extend(self.run_component_methods_on_entity(&mut child, &lookup, method));
                 }
                 updates.push((child.transform.clone(), entity_updates));
             }
@@ -694,7 +691,7 @@ impl RuneInstance {
     fn run_component_methods_on_entity(
         &mut self,
         entity: &mut crate::ecs::RuntimeEntity<Self>,
-        entity_lookup: HashMap<u32, Arc<Mutex<crate::ecs::RuntimeEntity<Self>>>>,
+        entity_lookup: &HashMap<u32, Arc<Mutex<crate::ecs::RuntimeEntity<Self>>>>,
         c_flags: ComponentFlags,
     ) -> Vec<EntityUpdate> {
         #[cfg(feature = "disable_common_ecs_methods")]
@@ -743,16 +740,15 @@ impl RuneInstance {
                 }
             }
         }
-        for (id, shared) in self.shared_entities.read().unwrap().iter() {
+        for (id, shared) in self.shared_entities.write().unwrap().drain() {
             let entity_obj = shared.shared.downcast_borrow_ref::<RuneEntity>().unwrap();
-            if *id != entity.get_id() {
-                let mut entity = entity_lookup.get(id).unwrap().lock().unwrap();
+            if id != entity.get_id() {
+                let mut entity = entity_lookup.get(&id).unwrap().lock().unwrap();
                 process_entity_update(entity_obj.clone(), &mut entity);
             } else {
                 process_entity_update(entity_obj.clone(), entity);
             }
         }
-        self.shared_entities.write().unwrap().clear();
         let mut updates = Vec::new();
         for drawable in &entity_obj.drawables {
             updates.push(EntityUpdate::AddDrawable(Into::<DrawablePrototype>::into(
@@ -928,6 +924,17 @@ fn core_modules(
     })
     .build()?;
     m.function("e", move |id: u32| {
+        if shared_entities.read().unwrap().contains_key(&id) {
+            return Some(
+                shared_entities
+                    .read()
+                    .unwrap()
+                    .get(&id)
+                    .unwrap()
+                    .shared
+                    .clone(),
+            );
+        }
         let e = ecs.read().unwrap().get_entity(id);
         if let Some(e) = e {
             let entity = e.try_lock();
