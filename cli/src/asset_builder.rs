@@ -2,7 +2,6 @@ use crate::info;
 use crate::shard_gen;
 use loitsu::scripting::ScriptingSource;
 use loitsu::Preferences;
-use loitsu_asset_gen::get_asset_overrides;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
@@ -82,7 +81,6 @@ pub async fn build_assets(out_dir: &PathBuf, force: bool) {
     info!("Generating shards...");
     let (shards, static_shard) = shard_gen::generate_shards(scenes, scripts, &preferences);
 
-    let overrides = get_asset_overrides(&asset_path);
     // lets make sure the shard dir exists
     let s_path = Path::new(&shard_dir);
 
@@ -99,7 +97,7 @@ pub async fn build_assets(out_dir: &PathBuf, force: bool) {
     let mut total_size: usize = 0;
     let shard_count = shards.len();
     for shard in shards {
-        let data = shard.encode(&overrides).await;
+        let data = shard.encode().await;
         total_size += data.len();
         let mut path = shard_dir.clone();
         path.push(shard.name);

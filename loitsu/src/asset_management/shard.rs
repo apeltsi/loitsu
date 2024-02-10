@@ -3,6 +3,7 @@ use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 
 use super::asset::Asset;
+use super::asset_reference::AssetReference;
 use super::parse::parse;
 use super::AssetError;
 
@@ -19,6 +20,13 @@ pub struct Shard {
 pub struct ShardFile {
     pub name: String,
     pub data: Vec<u8>,
+    pub r#type: ShardFileType,
+}
+
+#[derive(Debug, Clone, bitcode::Encode, bitcode::Decode)]
+pub enum ShardFileType {
+    Texture,
+    FileMeta,
 }
 
 impl Shard {
@@ -29,8 +37,9 @@ impl Shard {
         }
     }
 
-    pub fn add_file(&mut self, name: String, data: Vec<u8>) {
-        self.assets.insert(name.clone(), ShardFile { name, data });
+    pub fn add_file(&mut self, name: String, data: Vec<u8>, r#type: ShardFileType) {
+        self.assets
+            .insert(name.clone(), ShardFile { name, data, r#type });
     }
 
     pub fn get_assets(&self) -> &HashMap<String, ShardFile> {
@@ -101,14 +110,19 @@ pub struct ConsumedShard {
 }
 
 impl ConsumedShard {
-    pub fn initialize(&mut self, graphics_device: &wgpu::Device, queue: &wgpu::Queue) {
+    pub fn initialize(
+        &mut self,
+        graphics_device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        asset_refs: &HashMap<String, Arc<Mutex<AssetReference>>>,
+    ) {
         // assets such as sprites have to be initialized
         // (with access to the graphics device)
         for (_, asset) in self.assets.iter_mut() {
             asset
                 .lock()
                 .unwrap()
-                .initialize(graphics_device, queue)
+                .initialize(graphics_device, queue, asset_refs)
                 .unwrap();
         }
         self.is_initialized = true;

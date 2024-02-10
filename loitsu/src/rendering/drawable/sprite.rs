@@ -1,6 +1,8 @@
 use super::{Drawable, TransformUniform, QUAD_INDICES, QUAD_VERTICES};
 use crate::{
-    asset_management::{asset::Asset, asset_reference::AssetReference, AssetManager},
+    asset_management::{
+        asset::Asset, asset_reference::AssetReference, texture_asset::TextureMeta, AssetManager,
+    },
     ecs::RuntimeTransform,
     rendering::shader::ShaderManager,
 };
@@ -25,7 +27,8 @@ pub struct SpriteDrawable {
     uniform_dirty: bool,
     sprite_dirty: bool,
     asset_ref: Option<Arc<Mutex<AssetReference>>>,
-    asset_version: u32,
+    asset_version: (u32, u32),
+    meta_asset: Option<TextureMeta>,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -49,7 +52,8 @@ impl<'a> SpriteDrawable {
             uniform_dirty: false,
             sprite_dirty: false,
             asset_ref: None,
-            asset_version: 0,
+            asset_version: (0, 0),
+            meta_asset: None,
         }
     }
 }
@@ -81,13 +85,14 @@ impl<'b> Drawable<'b> for SpriteDrawable {
         self.asset_ref = Some(asset_manager.get_asset(&self.sprite));
         let asset_ref = self.asset_ref.clone().unwrap();
         let asset_ref = asset_ref.lock().unwrap();
-        self.asset_version = asset_ref.get_version();
         let asset = asset_ref.get_asset();
         let locked_asset = asset.lock().unwrap();
-        let sprite_asset = match *locked_asset {
-            Asset::Image(ref image_asset) => Some(image_asset),
+        let meta_asset = match *locked_asset {
+            Asset::TextureMeta(ref texture_meta) => Some(texture_meta.clone()),
             _ => None,
         };
+        self.meta_asset = meta_asset.clone();
+        self.asset_version = version_tuple(&asset_ref, &meta_asset);
         self.uniform_buffer = Some(
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some("Sprite Uniform Buffer"),
@@ -107,7 +112,7 @@ impl<'b> Drawable<'b> for SpriteDrawable {
                 },
             ));
         }
-        self.create_bind_group(device, sprite_asset);
+        self.create_bind_group(device, &meta_asset);
     }
 
     fn draw<'a>(
@@ -148,35 +153,46 @@ impl<'b> Drawable<'b> for SpriteDrawable {
             );
             let asset_ref = self.asset_ref.clone().unwrap();
             let asset_ref = asset_ref.lock().unwrap();
-            self.asset_version = asset_ref.get_version();
             let asset = asset_ref.get_asset();
             let locked_asset = asset.lock().unwrap();
-            let sprite_asset = match *locked_asset {
-                Asset::Image(ref image_asset) => Some(image_asset),
+            let meta_asset = match *locked_asset {
+                Asset::TextureMeta(ref meta_asset) => Some(meta_asset.clone()),
                 _ => None,
             };
-            self.create_bind_group(device, sprite_asset);
+            self.asset_version = version_tuple(&asset_ref, &meta_asset);
+            self.create_bind_group(device, &meta_asset);
             self.sprite_dirty = false;
         }
         let asset_ref = self.asset_ref.clone().unwrap();
-        if self.asset_version < asset_ref.lock().unwrap().get_version() {
+        if self.asset_version < version_tuple(&asset_ref.lock().unwrap(), &self.meta_asset) {
             // we're outdated
-            let asset_ref = self.asset_ref.clone().unwrap();
             let asset_ref = asset_ref.lock().unwrap();
             let asset = asset_ref.get_asset();
             #[allow(unused_mut)]
             let mut locked_asset = asset.lock().unwrap();
             #[cfg(feature = "direct_asset_management")]
-            locked_asset.initialize(device, queue).unwrap(); // the direct asset management model
-                                                             // doesn't guarantee that the asset is initialized
-                                                             // so we'll do it here, just to be
-                                                             // sure
-            let sprite_asset = match *locked_asset {
-                Asset::Image(ref image_asset) => Some(image_asset),
+            locked_asset
+                .initialize(
+                    device,
+                    queue,
+                    &crate::asset_management::ASSET_MANAGER
+                        .lock()
+                        .unwrap()
+                        .assets
+                        .lock()
+                        .unwrap()
+                        .assets,
+                )
+                .unwrap(); // the direct asset management model
+                           // doesn't guarantee that the asset is initialized
+                           // so we'll do it here, just to be
+                           // sure
+            let meta_asset = match *locked_asset {
+                Asset::TextureMeta(ref meta_asset) => Some(meta_asset.clone()),
                 _ => None,
             };
-            self.create_bind_group(device, sprite_asset);
-            self.asset_version = asset_ref.get_version();
+            self.create_bind_group(device, &meta_asset);
+            self.asset_version = version_tuple(&asset_ref, &meta_asset);
         }
         if self.bind_group.is_none() {
             return; // Our texture probably hasn't loaded yet
@@ -219,11 +235,17 @@ impl SpriteDrawable {
     fn create_bind_group(
         &mut self,
         device: &wgpu::Device,
-        sprite_asset: Option<&crate::asset_management::image_asset::ImageAsset>,
+        meta_asset: &Option<crate::asset_management::texture_asset::TextureMeta>,
     ) {
-        if sprite_asset.is_none() {
+        if meta_asset.is_none() {
             return;
         }
+        let asset = meta_asset.as_ref().unwrap().get_texture().unwrap();
+        let asset = asset.lock().unwrap();
+        let texture = match *asset {
+            Asset::Texture(ref texture) => texture,
+            _ => return,
+        };
         self.bind_group =
             Some(
                 device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -242,7 +264,7 @@ impl SpriteDrawable {
                         wgpu::BindGroupEntry {
                             binding: 1,
                             resource: wgpu::BindingResource::TextureView(
-                                sprite_asset.unwrap().get_texture_view().unwrap(),
+                                texture.get_texture_view().unwrap(),
                             ),
                         },
                         wgpu::BindGroupEntry {
@@ -264,4 +286,13 @@ impl SpriteDrawable {
                 }),
             );
     }
+}
+
+fn version_tuple(asset_ref: &AssetReference, meta_asset: &Option<TextureMeta>) -> (u32, u32) {
+    let first = asset_ref.get_version();
+    let second = match meta_asset {
+        Some(meta_asset) => meta_asset.get_texture_version(),
+        None => 0,
+    };
+    (first, second)
 }

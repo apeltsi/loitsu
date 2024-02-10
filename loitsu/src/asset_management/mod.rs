@@ -1,10 +1,11 @@
 pub mod asset;
+pub mod asset_meta;
 pub mod asset_reference;
 pub mod get_file;
-pub mod image_asset;
 pub mod parse;
 pub mod shard;
 pub mod static_shard;
+pub mod texture_asset;
 
 #[allow(unused_imports)]
 use self::{asset::Asset, asset_reference::AssetReference, static_shard::StaticShard};
@@ -140,11 +141,12 @@ impl AssetManager {
             return;
         }
         let mut assets = self.assets.lock().unwrap();
+        let asset_refs = assets.assets.clone();
         for shard in &mut assets.shards {
             if shard.is_initialized {
                 continue;
             }
-            shard.initialize(device, queue);
+            shard.initialize(device, queue, &asset_refs);
             log!("Shard '{}' initialized", shard.name);
         }
     }
@@ -196,6 +198,7 @@ impl AssetManager {
                             );
                             return;
                         }
+
                         // lets parse the asset
                         let shard_file = shard::ShardFile { name, data: file };
                         let asset = parse::parse(shard_file).unwrap();

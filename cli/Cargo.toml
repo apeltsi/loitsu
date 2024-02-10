@@ -1,6 +1,6 @@
 [package]
 name = "loitsu-cli"
-version = "0.1.0"
+version = "0.4.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -11,9 +11,9 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.4.6", features = ["derive"] }
-cargo_toml = "0.17.1"
+cargo_toml = "0.19.1"
 warp = "0.3"
-tokio = { version = "1.35", features = ["full"] }
+tokio = { version = "1.36", features = ["full"] }
 chrono = "0.4.31"
 walkdir = "2"
 loitsu = { path = "../loitsu", features = ["scene_generation", "json_preference_parse", "disable_common_ecs_methods"] }

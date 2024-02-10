@@ -1,6 +1,6 @@
 [package]
 name = "loitsu"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2021"
 authors = ["Amos Peltonen"]
 
@@ -40,6 +40,6 @@ instant = { version = "0.1", features = [ "wasm-bindgen" ] }
 wgpu = "0.19.1"
 zstd = "0.13"
 instant = "0.1"
-tokio = { version = "1.35", features=["full"]}
+tokio = { version = "1.36", features=["full"]}
 colored = "2.0.4"
 futures = "0.3.29"
