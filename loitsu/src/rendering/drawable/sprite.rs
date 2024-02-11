@@ -159,17 +159,20 @@ impl<'b> Drawable<'b> for SpriteDrawable {
                 Asset::TextureMeta(ref meta_asset) => Some(meta_asset.clone()),
                 _ => None,
             };
+            self.meta_asset = meta_asset.clone();
             self.asset_version = version_tuple(&asset_ref, &meta_asset);
             self.create_bind_group(device, &meta_asset);
             self.sprite_dirty = false;
         }
-        let asset_ref = self.asset_ref.clone().unwrap();
+        let asset_ref = self.asset_ref.clone().expect("Asset ref is undefined");
         if self.asset_version < version_tuple(&asset_ref.lock().unwrap(), &self.meta_asset) {
             // we're outdated
             let asset_ref = asset_ref.lock().unwrap();
             let asset = asset_ref.get_asset();
             #[allow(unused_mut)]
             let mut locked_asset = asset.lock().unwrap();
+            // the direct asset management model doesn't guarantee
+            // that the asset is initialized so we'll do it here, just to be sure
             #[cfg(feature = "direct_asset_management")]
             locked_asset
                 .initialize(
@@ -183,14 +186,32 @@ impl<'b> Drawable<'b> for SpriteDrawable {
                         .unwrap()
                         .assets,
                 )
-                .unwrap(); // the direct asset management model
-                           // doesn't guarantee that the asset is initialized
-                           // so we'll do it here, just to be
-                           // sure
+                .unwrap();
             let meta_asset = match *locked_asset {
                 Asset::TextureMeta(ref meta_asset) => Some(meta_asset.clone()),
                 _ => None,
             };
+            #[cfg(feature = "direct_asset_management")]
+            {
+                if let Some(meta_asset) = &meta_asset {
+                    if let Ok(tex) = meta_asset.get_texture() {
+                        tex.lock()
+                            .unwrap()
+                            .initialize(
+                                device,
+                                queue,
+                                &crate::asset_management::ASSET_MANAGER
+                                    .lock()
+                                    .unwrap()
+                                    .assets
+                                    .lock()
+                                    .unwrap()
+                                    .assets,
+                            )
+                            .unwrap();
+                    }
+                }
+            }
             self.create_bind_group(device, &meta_asset);
             self.asset_version = version_tuple(&asset_ref, &meta_asset);
         }
@@ -237,7 +258,7 @@ impl SpriteDrawable {
         device: &wgpu::Device,
         meta_asset: &Option<crate::asset_management::texture_asset::TextureMeta>,
     ) {
-        if meta_asset.is_none() {
+        if meta_asset.is_none() || meta_asset.as_ref().unwrap().get_texture().is_err() {
             return;
         }
         let asset = meta_asset.as_ref().unwrap().get_texture().unwrap();
@@ -246,6 +267,12 @@ impl SpriteDrawable {
             Asset::Texture(ref texture) => texture,
             _ => return,
         };
+
+        let tex_view = texture.get_texture_view();
+        if tex_view.is_none() {
+            return;
+        }
+        let tex_view = tex_view.unwrap();
         self.bind_group =
             Some(
                 device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -263,9 +290,7 @@ impl SpriteDrawable {
                         },
                         wgpu::BindGroupEntry {
                             binding: 1,
-                            resource: wgpu::BindingResource::TextureView(
-                                texture.get_texture_view().unwrap(),
-                            ),
+                            resource: wgpu::BindingResource::TextureView(tex_view),
                         },
                         wgpu::BindGroupEntry {
                             binding: 2,

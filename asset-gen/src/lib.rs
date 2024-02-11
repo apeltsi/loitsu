@@ -1,7 +1,7 @@
 use image::io::Reader as ImageReader;
 use loitsu::asset_management::{
     asset_meta::{AssetMeta, TextureMetadata},
-    shard::{Shard, ShardFileType},
+    shard::{guess_file_type, Shard, ShardFileType},
 };
 use std::{
     hash::Hasher,
@@ -66,21 +66,7 @@ pub async fn resolve_asset(
     asset_relative: &str,
     asset_path: &PathBuf,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let file_ext = asset_path
-        .extension()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_lowercase();
-    let file_type = match file_ext.as_str() {
-        "png" => ShardFileType::Texture,
-        "jpeg" => ShardFileType::Texture,
-        "meta" => {
-            println!("Warning: Meta files should not be references directly. Please reference the meta target instead.");
-            return Ok(());
-        }
-        _ => panic!("Unsupported file type: {}", file_ext),
-    };
+    let file_type = guess_file_type(asset_relative);
     let file_meta_path = asset_path.with_extension("meta");
     let file_meta = if !file_meta_path.exists() {
         // get default meta for the file type

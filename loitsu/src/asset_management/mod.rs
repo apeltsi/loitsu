@@ -7,6 +7,7 @@ pub mod shard;
 pub mod static_shard;
 pub mod texture_asset;
 
+use self::asset_meta::AssetMeta;
 #[allow(unused_imports)]
 use self::{asset::Asset, asset_reference::AssetReference, static_shard::StaticShard};
 use crate::{error, log_asset as log};
@@ -183,6 +184,7 @@ impl AssetManager {
             let name = name.to_owned();
             #[cfg(feature = "editor")]
             crate::web::add_editor_loading_task("Loading assets");
+            let self_assets = self.assets.clone();
             spawn_local(async move {
                 let result = get_file::get_file(format!("assets/{}", name)).await;
                 match result {
@@ -198,11 +200,35 @@ impl AssetManager {
                             );
                             return;
                         }
-
+                        let file: AssetMetaPair =
+                            bitcode::decode(&file).expect("Couldn't decode AssetMetaPair");
+                        let file_type = shard::guess_file_type(&name);
                         // lets parse the asset
-                        let shard_file = shard::ShardFile { name, data: file };
-                        let asset = parse::parse(shard_file).unwrap();
-                        asset_ref_clone.lock().unwrap().update(asset);
+                        let shard_file = shard::ShardFile {
+                            name: format!("{}.TARGET", name),
+                            data: file.asset,
+                            r#type: file_type,
+                        };
+                        let asset = parse::parse(shard_file).expect("Couldn't parse asset");
+
+                        if file.meta == AssetMeta::None {
+                            asset_ref_clone.lock().unwrap().update(asset);
+                        } else {
+                            // we should actually return the meta instead of the asset
+                            // but we'll still have to add the asset to the asset manager
+                            let mut aref = AssetReference::new(asset);
+                            self_assets.lock().unwrap().assets.insert(
+                                format!("{}.TARGET", name.to_owned()),
+                                Arc::new(Mutex::new(aref)),
+                            );
+                            let meta_file = shard::ShardFile {
+                                name,
+                                data: bitcode::encode(&file.meta).unwrap(),
+                                r#type: shard::ShardFileType::FileMeta,
+                            };
+                            let meta = parse::parse(meta_file).unwrap();
+                            asset_ref_clone.lock().unwrap().update(meta);
+                        }
                     }
                     Err(e) => {
                         error!("Failed to load asset: {:?}", e.message);
@@ -260,4 +286,10 @@ impl From<tokio::task::JoinError> for AssetError {
     fn from(value: tokio::task::JoinError) -> Self {
         AssetError::new(&format!("{:?}", value))
     }
+}
+#[allow(dead_code)]
+#[derive(Debug, Clone, bitcode::Encode, bitcode::Decode)]
+pub struct AssetMetaPair {
+    pub asset: Vec<u8>,
+    pub meta: AssetMeta,
 }

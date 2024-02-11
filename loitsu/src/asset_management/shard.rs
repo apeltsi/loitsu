@@ -29,6 +29,16 @@ pub enum ShardFileType {
     FileMeta,
 }
 
+pub fn guess_file_type(name: &str) -> ShardFileType {
+    let name = name.to_lowercase();
+    if name.ends_with(".png") || name.ends_with(".jpg") || name.ends_with(".jpeg") {
+        return ShardFileType::Texture;
+    } else if name.ends_with(".meta") {
+        return ShardFileType::FileMeta;
+    }
+    panic!("Unknown file type {}", name);
+}
+
 impl Shard {
     pub fn new(name: String) -> Shard {
         Shard {
