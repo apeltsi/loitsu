@@ -100,7 +100,7 @@ pub fn default_meta(file_type: &ShardFileType, asset_path: &str) -> AssetMeta {
         ShardFileType::Texture => {
             let tex_meta = TextureMetadata {
                 resolution_multiplier: Some(1.0),
-                include_alpha: Some(false),
+                include_alpha: Some(true),
                 uv: Some((0.0, 0.0, 1.0, 1.0)),
                 target: format!("{}.TARGET", asset_path),
             };

@@ -40,7 +40,7 @@ impl TextureMetadata {
     }
 
     pub fn get_include_alpha(&self) -> bool {
-        self.include_alpha.unwrap_or(false)
+        self.include_alpha.unwrap_or(true)
     }
 
     pub fn get_target(&self) -> &str {
@@ -59,7 +59,7 @@ impl TextureMetadata {
                 return TextureFormat::RGB8;
             }
         } else {
-            TextureFormat::RGB8
+            TextureFormat::RGBA8
         }
     }
 }
