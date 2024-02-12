@@ -141,6 +141,10 @@ impl TextureMeta {
         let texture = self.texture.lock().unwrap();
         return texture.get_version();
     }
+
+    pub fn get_uv(&self) -> (f32, f32, f32, f32) {
+        self.uv
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

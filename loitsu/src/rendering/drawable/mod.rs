@@ -25,6 +25,27 @@ pub const QUAD_VERTICES: &[Vertex] = &[
     }, // D
 ];
 
+pub fn get_quad_vertices(uv: (f32, f32, f32, f32)) -> [Vertex; 4] {
+    [
+        Vertex {
+            position: [-0.5, 0.5, 0.0],
+            tex_coords: [uv.0, uv.1],
+        }, // A
+        Vertex {
+            position: [-0.5, -0.5, 0.0],
+            tex_coords: [uv.0, uv.3],
+        }, // B
+        Vertex {
+            position: [0.5, 0.5, 0.0],
+            tex_coords: [uv.2, uv.1],
+        }, // C
+        Vertex {
+            position: [0.5, -0.5, 0.0],
+            tex_coords: [uv.2, uv.3],
+        }, // D
+    ]
+}
+
 pub const QUAD_INDICES: &[u16] = &[0, 1, 2, 2, 1, 3];
 
 pub enum DrawablePrototype {

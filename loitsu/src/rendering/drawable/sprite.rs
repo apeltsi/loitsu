@@ -1,4 +1,4 @@
-use super::{Drawable, TransformUniform, QUAD_INDICES, QUAD_VERTICES};
+use super::{get_quad_vertices, Drawable, TransformUniform, QUAD_INDICES, QUAD_VERTICES};
 use crate::{
     asset_management::{
         asset::Asset, asset_reference::AssetReference, texture_asset::TextureMeta, AssetManager,
@@ -274,6 +274,17 @@ impl SpriteDrawable {
             return;
         }
         let tex_view = tex_view.unwrap();
+        // update vertex buffer
+        {
+            let vertices = get_quad_vertices(self.meta_asset.as_ref().unwrap().get_uv());
+            self.vertex_buffer = Some(device.create_buffer_init(
+                &wgpu::util::BufferInitDescriptor {
+                    label: Some("Sprite Vertex Buffer"),
+                    contents: bytemuck::cast_slice(&vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                },
+            ));
+        }
         self.bind_group =
             Some(
                 device.create_bind_group(&wgpu::BindGroupDescriptor {

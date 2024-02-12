@@ -216,7 +216,7 @@ impl AssetManager {
                         } else {
                             // we should actually return the meta instead of the asset
                             // but we'll still have to add the asset to the asset manager
-                            let mut aref = AssetReference::new(asset);
+                            let aref = AssetReference::new(asset);
                             self_assets.lock().unwrap().assets.insert(
                                 format!("{}.TARGET", name.to_owned()),
                                 Arc::new(Mutex::new(aref)),
