@@ -1,6 +1,11 @@
-use super::AssetError;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
-pub struct ImageAsset {
+use super::{asset::Asset, asset_reference::AssetReference, AssetError};
+
+pub struct TextureAsset {
     name: String,
     rgba: image::RgbaImage,
     texture: Option<wgpu::Texture>,
@@ -8,7 +13,7 @@ pub struct ImageAsset {
     dimensions: (u32, u32),
 }
 
-impl ImageAsset {
+impl TextureAsset {
     pub fn get_texture(&self) -> Option<&wgpu::Texture> {
         self.texture.as_ref()
     }
@@ -16,11 +21,12 @@ impl ImageAsset {
     pub fn get_texture_view(&self) -> Option<&wgpu::TextureView> {
         self.texture_view.as_ref()
     }
-    pub fn from_bytes(bytes: Vec<u8>, name: &str) -> ImageAsset {
+
+    pub fn from_bytes(bytes: Vec<u8>, name: &str) -> TextureAsset {
         let image = image::load_from_memory(&bytes).unwrap();
         let image = image.to_rgba8();
         let dimensions = image.dimensions();
-        ImageAsset {
+        TextureAsset {
             name: name.to_string(),
             rgba: image,
             dimensions,
@@ -98,9 +104,62 @@ impl ImageAsset {
     }
 }
 
+#[derive(Clone)]
+pub struct TextureMeta {
+    target: String,
+    texture: Arc<Mutex<AssetReference>>,
+    uv: (f32, f32, f32, f32),
+    format: TextureFormat,
+}
+
+impl TextureMeta {
+    pub fn new(target: &str, uv: (f32, f32, f32, f32), format: TextureFormat) -> TextureMeta {
+        TextureMeta {
+            target: target.to_string(),
+            texture: Arc::new(Mutex::new(AssetReference::new(Arc::new(Mutex::new(
+                Asset::None,
+            ))))),
+            uv,
+            format,
+        }
+    }
+
+    pub fn initialize(
+        &mut self,
+        assets: &HashMap<String, Arc<Mutex<AssetReference>>>,
+    ) -> Result<(), AssetError> {
+        self.texture = assets.get(&self.target).expect("TextureMeta target not found! The texture meta's target should be in the same shard as the meta").clone();
+        Ok(())
+    }
+
+    pub fn get_texture(&self) -> Result<Arc<Mutex<Asset>>, AssetError> {
+        let texture = self.texture.lock().unwrap();
+        Ok(texture.get_asset())
+    }
+
+    pub fn get_texture_version(&self) -> u32 {
+        let texture = self.texture.lock().unwrap();
+        return texture.get_version();
+    }
+
+    pub fn get_uv(&self) -> (f32, f32, f32, f32) {
+        self.uv
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TextureFormat {
+    RGBA8,
+    RGBA16,
+    RGBA32,
+    RGB8,
+    RGB16,
+    RGB32,
+}
+
 // i know this looks bad just lemme cook
 // (really feel like this will be a problem in the future)
 #[cfg(target_arch = "wasm32")]
-unsafe impl Sync for ImageAsset {}
+unsafe impl Sync for TextureAsset {}
 #[cfg(target_arch = "wasm32")]
-unsafe impl Send for ImageAsset {}
+unsafe impl Send for TextureAsset {}

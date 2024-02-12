@@ -2,12 +2,10 @@ use loitsu::asset_management::static_shard::StaticShard;
 use loitsu::scene_management::Scene;
 use loitsu::scripting::ScriptingSource;
 use loitsu::Preferences;
-use loitsu_asset_gen::{handle_override, AssetOverride};
+use loitsu_asset_gen::resolve_asset;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
-use std::fs::File;
 use std::hash::{Hash, Hasher};
-use std::io::Read;
 
 #[derive(Debug, Clone)]
 pub struct Shard {
@@ -93,23 +91,16 @@ impl Shard {
         Some(others)
     }
 
-    pub async fn encode(&self, overrides: &HashMap<String, AssetOverride>) -> Vec<u8> {
+    pub async fn encode(&self) -> Vec<u8> {
         let mut path = std::env::current_dir().unwrap();
         path.push("assets");
         let mut actual_shard = loitsu::asset_management::shard::Shard::new(self.name.clone());
         for asset in &self.assets {
-            // lets read the raw file
-            let mut file_path = path.clone();
-            file_path.push(asset.clone());
-            let mut file =
-                File::open(file_path.clone()).expect(format!("Unable to open {}", asset).as_str());
-            let mut data = Vec::new();
-            file.read_to_end(&mut data).unwrap();
-            // lets check if we have an override
-            if let Some(override_data) = overrides.get(asset) {
-                data = handle_override(file_path, data, override_data).await;
-            }
-            actual_shard.add_file(asset.to_string(), data);
+            let mut asset_path = path.clone();
+            asset_path.push(asset);
+            resolve_asset(&mut actual_shard, asset, &asset_path)
+                .await
+                .unwrap();
         }
         actual_shard.encode()
     }

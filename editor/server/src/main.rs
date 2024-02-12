@@ -1,5 +1,7 @@
+use loitsu::asset_management::shard::guess_file_type;
+use loitsu::asset_management::AssetMetaPair;
 use loitsu::Preferences;
-use loitsu_asset_gen::{get_asset_overrides, handle_override};
+use loitsu_asset_gen::{default_meta, perform_pre_processing};
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
@@ -12,7 +14,6 @@ use warp::Filter;
 async fn main() {
     let asset_path = std::env::current_dir().unwrap().join("assets");
     let preferences = parse_preferences(asset_path.clone());
-    let overrides = get_asset_overrides(&asset_path.clone());
 
     let exe_path = std::env::current_exe().unwrap();
     let path = exe_path.parent().unwrap().join("editor_assets");
@@ -72,7 +73,6 @@ async fn main() {
             use tokio::fs::File;
             use tokio::io::AsyncReadExt;
             let asset_path = asset_path_clone.clone();
-            let overrides = overrides.clone();
             async move {
                 let mut path = asset_path;
                 path.push(tail.as_str());
@@ -80,17 +80,27 @@ async fn main() {
                 if !path.exists() {
                     return Ok::<_, warp::Rejection>(Response::builder().status(404).body(vec![]));
                 }
-                let mut file = File::open(path).await.unwrap();
+                let mut file = File::open(&path).await.unwrap();
                 let mut data = Vec::new();
                 file.read_to_end(&mut data).await.unwrap();
-                if !overrides.get(tail.as_str()).is_none() {
-                    data = handle_override(
-                        tail.as_str().into(),
-                        data,
-                        overrides.get(tail.as_str()).unwrap(),
-                    )
-                    .await;
+                // now lets check if a .meta file exists for this asset
+                let mut meta_path = path.clone();
+                meta_path.set_extension("meta");
+                let file_type = guess_file_type(&path.to_str().unwrap());
+                let mut meta = default_meta(&file_type, tail.as_str());
+                if meta_path.exists() {
+                    let mut file = File::open(meta_path).await.unwrap();
+                    // deserialize the json
+                    let mut data = Vec::new();
+                    file.read_to_end(&mut data).await.unwrap();
+                    meta = serde_json::from_slice(&data).unwrap();
                 }
+                let asset_meta = AssetMetaPair {
+                    asset: perform_pre_processing(&path, &meta).await,
+                    meta,
+                };
+
+                let data = bitcode::encode(&asset_meta).unwrap();
                 Ok::<_, warp::Rejection>(
                     Response::builder()
                         .header(

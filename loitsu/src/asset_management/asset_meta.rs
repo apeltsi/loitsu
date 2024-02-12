@@ -1,0 +1,65 @@
+use super::texture_asset::TextureFormat;
+
+#[cfg_attr(
+    feature = "json_preference_parse",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+#[cfg_attr(feature = "json_preference_parse", serde(untagged))]
+#[derive(Debug, Clone, PartialEq, bitcode::Encode, bitcode::Decode)]
+pub enum AssetMeta {
+    None, // used mainly in asset-gen to indicate that the asset doesn't have any form of metadata
+    TextureMeta(TextureMetadata),
+}
+
+impl AssetMeta {
+    pub fn add_target_suffix(&mut self, suffix: &str) {
+        match self {
+            AssetMeta::TextureMeta(tex_meta) => {
+                tex_meta.target.push_str(suffix);
+            }
+            _ => {}
+        }
+    }
+}
+
+#[cfg_attr(
+    feature = "json_preference_parse",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+#[derive(Debug, Clone, PartialEq, bitcode::Encode, bitcode::Decode)]
+pub struct TextureMetadata {
+    pub resolution_multiplier: Option<f32>,
+    pub include_alpha: Option<bool>,
+    pub uv: Option<(f32, f32, f32, f32)>,
+    pub target: String,
+}
+
+impl TextureMetadata {
+    pub fn get_resolution_multiplier(&self) -> f32 {
+        self.resolution_multiplier.unwrap_or(1.0)
+    }
+
+    pub fn get_include_alpha(&self) -> bool {
+        self.include_alpha.unwrap_or(true)
+    }
+
+    pub fn get_target(&self) -> &str {
+        &self.target
+    }
+
+    pub fn get_uv(&self) -> (f32, f32, f32, f32) {
+        self.uv.unwrap_or((0.0, 0.0, 1.0, 1.0))
+    }
+
+    pub fn get_format(&self) -> TextureFormat {
+        if let Some(include_alpha) = self.include_alpha {
+            if include_alpha {
+                return TextureFormat::RGBA8;
+            } else {
+                return TextureFormat::RGB8;
+            }
+        } else {
+            TextureFormat::RGBA8
+        }
+    }
+}

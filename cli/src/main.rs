@@ -78,6 +78,9 @@ fn clean() {
     path.push("asset_cache");
     if path.exists() {
         fs::remove_dir_all(path.clone()).unwrap();
+        println!("loitsu cache has been cleared!");
+    } else {
+        println!("loitsu cache is already clean!");
     }
 }
 

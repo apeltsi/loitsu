@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use super::{asset::Asset, AssetError};
 
@@ -36,7 +39,8 @@ impl AssetReference {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
+        assets: &HashMap<String, Arc<Mutex<AssetReference>>>,
     ) -> Result<(), AssetError> {
-        self.asset.lock().unwrap().initialize(device, queue)
+        self.asset.lock().unwrap().initialize(device, queue, assets)
     }
 }
