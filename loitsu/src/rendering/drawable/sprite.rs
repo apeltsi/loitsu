@@ -165,7 +165,8 @@ impl<'b> Drawable<'b> for SpriteDrawable {
             self.sprite_dirty = false;
         }
         let asset_ref = self.asset_ref.clone().expect("Asset ref is undefined");
-        if self.asset_version < version_tuple(&asset_ref.lock().unwrap(), &self.meta_asset) {
+        let version_tuple = version_tuple(&asset_ref.lock().unwrap(), &self.meta_asset);
+        if self.asset_version < version_tuple {
             // we're outdated
             let asset_ref = asset_ref.lock().unwrap();
             let asset = asset_ref.get_asset();
@@ -213,7 +214,7 @@ impl<'b> Drawable<'b> for SpriteDrawable {
                 }
             }
             self.create_bind_group(device, &meta_asset);
-            self.asset_version = version_tuple(&asset_ref, &meta_asset);
+            self.asset_version = version_tuple;
         }
         if self.bind_group.is_none() {
             return; // Our texture probably hasn't loaded yet

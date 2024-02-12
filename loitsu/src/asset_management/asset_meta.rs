@@ -4,10 +4,22 @@ use super::texture_asset::TextureFormat;
     feature = "json_preference_parse",
     derive(serde::Serialize, serde::Deserialize)
 )]
+#[cfg_attr(feature = "json_preference_parse", serde(untagged))]
 #[derive(Debug, Clone, PartialEq, bitcode::Encode, bitcode::Decode)]
 pub enum AssetMeta {
     None, // used mainly in asset-gen to indicate that the asset doesn't have any form of metadata
     TextureMeta(TextureMetadata),
+}
+
+impl AssetMeta {
+    pub fn add_target_suffix(&mut self, suffix: &str) {
+        match self {
+            AssetMeta::TextureMeta(tex_meta) => {
+                tex_meta.target.push_str(suffix);
+            }
+            _ => {}
+        }
+    }
 }
 
 #[cfg_attr(

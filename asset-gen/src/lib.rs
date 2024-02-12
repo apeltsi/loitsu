@@ -14,12 +14,12 @@ use std::{
 pub fn get_asset_unique_hash(
     file_path: &PathBuf,
     file_data: &Vec<u8>,
-    asset_override: &AssetMeta,
+    asset_meta: &AssetMeta,
 ) -> String {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     hasher.write(file_path.to_str().unwrap().as_bytes());
     hasher.write(file_data);
-    hasher.write(bitcode::encode(asset_override).unwrap().as_slice());
+    hasher.write(bitcode::encode(asset_meta).unwrap().as_slice());
     format!("{:X}", hasher.finish())
 }
 
@@ -67,13 +67,15 @@ pub async fn resolve_asset(
     asset_path: &PathBuf,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let file_type = guess_file_type(asset_relative);
-    let file_meta_path = asset_path.with_extension("meta");
+    let extension = asset_path.extension().unwrap().to_str().unwrap();
+    let file_meta_path = asset_path.with_extension(format!("{}.meta", extension));
     let file_meta = if !file_meta_path.exists() {
         // get default meta for the file type
         default_meta(&file_type, asset_relative)
     } else {
         let file_meta_data = std::fs::read_to_string(file_meta_path)?;
-        let file_meta: AssetMeta = serde_json::from_str(file_meta_data.as_str())?;
+        let mut file_meta: AssetMeta = serde_json::from_str(file_meta_data.as_str())?;
+        file_meta.add_target_suffix(".TARGET");
         file_meta
     };
     if file_meta != AssetMeta::None {
