@@ -14,7 +14,7 @@ use crate::{asset_management::ASSET_MANAGER, util::scaling, ecs::RuntimeTransfor
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
-pub static mut TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
+pub static mut TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 
 static mut DEFAULT_SAMPLER: Option<wgpu::Sampler> = None;
 
@@ -57,17 +57,22 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, mut scripting: T,
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
     let swapchain_format = swapchain_capabilities.formats[0];
-
+    #[cfg(target_arch = "wasm32")]
     unsafe { TARGET_FORMAT = swapchain_format; }
+    #[cfg(not(target_arch = "wasm32"))]
+    unsafe { TARGET_FORMAT = swapchain_format.add_srgb_suffix(); }
 
     let mut config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        #[cfg(target_arch = "wasm32")]
         format: swapchain_format,
+        #[cfg(not(target_arch = "wasm32"))]
+        format: swapchain_format.remove_srgb_suffix(),
         width: size.width,
         height: size.height,
         present_mode: wgpu::PresentMode::AutoVsync,
         alpha_mode: swapchain_capabilities.alpha_modes[0],
-        view_formats: vec![],
+        view_formats: vec![unsafe { TARGET_FORMAT }],
         desired_maximum_frame_latency: 2
     };
     surface.configure(&device, &config);
@@ -586,7 +591,10 @@ pub fn render_frame(surface: &wgpu::Surface, device: &wgpu::Device,
         .expect("Failed to acquire next swap chain texture");
     let view = frame
         .texture
-        .create_view(&wgpu::TextureViewDescriptor::default());
+        .create_view(&wgpu::TextureViewDescriptor {
+            format: Some(unsafe { TARGET_FORMAT }),
+            ..Default::default()
+        });
 
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
     let clear_color = wgpu::Color::BLACK;
