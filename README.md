@@ -1,4 +1,4 @@
-![The loitsu logo](https://github.com/apeltsi/loitsu/assets/49206921/e9ae0cc1-896c-4120-9582-8ef7bae007b3)
+![The loitsu logo](https://github.com/apeltsi/loitsu/assets/49206921/40bd92ea-d96d-4c4c-be14-a3e784eb0c27)
 
 # loitsu
 
