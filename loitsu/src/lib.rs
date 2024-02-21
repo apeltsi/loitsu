@@ -101,7 +101,7 @@ pub fn init_engine() {
         console_log::init().expect("could not initialize logger");
     }
 
-    log!("Loitsu core starting up...");
+    log!("Loitsu core v{} starting up...", env!("CARGO_PKG_VERSION"));
     let ecs = Arc::new(RwLock::new(
         ecs::ECS::<scripting::rune_runtime::RuneInstance>::new(),
     ));
