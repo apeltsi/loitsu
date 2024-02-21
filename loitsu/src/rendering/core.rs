@@ -456,16 +456,15 @@ fn calculate_target_fps(window: &winit::window::Window) -> f32 {
     let monitor = window.current_monitor().unwrap();
     let video_mode = monitor.video_modes().next().unwrap();
     let refresh_rate = video_mode.refresh_rate_millihertz() as f32 / 1000.0;
-    return refresh_rate;
+    refresh_rate
 }
 
 #[allow(dead_code)]
 fn get_entity_screen_space_bounds(camera: &CameraState, rtransform: &mut RuntimeTransform, frame_num: u64) -> Option<(f32, f32, f32, f32)> {
-
     let (position, _rotation, scale) = rtransform.eval_transform(frame_num);
     let screen_pos = scaling::as_screen_pos(camera, position);
     let screen_scale = scaling::as_screen_scale(camera, scale);
-    return Some((screen_pos.0, screen_pos.1, screen_scale.0, screen_scale.1));
+    Some((screen_pos.0, screen_pos.1, screen_scale.0, screen_scale.1))
 }
 
 #[allow(dead_code)]
