@@ -4,7 +4,9 @@
 
 A cross-platform game engine written in Rust. Loitsu is designed to be able to support multiple implementation languages. Currently [Rune](https://rune-rs.github.io/) is the main scripting language, but more languages are planned.
 
-> :warning: Loitsu is very experimental, expect many API changes. 
+> [!WARNING]
+>
+> Loitsu is very experimental, expect many API changes. 
 
 ## Platform support
 
