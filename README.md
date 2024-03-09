@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="512" height="512" src="https://github.com/apeltsi/loitsu/assets/49206921/40bd92ea-d96d-4c4c-be14-a3e784eb0c27" alt="Atlas Logo">
+  <img width="512" height="512" src="https://github.com/apeltsi/loitsu/assets/49206921/40bd92ea-d96d-4c4c-be14-a3e784eb0c27" alt="Loitsu Logo">
 </p>
 
 # loitsu
