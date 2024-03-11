@@ -1,6 +1,7 @@
 import init, {resize} from "./{APP_NAME}.js";
 const loadingText = document.getElementById("loadingText");
 const log_container = document.getElementById("log_container");
+add_log("{APP_NAME}", "#00FF00", " is running in debug mode. Make a release build to disable logs.");
 export function set_status(status) {
     switch (status) {
         case 1:
@@ -20,6 +21,9 @@ export function set_status(status) {
 }
 
 export function add_log(prefix, color_hex, message) {
+    if ({IS_RELEASE}) {
+        return;
+    }
     let log = document.createElement("p");
     log.innerHTML = `<span style="color: ${color_hex};">${prefix}</span> ${message}`;
     log_container.appendChild(log);

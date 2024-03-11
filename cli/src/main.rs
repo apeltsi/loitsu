@@ -140,9 +140,9 @@ async fn build(target: &str, release: bool, run: bool, force: bool) {
         wasm_bindgen(&out_path, package_name.as_str());
         info!("Creating player...");
         // Lets copy the web player files
-        generate_player_files(&out_path, &package_name, &loitsu_version);
+        generate_player_files(&out_path, &package_name, &loitsu_version, release);
 
-        asset_builder::build_assets(&out_path.join("out"), force).await;
+        asset_builder::build_assets(&out_path.join("out"), force, release).await;
         if run {
             start_webserver(&out_path).await;
         } else {
@@ -158,7 +158,7 @@ async fn build(target: &str, release: bool, run: bool, force: bool) {
         } else {
             out_path.push("debug");
         }
-        asset_builder::build_assets(&out_path, force).await;
+        asset_builder::build_assets(&out_path, force, release).await;
         info!("Building native target...");
         build_with_args(vec![], release, run);
     } else {
@@ -166,15 +166,17 @@ async fn build(target: &str, release: bool, run: bool, force: bool) {
     }
 }
 
-fn generate_player_files(path: &PathBuf, app_name: &str, loitsu_version: &str) {
+fn generate_player_files(path: &PathBuf, app_name: &str, loitsu_version: &str, is_release: bool) {
     // First lets load the player html file located in /player
     let build_path = path.join("out");
     let raw_player_html = include_str!("../player/index.html");
     let build_date = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let release_value = if is_release { "true" } else { "false" };
     let player_html = raw_player_html
         .replace("{APP_NAME}", &app_name)
         .replace("{LOITSU_VERSION}", &loitsu_version)
-        .replace("{BUILD_DATE}", &build_date);
+        .replace("{BUILD_DATE}", &build_date)
+        .replace("{IS_RELEASE}", release_value);
 
     // Now lets write the html file to the output directory
     let out_str = build_path.to_str().unwrap();
@@ -186,7 +188,11 @@ fn generate_player_files(path: &PathBuf, app_name: &str, loitsu_version: &str) {
     // Finally lets copy the loitsu logo & js to the output directory
     let logo_bytes = include_bytes!("../player/loitsu.png");
     let dest_path = Path::new(&out_dir).join("loitsu.png");
-    let loitsu_js = include_str!("../player/loitsu-web.js").replace("{APP_NAME}", &app_name);
+    let loitsu_js = include_str!("../player/loitsu-web.js")
+        .replace("{APP_NAME}", &app_name)
+        .replace("{LOITSU_VERSION}", &loitsu_version)
+        .replace("{BUILD_DATE}", &build_date)
+        .replace("{IS_RELEASE}", release_value);
     let dest_path_js = Path::new(&out_dir).join("loitsu-web.js");
 
     fs::write(&dest_path, logo_bytes).expect("Unable to write file");

@@ -133,7 +133,7 @@ pub async fn perform_pre_processing(file_path: &PathBuf, asset_meta: &AssetMeta)
                 image::imageops::FilterType::Lanczos3,
             );
             let mut buffer: Vec<u8> = Vec::new();
-            img.write_to(&mut Cursor::new(&mut buffer), image::ImageOutputFormat::Png)
+            img.write_to(&mut Cursor::new(&mut buffer), image::ImageFormat::Png)
                 .unwrap();
             write_cached_asset(file_path, &file_data, asset_meta, &buffer);
             buffer

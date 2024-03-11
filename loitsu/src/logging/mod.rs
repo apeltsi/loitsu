@@ -37,12 +37,12 @@ macro_rules! error {
 
 #[macro_export]
 macro_rules! log_render {
-    ($($t:tt)*) => ($crate::logging::log("[LoiRender]", $crate::logging::Color::BrightCyan, &format_args!($($t)*).to_string()))
+    ($($t:tt)*) => ($crate::logging::log("[LoiRen]", $crate::logging::Color::BrightCyan, &format_args!($($t)*).to_string()))
 }
 
 #[macro_export]
 macro_rules! log_scripting {
-    ($($t:tt)*) => ($crate::logging::log("[LoiScripting]", $crate::logging::Color::Cyan, &format_args!($($t)*).to_string()))
+    ($($t:tt)*) => ($crate::logging::log("[LoiScript]", $crate::logging::Color::Cyan, &format_args!($($t)*).to_string()))
 }
 
 #[macro_export]

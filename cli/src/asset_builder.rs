@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::str;
 use walkdir::WalkDir;
 
-pub async fn build_assets(out_dir: &PathBuf, force: bool) {
+pub async fn build_assets(out_dir: &PathBuf, force: bool, release: bool) {
     let asset_path = std::env::current_dir().unwrap().join("assets");
     let shard_dir = out_dir.join("shards");
 
@@ -97,7 +97,7 @@ pub async fn build_assets(out_dir: &PathBuf, force: bool) {
     let mut total_size: usize = 0;
     let shard_count = shards.len();
     for shard in shards {
-        let data = shard.encode().await;
+        let data = shard.encode(release).await;
         total_size += data.len();
         let mut path = shard_dir.clone();
         path.push(shard.name);

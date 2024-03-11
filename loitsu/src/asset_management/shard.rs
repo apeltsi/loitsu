@@ -64,11 +64,17 @@ impl Shard {
         &self.name
     }
 
-    pub fn encode(&self) -> Vec<u8> {
+    pub fn encode(&self, release: bool) -> Vec<u8> {
         let uncompressed_bytes = bitcode::encode(&self).unwrap();
 
         // now lets compress it
-        let mut encoder = zstd::stream::Encoder::new(Vec::new(), 0).unwrap();
+        let mut encoder = if release {
+            let mut enc = zstd::stream::Encoder::new(Vec::new(), 20).unwrap();
+            enc.long_distance_matching(true).unwrap();
+            enc
+        } else {
+            zstd::stream::Encoder::new(Vec::new(), 0).unwrap()
+        };
         encoder.write_all(&uncompressed_bytes).unwrap();
         let compressed_bytes = encoder.finish().unwrap();
         compressed_bytes

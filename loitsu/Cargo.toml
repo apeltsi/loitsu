@@ -1,8 +1,8 @@
 [package]
 name = "loitsu"
-version = "0.4.1"
-edition = "2021"
-authors = ["Amos Peltonen"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
 
 [features]
 scene_generation = ["dep:serde_json", "dep:serde"]
@@ -12,24 +12,24 @@ editor = ["disable_common_ecs_methods", "scene_generation", "direct_asset_manage
 direct_asset_management = []
 
 [dependencies]
-env_logger = "0.11.1"
-rune = {version = "0.13.1", features = ["disable-io"]}
-winit = "0.29.10"
-raw-window-handle = "0.6.0"
+env_logger.workspace = true
+rune.workspace = true
+winit.workspace = true
+raw-window-handle.workspace = true
 serde_json = {version = "1.0", optional = true}
 serde = {version = "1.0", optional = true}
-bitcode = "0.5.1"
-lazy_static = "1.4.0"
-image = "0.24.7"
-bitflags = "2.4.1"
-bytemuck = {version = "1.14.0", features = ["derive"]}
-cgmath = "0.18.0"
+bitcode.workspace = true
+lazy_static.workspace = true
+image.workspace = true
+bitflags.workspace = true
+bytemuck.workspace = true
+cgmath.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
 console_log = "1.0.0"
-wasm-bindgen = "0.2.88"
-wasm-bindgen-futures = "0.4.39"
+wasm-bindgen.workspace = true
+wasm-bindgen-futures.workspace = true
 web-sys = {version = "0.3.64", features = ["Headers", "Request", "RequestInit", "RequestMode", "Response", "Window"]}
 wgpu = {version = "0.19.1", default-features = false, features = ["webgl", "wgsl"]}
 js-sys = "0.3.64"
@@ -40,6 +40,6 @@ instant = { version = "0.1", features = [ "wasm-bindgen" ] }
 wgpu = "0.19.1"
 zstd = "0.13"
 instant = "0.1"
-tokio = { version = "1.36", features=["full"]}
-colored = "2.0.4"
+tokio.workspace = true
 futures = "0.3.29"
+colored.workspace = true
