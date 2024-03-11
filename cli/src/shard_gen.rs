@@ -91,7 +91,7 @@ impl Shard {
         Some(others)
     }
 
-    pub async fn encode(&self) -> Vec<u8> {
+    pub async fn encode(&self, release: bool) -> Vec<u8> {
         let mut path = std::env::current_dir().unwrap();
         path.push("assets");
         let mut actual_shard = loitsu::asset_management::shard::Shard::new(self.name.clone());
@@ -102,7 +102,7 @@ impl Shard {
                 .await
                 .unwrap();
         }
-        actual_shard.encode()
+        actual_shard.encode(release)
     }
 
     pub fn find_intersection(&self, other: &Shard) -> Vec<String> {
