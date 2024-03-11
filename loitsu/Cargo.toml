@@ -1,8 +1,8 @@
 [package]
 name = "loitsu"
-version = "0.4.1"
-edition = "2021"
-authors = ["Amos Peltonen"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
 
 [features]
 scene_generation = ["dep:serde_json", "dep:serde"]

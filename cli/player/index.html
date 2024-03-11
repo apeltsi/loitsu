@@ -73,12 +73,12 @@
 			}
 			@keyframes logoSplash {
 				from {
-					transform: scale(0.8);
 					opacity: 0;
+                    filter: grayscale(0.7);
 				}
 				to {
-					transform: scale(1);
 					opacity: 1;
+                    filter: grayscale(0);
 				}
 			}
             @keyframes logFade {
@@ -101,7 +101,7 @@
 		<div class="loadingContainer" id="loading">
 			<img src="./loitsu.png" class="logo" alt="Loitsu Logo" />
 			<h1 id="loadingText">Loading Loitsu runtime...</h1>
-			<p>Loitsu web 0.1.2</p>
+			<p>Loitsu web 0.1.3</p>
 			<p>Loitsu runtime {LOITSU_VERSION}</p>
 			<p>Built on {BUILD_DATE}</p>
 		</div>
