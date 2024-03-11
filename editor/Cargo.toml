@@ -1,8 +1,8 @@
 [package]
 name = "loitsu-editor"
-version = "0.4.1"
-edition = "2021"
-authors = ["Amos Peltonen"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
 
 [dependencies]
 loitsu = { path = "../loitsu", features = ["editor"] }
