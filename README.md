@@ -14,6 +14,7 @@ A cross-platform game engine written in Rust. Loitsu is designed to be able to s
 
 - Linux (both Wayland and X11)
 - Windows
+- macOS
 - Web (WebGL)
 
 > Loitsu might work on other platforms, but is only tested on the above. Mobile support is not planned currently.
